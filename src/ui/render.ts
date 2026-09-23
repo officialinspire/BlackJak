@@ -25,6 +25,8 @@ interface AppModel {
   error: string | null;
 }
 
+type RoundTone = 'idle' | 'playing' | 'blackjack' | 'win' | 'loss' | 'push' | 'mixed';
+
 const initialProfile = loadProfile();
 
 const model: AppModel = {
@@ -61,13 +63,27 @@ function normalizedStake(): number {
   return model.selectedStake;
 }
 
+function roundTone(round: RoundState | null): RoundTone {
+  if (!round) return 'idle';
+  if (round.phase !== 'resolved') return 'playing';
+
+  const outcomes = new Set(round.results.map((result) => result.outcome));
+  if (outcomes.size !== 1) return 'mixed';
+
+  const outcome = round.results[0]?.outcome;
+  if (outcome === 'blackjack' || outcome === 'win' || outcome === 'loss' || outcome === 'push') return outcome;
+  return 'mixed';
+}
+
 function menuMarkup(): string {
   return `
     <main id="app-main" class="screen menu-screen">
+      <div class="ambient-lamp ambient-lamp-menu" aria-hidden="true"></div>
       <section class="brand-lockup" aria-labelledby="game-title">
-        <p class="eyebrow">OFFICIAL INSPIRE PRESENTS</p>
-        <h1 id="game-title">${APP_NAME}</h1>
+        <div class="brand-kicker"><span></span><p>OFFICIAL INSPIRE PRESENTS</p><span></span></div>
+        <h1 id="game-title" aria-label="${APP_NAME}"><span>BLACK</span><em>JAK</em></h1>
         <p class="tagline">${APP_TAGLINE}</p>
+        <p class="brand-note">Private table. Fictional chips. Questionable judgment.</p>
       </section>
       <nav class="menu-grid" aria-label="BlackJak modes">
         ${button('Classic BlackJak', 'classic')}
@@ -88,6 +104,25 @@ function placeholderMarkup(title: string, copy: string): string {
         <p class="eyebrow">COMING IN A LATER PHASE</p>
         <h1>${title}</h1>
         <p>${copy}</p>
+      </section>
+    </main>`;
+}
+
+function settingsMarkup(): string {
+  return `
+    <main id="app-main" class="screen panel-screen">
+      <div class="ambient-lamp" aria-hidden="true"></div>
+      <button class="back-button" data-screen="menu">← Menu</button>
+      <section class="glass-panel settings-panel">
+        <p class="eyebrow">TABLE SETUP</p>
+        <h1>Settings</h1>
+        <div class="settings-list">
+          <div class="setting-row"><span><strong>Motion</strong><small>Animations follow your device preference.</small></span><b>System</b></div>
+          <div class="setting-row"><span><strong>Audio</strong><small>Sound and ambience arrive in Prompt 7.</small></span><b>Later</b></div>
+          <div class="setting-row"><span><strong>Haptics</strong><small>Mobile feedback arrives in Prompt 7.</small></span><b>Later</b></div>
+          <div class="setting-row"><span><strong>Classic rules</strong><small>3:2 blackjack · dealer stands on soft 17.</small></span><b>Locked</b></div>
+        </div>
+        <p class="panel-footnote">Reduced-motion mode is already respected automatically.</p>
       </section>
     </main>`;
 }
@@ -123,6 +158,12 @@ function handResultLabel(round: RoundState, hand: PlayerHand): string {
   return result ? result.outcome.toUpperCase() : hand.status.toUpperCase();
 }
 
+function outcomeClass(round: RoundState, hand: PlayerHand): string {
+  if (round.phase !== 'resolved') return '';
+  const outcome = round.results.find((entry) => entry.handId === hand.id)?.outcome;
+  return outcome ? `is-${outcome}` : '';
+}
+
 function playerHandsMarkup(round: RoundState | null): string {
   if (!round?.hands.length) {
     return `<div class="empty-hand" aria-hidden="true"><span>PLACE YOUR STAKE</span></div>`;
@@ -133,17 +174,42 @@ function playerHandsMarkup(round: RoundState | null): string {
       const evaluation = evaluateHand(hand.cards);
       const active = round.phase === 'player-turn' && index === round.activeHandIndex;
       return `
-        <section class="player-hand ${active ? 'is-active' : ''}" aria-label="Player hand ${index + 1}${active ? ', active' : ''}">
+        <section class="player-hand ${active ? 'is-active' : ''} ${evaluation.isBust ? 'is-bust' : ''} ${outcomeClass(round, hand)}" aria-label="Player hand ${index + 1}${active ? ', active' : ''}">
           <div class="hand-meta">
             <span>HAND ${index + 1}${round.hands.length > 1 ? ` / ${round.hands.length}` : ''}</span>
             <strong>${evaluation.total}</strong>
             <span class="hand-wager">${formatChips(hand.wager)} chips</span>
           </div>
-          <div class="cards">${hand.cards.map((card) => cardMarkup(card)).join('')}</div>
+          <div class="cards">${hand.cards.map((card, cardIndex) => cardMarkup(card, false, cardIndex + index * 2)).join('')}</div>
           <span class="hand-state">${handResultLabel(round, hand)}</span>
         </section>`;
     }).join('')}
   </div>`;
+}
+
+function resultBannerMarkup(round: RoundState | null): string {
+  if (!round || round.phase !== 'resolved') return '';
+  const tone = roundTone(round);
+  const net = round.results.reduce((sum, result) => sum + result.net, 0);
+  const netLabel = net === 0 ? '±0' : `${net > 0 ? '+' : ''}${formatChips(net)}`;
+  const titleMap: Record<Exclude<RoundTone, 'idle' | 'playing'>, string> = {
+    blackjack: 'BLACKJAK',
+    win: 'PAID',
+    loss: 'BUSTED',
+    push: 'PUSH',
+    mixed: 'SPLIT DECISION',
+  };
+  const detail = round.results.length > 1
+    ? round.results.map((result, index) => `H${index + 1} ${result.outcome.toUpperCase()}`).join(' · ')
+    : round.results[0]?.outcome.toUpperCase() ?? '';
+
+  return `
+    <div class="result-banner result-${tone}" aria-live="polite">
+      <span>ROUND RESULT</span>
+      <strong>${titleMap[tone as Exclude<RoundTone, 'idle' | 'playing'>]}</strong>
+      <b>${netLabel} chips</b>
+      <small>${detail}</small>
+    </div>`;
 }
 
 function bettingControlsMarkup(): string {
@@ -187,9 +253,11 @@ function classicMarkup(): string {
   const revealDealer = round?.phase === 'resolved';
   const dealerTotal = dealerCards.length ? (revealDealer ? evaluateHand(dealerCards).total : '?') : '—';
   const showActions = round?.phase === 'player-turn';
+  const tone = roundTone(round);
 
   return `
-    <main id="app-main" class="screen table-screen">
+    <main id="app-main" class="screen table-screen round-${tone}">
+      <div class="ambient-lamp ambient-lamp-table" aria-hidden="true"></div>
       <header class="table-header">
         <button class="back-button" data-screen="menu">← Menu</button>
         <div class="hud" aria-label="Player resources">
@@ -201,7 +269,7 @@ function classicMarkup(): string {
       <section class="table" aria-label="Classic BlackJak table">
         <div class="hand-zone dealer-zone">
           <div class="zone-label"><span>DEALER</span><strong>${dealerTotal}</strong></div>
-          <div class="cards dealer-cards">${dealerCards.length ? dealerCards.map((card, index) => cardMarkup(card, index === 1 && !revealDealer)).join('') : '<div class="empty-cards" aria-hidden="true"></div>'}</div>
+          <div class="cards dealer-cards">${dealerCards.length ? dealerCards.map((card, index) => cardMarkup(card, index === 1 && !revealDealer, index)).join('') : '<div class="empty-cards" aria-hidden="true"><span>DEALER</span></div>'}</div>
         </div>
 
         <div class="table-mark" aria-hidden="true">BLACK<span>JAK</span></div>
@@ -209,6 +277,7 @@ function classicMarkup(): string {
         <div class="hand-zone player-zone">
           ${playerHandsMarkup(round)}
         </div>
+        ${resultBannerMarkup(round)}
       </section>
 
       <section class="game-controls" aria-label="Classic BlackJak controls">
@@ -298,7 +367,7 @@ function render(): void {
       app().innerHTML = statsMarkup();
       break;
     case 'settings':
-      app().innerHTML = placeholderMarkup('Settings', 'Audio, haptics, motion, accessibility, and gameplay preferences will live here.');
+      app().innerHTML = settingsMarkup();
       break;
   }
 
