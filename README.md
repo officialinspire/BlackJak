@@ -6,7 +6,7 @@ BlackJak is a mobile-first blackjack game from OFFICIAL INSPIRE, inspired in per
 
 ## Current status
 
-**Prompts 0–2 implemented. Classic BlackJak is now playable.**
+**Prompts 0–3 implemented. Classic BlackJak is playable and now has its first full premium presentation pass.**
 
 Current demo features:
 
@@ -30,7 +30,13 @@ Current demo features:
 - persistent chip balance and Classic stats in versioned local storage
 - persistent hands / wins / losses / pushes / blackjacks
 - original HTML/CSS card faces and backs
-- basic deal animation with reduced-motion fallback
+- premium charcoal-felt / black-lacquer / brass-gold private-table visual system
+- redesigned title/menu, Stats panel, Settings shell, and zero-chip recovery presentation
+- engraved-style BlackJak card backs and premium cream playing-card faces
+- staggered card-deal motion with reduced-motion fallback
+- dedicated BLACKJAK / win / loss / push / split-decision result presentation
+- circular chip-style stake controls and polished action controls
+- responsive presentation tuned for 320px, 360px, 390px, 430px, tablet, and desktop widths
 - accessible focus states, semantic controls, live result feedback, and 44px+ touch targets
 - Vitest coverage for deck, hands, rules, round state, storage fallback, and session economy
 
@@ -38,7 +44,7 @@ Current demo features:
 
 See **[BlackJak-Development-Prompts.md](./BlackJak-Development-Prompts.md)**.
 
-Prompt 3 is the dedicated visual/presentation polish pass. Prompt 4 adds Jak's reactive dealer personality.
+Prompt 3 is complete. Prompt 4 adds Jak's data-driven reactive dealer personality and commentary layer.
 
 ## Local development
 
