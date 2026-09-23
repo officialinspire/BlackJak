@@ -6,7 +6,7 @@ BlackJak is a mobile-first blackjack game from OFFICIAL INSPIRE, inspired in per
 
 ## Current status
 
-**Prompts 0–10 implemented. BlackJak now includes the dedicated accessibility/mobile QA and robustness pass on top of the installable offline PWA, Classic, Jak's House, progression, feedback, stats, and Daily Hand.**
+**BlackJak Demo v0.1.0 release candidate. Prompts 0–11 are implemented, including Classic play, Jak's House, local progression, Daily Hand, audio/haptics, accessibility/mobile QA, offline PWA support, release smoke coverage, and CI validation.**
 
 Current demo features:
 
@@ -94,9 +94,40 @@ Current demo features:
 
 See **[BlackJak-Development-Prompts.md](./BlackJak-Development-Prompts.md)**.
 
-Prompt 10 is complete. Prompt 11 is the demo release-candidate and repository-cleanup pass.
+Prompt 11 is complete. The demo is at **v0.1.0 release-candidate** status; post-demo expansion work remains intentionally out of scope until this build is stable.
+
+## Controls
+
+Touch/click controls are always available. Keyboard users can Tab / Shift+Tab through the interface and use these shortcuts when a table action is available:
+
+- **H** — Hit
+- **S** — Stand
+- **D** — Double
+- **P** — Split
+- **N** — Deal / Deal Again / start the Daily Hand when available
+- **Esc** — return to the menu
+
+## Local progression and saves
+
+BlackJak stores chips, REP, achievements, stats, Daily Hand completion, and feedback settings locally in the browser. There is no account or backend requirement in v0.1.0. Clearing browser/site data removes that local progress.
+
+REP is a progression score only. It never changes deck order, odds, dealer behavior, or Classic blackjack payouts.
+
+## Install / PWA
+
+On a supported browser, load the production build once while online. When the browser exposes an install prompt, BlackJak can be installed as a standalone PWA. After the service worker has cached a successful production load, the app shell and local-first game state remain available offline.
+
+The target production path is:
+
+```text
+https://officialinspire.github.io/BlackJak/
+```
+
+GitHub Pages must first be enabled once at **Settings → Pages → Build and deployment → GitHub Actions** for that URL to deploy.
 
 ## Local development
+
+Requires **Node.js 22+**.
 
 ```bash
 npm install
@@ -111,21 +142,31 @@ Then open the local URL printed by Vite.
 npm test
 npm run typecheck
 npm run build
+npm run release:check
 ```
+
+`npm run release:check` is the v0.1.0 release gate and runs the complete test suite, explicit TypeScript validation, and the production PWA build.
 
 ## Project structure
 
 ```text
 src/
-  config/      App constants and stake configuration
-  game/        Pure blackjack rules, round state, and session economy
-  storage/     Versioned browser persistence and profile loading
-  styles/      Responsive visual system
-  types/       App/profile types
-  ui/          DOM rendering helpers/components
-tests/         Vitest rules and state/economy tests
-public/        Static assets
+  config/      App constants and release/game configuration
+  data/        Dealer dialogue, progression, and House modifier definitions
+  feedback/    Synthesized audio and haptic feedback
+  game/        Pure rules, round/session state, House mode, progression, and Daily Hand
+  pwa/         Install/update/network-status registration behavior
+  storage/     Versioned local persistence and safe hydration
+  styles/      Core, premium, mode-specific, PWA, and QA responsive styles
+  types/       App/profile/preference types
+  ui/          Card markup and DOM rendering/event flow
+tests/         Vitest engine, persistence, accessibility-markup, and release-smoke suites
+public/        Manifest, install icons, and Pages static files
+scripts/       Post-build service-worker generation
+.github/       CI and conditional GitHub Pages deployment workflow
 ```
+
+The repository intentionally has no runtime framework dependency beyond browser APIs; Vite, TypeScript, and Vitest are development dependencies.
 
 ## Classic BlackJak v1 rules contract
 
@@ -289,6 +330,35 @@ The responsive QA layer keeps controls at roughly 44px or larger, applies `touch
 An unfinished Classic or House wager is held in memory and committed only when the round resolves. Refreshing or abandoning an unresolved hand therefore restores the last committed bankroll rather than charging for a round that no longer exists. Malformed JSON, wrong-version storage envelopes, missing values, and blocked browser storage all fall back safely.
 
 
+## Current limitations
+
+- **Single-player/local-first demo:** no multiplayer, backend account system, cloud save, or global leaderboard.
+- **Browser-local persistence:** clearing site data removes chips, REP, stats, achievements, Daily completion, and settings.
+- **Classic v1 scope:** no insurance, surrender, side bets, or real-money functionality.
+- **Jak collaboration assets:** the current JG presentation is a placeholder-safe identity treatment; no unapproved photo likeness or cloned voice is included.
+- **PWA deployment dependency:** GitHub Pages must be enabled once in repository settings before the production URL can deploy.
+- **Automated browser E2E:** v0.1.0 uses deterministic engine/state tests plus GitHub Actions production-build validation; a full cross-browser/device automation lab is a future improvement.
+
+## Roadmap after v0.1.0
+
+Post-demo work is intentionally deferred until the release candidate is stable. Potential later work includes approved Jak Gold voice/likeness assets, additional dealer rooms, cosmetic card/chip themes, expanded House modifiers, richer Daily analytics, multiplayer/pass-and-play experiments, cloud saves, leaderboards, seasonal events, and deeper achievement content.
+
+See **[BlackJak-Development-Prompts.md](./BlackJak-Development-Prompts.md)** for the original staged development roadmap and **[CHANGELOG.md](./CHANGELOG.md)** for release history.
+
+## Release validation
+
+The v0.1.0 release-candidate pass reviews package scripts/dependencies, PWA configuration, deployment behavior, TODO/scaffold residue, repository assets, TypeScript diagnostics, test output, and production-build output.
+
+A dedicated release-smoke suite covers:
+- fresh profile/default bankroll and zero-chip refill
+- natural blackjack settlement, REP, stats, and achievement unlock
+- bust, Double, and Split resolution paths
+- profile/progression and feedback-settings persistence
+- Jak's House isolation and Gold Card scheduling
+- deterministic Daily Hand and one-award-per-date behavior
+
+GitHub Actions remains the source of truth for the final build gate.
+
 ## Practice-chip economy
 
 BlackJak is an entertainment game using **fictional practice chips and REP only**. Practice chips cannot be purchased or exchanged for money or prizes. If the local practice-chip balance reaches zero, the game provides a free refill to the baseline stack.
@@ -296,6 +366,12 @@ BlackJak is an entertainment game using **fictional practice chips and REP only*
 ## Design principle
 
 > **Don't reinvent blackjack. Reinvent the feeling of sitting at the table.**
+
+## Credits
+
+- **Design, development, and publishing:** OFFICIAL INSPIRE
+- **Jak Gold collaboration credit:** *Placeholder — replace with approved collaboration / likeness / voice credit before any build using those assets.*
+- The current v0.1.0 build uses original/project-safe interface art, a JG monogram placeholder, browser-synthesized audio, and no unapproved cloned voice or photo likeness.
 
 ## OFFICIAL INSPIRE
 
