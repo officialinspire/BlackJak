@@ -19,6 +19,7 @@ All notable changes to BlackJak are documented here.
 - Project version promoted from pre-release `0.0.1` to `0.1.0`.
 - Unresolved Classic/House stakes now remain in memory until resolution so refresh/abandon does not charge an unfinished round.
 - GitHub Actions now treats unavailable GitHub Pages as a safe deployment skip while preserving a built `dist/` artifact.
+- GitHub Actions dependencies were upgraded to current Node-24-era major versions to remove the runner deprecation warning.
 
 ### Validation
 - Release gate: `npm run release:check`.
