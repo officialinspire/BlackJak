@@ -6,7 +6,7 @@ BlackJak is a mobile-first blackjack game from OFFICIAL INSPIRE, inspired in per
 
 ## Current status
 
-**Prompts 0–4 implemented. Classic BlackJak is playable, visually polished, and now has a reactive Jak dealer personality layer.**
+**Prompts 0–5 implemented. Classic BlackJak is playable, polished, reactive, and now includes persistent REP, titles, and achievements.**
 
 Current demo features:
 
@@ -42,6 +42,14 @@ Current demo features:
 - reactions for blackjacks, dealer blackjacks, wins/losses, pushes, risky hits, doubles, splits, streaks, busts, refills, and return visits
 - compact JG monogram dealer identity placeholder; no unapproved photo likeness or cloned voice
 - commentary stays non-blocking and updates as a subtitle/status layer during play
+- persistent REP progression that never changes card odds or dealer behavior
+- REP rewards for wins, natural BlackJak, successful doubles, split sweeps, five-card wins, and survived risky hits
+- eight escalating titles from **Table Scrub** through **BlackJak**
+- nine deterministic achievements: BLACKJAK, WHY WOULD YOU DO THAT?, SPLIT PERSONALITY, GOLDEN BOY, HOUSE MONEY, I CAN QUIT ANYTIME, AGAIN., JAKPOT, and ABSOLUTE BULLSHII
+- persistent win/loss streak state and ten-hand blackjack history
+- compact title/REP meter on the table plus full progression display on Stats
+- non-blocking achievement unlock toasts
+- backward-compatible profile hydration for saves created before Prompt 5
 - accessible focus states, semantic controls, live result feedback, and 44px+ touch targets
 - Vitest coverage for deck, hands, rules, round state, storage fallback, and session economy
 
@@ -49,7 +57,7 @@ Current demo features:
 
 See **[BlackJak-Development-Prompts.md](./BlackJak-Development-Prompts.md)**.
 
-Prompt 4 is complete. Prompt 5 adds REP, titles, achievements, and long-term progression.
+Prompt 5 is complete. Prompt 6 adds the separate Jak's House arcade mode and modifier framework.
 
 ## Local development
 

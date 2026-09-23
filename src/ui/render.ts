@@ -1,6 +1,9 @@
 import { APP_NAME, APP_TAGLINE, MAX_STAKE, STAKE_OPTIONS } from '../config/constants';
+import { ACHIEVEMENTS, titleProgressForRep, type AchievementDefinition } from '../data/progression';
 import {
   allowedActions,
+  applyProgression,
+  emptyRoundProgressionContext,
   evaluateHand,
   getActiveHand,
   performAction,
@@ -8,12 +11,14 @@ import {
   reserveStake,
   settleResults,
   selectDialogue,
+  unlockAchievementIds,
   startRound,
   type DialogueEvent,
   type DialogueMemory,
   type DialogueSelection,
   type PlayerAction,
   type PlayerHand,
+  type RoundProgressionContext,
   type RoundState,
 } from '../game';
 import { loadProfile, saveProfile } from '../storage/profile';
@@ -29,8 +34,9 @@ interface AppModel {
   error: string | null;
   commentary: DialogueSelection;
   dialogueMemory: DialogueMemory;
-  winStreak: number;
-  lossStreak: number;
+  roundProgress: RoundProgressionContext;
+  achievementToasts: AchievementDefinition[];
+  lastRepEarned: number;
 }
 
 type RoundTone = 'idle' | 'playing' | 'blackjack' | 'win' | 'loss' | 'push' | 'mixed';
@@ -46,8 +52,9 @@ const model: AppModel = {
   error: null,
   commentary: initialDialogue.selection,
   dialogueMemory: initialDialogue.memory,
-  winStreak: 0,
-  lossStreak: 0,
+  roundProgress: emptyRoundProgressionContext(),
+  achievementToasts: [],
+  lastRepEarned: 0,
 };
 
 const app = (): HTMLElement => {
@@ -94,22 +101,6 @@ function roundTone(round: RoundState | null): RoundTone {
   return 'mixed';
 }
 
-function updateResultStreaks(round: RoundState): void {
-  const allWins = round.results.length > 0 && round.results.every((result) => result.outcome === 'win' || result.outcome === 'blackjack');
-  const allLosses = round.results.length > 0 && round.results.every((result) => result.outcome === 'loss');
-
-  if (allWins) {
-    model.winStreak += 1;
-    model.lossStreak = 0;
-  } else if (allLosses) {
-    model.lossStreak += 1;
-    model.winStreak = 0;
-  } else {
-    model.winStreak = 0;
-    model.lossStreak = 0;
-  }
-}
-
 function resolutionDialogueEvent(round: RoundState): DialogueEvent {
   const dealer = evaluateHand(round.dealer);
   const splitRound = round.hands.length > 1;
@@ -130,8 +121,8 @@ function resolutionDialogueEvent(round: RoundState): DialogueEvent {
 
   if (dealer.isBust && round.results.some((result) => result.outcome === 'win')) return 'dealer_bust';
   if (allLosses && round.hands.some((hand) => evaluateHand(hand.cards).isBust)) return 'player_bust';
-  if (model.winStreak >= 3) return 'winning_streak';
-  if (model.lossStreak >= 3) return 'losing_streak';
+  if (model.profile.progression.currentWinStreak >= 3) return 'winning_streak';
+  if (model.profile.progression.currentLossStreak >= 3) return 'losing_streak';
   if (round.results.every((result) => result.outcome === 'push')) return 'push';
   if (allWins) return 'player_win';
   if (allLosses) return 'player_loss';
@@ -139,6 +130,7 @@ function resolutionDialogueEvent(round: RoundState): DialogueEvent {
 }
 
 function menuMarkup(): string {
+  const title = titleProgressForRep(model.profile.rep);
   return `
     <main id="app-main" class="screen menu-screen">
       <div class="ambient-lamp ambient-lamp-menu" aria-hidden="true"></div>
@@ -154,6 +146,10 @@ function menuMarkup(): string {
         ${button('Stats', 'stats')}
         ${button('Settings', 'settings')}
       </nav>
+      <div class="menu-progression" aria-label="BlackJak progression">
+        <span>${title.current.name}</span>
+        <b>${model.profile.rep} REP</b>
+      </div>
       <div class="menu-bankroll" aria-label="Saved Classic BlackJak bankroll">Practice chips <strong>${formatChips(model.profile.chips)}</strong></div>
       <p class="fine-print">Fictional practice chips only. No purchases, cash-out, or real-money wagering.</p>
     </main>`;
@@ -193,12 +189,25 @@ function settingsMarkup(): string {
 
 function statsMarkup(): string {
   const stats = model.profile.stats;
+  const title = titleProgressForRep(model.profile.rep);
+  const unlocked = new Set(model.profile.progression.unlockedAchievements);
   return `
     <main id="app-main" class="screen panel-screen">
       <button class="back-button" data-screen="menu">← Menu</button>
       <section class="glass-panel stats-panel">
         <p class="eyebrow">CLASSIC BLACKJAK</p>
         <h1>Stats</h1>
+        <div class="progression-summary">
+          <div class="title-lockup">
+            <span>CURRENT TITLE</span>
+            <strong>${title.current.name}</strong>
+            <b>${model.profile.rep} REP</b>
+          </div>
+          <div class="rep-track" aria-label="${title.next ? `${Math.round(title.percent)} percent toward ${title.next.name}` : 'Maximum title reached'}">
+            <span style="width: ${title.percent}%"></span>
+          </div>
+          <small>${title.next ? `${title.next.minRep - model.profile.rep} REP to ${title.next.name}` : 'Top title unlocked.'}</small>
+        </div>
         <div class="stats-grid">
           ${statCard('Practice chips', formatChips(model.profile.chips))}
           ${statCard('Hands', stats.totalHands)}
@@ -207,6 +216,12 @@ function statsMarkup(): string {
           ${statCard('Pushes', stats.pushes)}
           ${statCard('Blackjacks', stats.blackjacks)}
         </div>
+        <div class="achievement-section">
+          <div class="section-heading"><span>ACHIEVEMENTS</span><b>${unlocked.size}/${ACHIEVEMENTS.length}</b></div>
+          <div class="achievement-grid">
+            ${ACHIEVEMENTS.map((achievement) => achievementCardMarkup(achievement, unlocked.has(achievement.id))).join('')}
+          </div>
+        </div>
         <p class="stats-note">Split hands are counted individually in win/loss statistics.</p>
       </section>
     </main>`;
@@ -214,6 +229,27 @@ function statsMarkup(): string {
 
 function statCard(label: string, value: string | number): string {
   return `<div class="stat-card"><span>${label}</span><strong>${value}</strong></div>`;
+}
+
+function achievementCardMarkup(achievement: AchievementDefinition, unlocked: boolean): string {
+  return `
+    <article class="achievement-card ${unlocked ? 'is-unlocked' : 'is-locked'}">
+      <span class="achievement-mark" aria-hidden="true">${unlocked ? '◆' : '◇'}</span>
+      <div><strong>${achievement.name}</strong><p>${achievement.description}</p></div>
+      <b>${unlocked ? 'UNLOCKED' : 'LOCKED'}</b>
+    </article>`;
+}
+
+function achievementToastMarkup(): string {
+  const achievement = model.achievementToasts[0];
+  if (!achievement) return '';
+  const extra = model.achievementToasts.length - 1;
+  return `
+    <div class="achievement-toast" role="status" aria-live="polite" aria-atomic="true">
+      <span class="toast-icon" aria-hidden="true">◆</span>
+      <div><small>ACHIEVEMENT UNLOCKED</small><strong>${achievement.name}</strong><p>${achievement.description}</p></div>
+      ${extra > 0 ? `<b>+${extra} MORE</b>` : ''}
+    </div>`;
 }
 
 function handResultLabel(round: RoundState, hand: PlayerHand): string {
@@ -266,6 +302,7 @@ function resultBannerMarkup(round: RoundState | null): string {
   const detail = round.results.length > 1
     ? round.results.map((result, index) => `H${index + 1} ${result.outcome.toUpperCase()}`).join(' · ')
     : round.results[0]?.outcome.toUpperCase() ?? '';
+  const repLine = model.lastRepEarned > 0 ? `+${model.lastRepEarned} REP` : '';
 
   return `
     <div class="result-banner result-${tone}" aria-live="polite">
@@ -273,6 +310,7 @@ function resultBannerMarkup(round: RoundState | null): string {
       <strong>${titleMap[tone as Exclude<RoundTone, 'idle' | 'playing'>]}</strong>
       <b>${netLabel} chips</b>
       <small>${detail}</small>
+      ${repLine ? `<em>${repLine}</em>` : ''}
     </div>`;
 }
 
@@ -318,15 +356,17 @@ function classicMarkup(): string {
   const dealerTotal = dealerCards.length ? (revealDealer ? evaluateHand(dealerCards).total : '?') : '—';
   const showActions = round?.phase === 'player-turn';
   const tone = roundTone(round);
+  const progression = titleProgressForRep(model.profile.rep);
 
   return `
     <main id="app-main" class="screen table-screen round-${tone}">
       <div class="ambient-lamp ambient-lamp-table" aria-hidden="true"></div>
       <header class="table-header">
         <button class="back-button" data-screen="menu">← Menu</button>
-        <div class="hud" aria-label="Player resources">
+        <div class="hud" aria-label="Player resources and progression">
           <span>CHIPS <strong>${formatChips(model.profile.chips)}</strong></span>
-          <span>REP <strong>${model.profile.rep}</strong></span>
+          <span class="title-pill">${progression.current.name}</span>
+          <span class="rep-pill">REP <strong>${model.profile.rep}</strong><i class="rep-mini-track" aria-hidden="true"><i style="width:${progression.percent}%"></i></i></span>
         </div>
       </header>
 
@@ -358,6 +398,7 @@ function classicMarkup(): string {
         ${showActions && round ? actionControlsMarkup(round) : bettingControlsMarkup()}
         <p class="practice-note">Practice chips have no monetary value.</p>
       </section>
+      ${achievementToastMarkup()}
     </main>`;
 }
 
@@ -382,14 +423,30 @@ function statusText(round: RoundState | null): string {
 
 function settleIfResolved(): void {
   if (!model.round || model.round.phase !== 'resolved') return;
-  persistProfile(settleResults(model.profile, model.round.results));
-  updateResultStreaks(model.round);
+
+  const settled = settleResults(model.profile, model.round.results);
+  const progression = applyProgression(settled, model.round, model.roundProgress);
+  persistProfile(progression.profile);
+  model.lastRepEarned = progression.repEarned;
+  model.achievementToasts = [...model.achievementToasts, ...progression.unlocked];
   say(resolutionDialogueEvent(model.round));
 }
 
 function dealRound(): void {
   const stake = normalizedStake();
   if (stake <= 0) throw new Error('Refill practice chips before dealing.');
+
+  model.achievementToasts = [];
+  model.lastRepEarned = 0;
+  model.roundProgress = emptyRoundProgressionContext();
+
+  if (model.profile.progression.currentLossStreak >= 5) {
+    const again = unlockAchievementIds(model.profile, ['again']);
+    if (again.unlocked.length > 0) {
+      persistProfile(again.profile);
+      model.achievementToasts = again.unlocked;
+    }
+  }
 
   const before = model.profile;
   const reserved = reserveStake(before, stake);
@@ -414,6 +471,7 @@ function takePlayerAction(action: PlayerAction): void {
   const hand = getActiveHand(model.round);
   const startingTotal = evaluateHand(hand.cards).total;
   const activeHandId = hand.id;
+  if (action === 'hit' && startingTotal === 20) model.roundProgress.hitOn20 = true;
   const before = model.profile;
   const additionalStake = action === 'double' || action === 'split' ? hand.wager : 0;
 
@@ -425,6 +483,13 @@ function takePlayerAction(action: PlayerAction): void {
 
   try {
     performAction(model.round, action, before.chips);
+
+    if (action === 'hit') {
+      const updatedHand = model.round.hands.find((candidate) => candidate.id === activeHandId);
+      if (updatedHand && !evaluateHand(updatedHand.cards).isBust && startingTotal >= 16) {
+        model.roundProgress.riskyHitSurvived = true;
+      }
+    }
 
     if (model.round.phase === 'resolved') {
       settleIfResolved();
@@ -508,6 +573,9 @@ function bindEvents(): void {
           persistProfile(refillPracticeChips(model.profile));
           model.selectedStake = 25;
           model.round = null;
+          model.roundProgress = emptyRoundProgressionContext();
+          model.achievementToasts = [];
+          model.lastRepEarned = 0;
           say('refill_chips');
         } else if (action) {
           takePlayerAction(action as PlayerAction);
