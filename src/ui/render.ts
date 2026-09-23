@@ -7,7 +7,11 @@ import {
   refillPracticeChips,
   reserveStake,
   settleResults,
+  selectDialogue,
   startRound,
+  type DialogueEvent,
+  type DialogueMemory,
+  type DialogueSelection,
   type PlayerAction,
   type PlayerHand,
   type RoundState,
@@ -23,11 +27,16 @@ interface AppModel {
   profile: PlayerProfile;
   selectedStake: number;
   error: string | null;
+  commentary: DialogueSelection;
+  dialogueMemory: DialogueMemory;
+  winStreak: number;
+  lossStreak: number;
 }
 
 type RoundTone = 'idle' | 'playing' | 'blackjack' | 'win' | 'loss' | 'push' | 'mixed';
 
 const initialProfile = loadProfile();
+const initialDialogue = selectDialogue(initialProfile.stats.totalHands > 0 ? 'return_player' : 'game_start');
 
 const model: AppModel = {
   screen: 'menu',
@@ -35,6 +44,10 @@ const model: AppModel = {
   profile: initialProfile,
   selectedStake: initialProfile.chips > 0 ? Math.min(25, initialProfile.chips) : 0,
   error: null,
+  commentary: initialDialogue.selection,
+  dialogueMemory: initialDialogue.memory,
+  winStreak: 0,
+  lossStreak: 0,
 };
 
 const app = (): HTMLElement => {
@@ -52,6 +65,12 @@ const formatChips = (value: number): string =>
 function persistProfile(profile: PlayerProfile): void {
   model.profile = profile;
   saveProfile(profile);
+}
+
+function say(event: DialogueEvent): void {
+  const next = selectDialogue(event, model.dialogueMemory);
+  model.commentary = next.selection;
+  model.dialogueMemory = next.memory;
 }
 
 function normalizedStake(): number {
@@ -73,6 +92,50 @@ function roundTone(round: RoundState | null): RoundTone {
   const outcome = round.results[0]?.outcome;
   if (outcome === 'blackjack' || outcome === 'win' || outcome === 'loss' || outcome === 'push') return outcome;
   return 'mixed';
+}
+
+function updateResultStreaks(round: RoundState): void {
+  const allWins = round.results.length > 0 && round.results.every((result) => result.outcome === 'win' || result.outcome === 'blackjack');
+  const allLosses = round.results.length > 0 && round.results.every((result) => result.outcome === 'loss');
+
+  if (allWins) {
+    model.winStreak += 1;
+    model.lossStreak = 0;
+  } else if (allLosses) {
+    model.lossStreak += 1;
+    model.winStreak = 0;
+  } else {
+    model.winStreak = 0;
+    model.lossStreak = 0;
+  }
+}
+
+function resolutionDialogueEvent(round: RoundState): DialogueEvent {
+  const dealer = evaluateHand(round.dealer);
+  const splitRound = round.hands.length > 1;
+  const allWins = round.results.every((result) => result.outcome === 'win' || result.outcome === 'blackjack');
+  const allLosses = round.results.every((result) => result.outcome === 'loss');
+
+  if (splitRound && allWins) return 'split_sweep';
+  if (splitRound && allLosses) return 'split_disaster';
+  if (round.results.some((result) => result.outcome === 'blackjack')) return 'player_blackjack';
+  if (dealer.isBlackjack && allLosses) return 'dealer_blackjack';
+
+  const doubledHand = round.hands.find((hand) => hand.doubled);
+  if (doubledHand) {
+    const doubledResult = round.results.find((result) => result.handId === doubledHand.id);
+    if (doubledResult?.outcome === 'win' || doubledResult?.outcome === 'blackjack') return 'double_win';
+    if (doubledResult?.outcome === 'loss') return 'double_loss';
+  }
+
+  if (dealer.isBust && round.results.some((result) => result.outcome === 'win')) return 'dealer_bust';
+  if (allLosses && round.hands.some((hand) => evaluateHand(hand.cards).isBust)) return 'player_bust';
+  if (model.winStreak >= 3) return 'winning_streak';
+  if (model.lossStreak >= 3) return 'losing_streak';
+  if (round.results.every((result) => result.outcome === 'push')) return 'push';
+  if (allWins) return 'player_win';
+  if (allLosses) return 'player_loss';
+  return 'idle';
 }
 
 function menuMarkup(): string {
@@ -120,6 +183,7 @@ function settingsMarkup(): string {
           <div class="setting-row"><span><strong>Motion</strong><small>Animations follow your device preference.</small></span><b>System</b></div>
           <div class="setting-row"><span><strong>Audio</strong><small>Sound and ambience arrive in Prompt 7.</small></span><b>Later</b></div>
           <div class="setting-row"><span><strong>Haptics</strong><small>Mobile feedback arrives in Prompt 7.</small></span><b>Later</b></div>
+          <div class="setting-row"><span><strong>Dealer commentary</strong><small>Reactive Jak lines are enabled and never block play.</small></span><b>On</b></div>
           <div class="setting-row"><span><strong>Classic rules</strong><small>3:2 blackjack · dealer stands on soft 17.</small></span><b>Locked</b></div>
         </div>
         <p class="panel-footnote">Reduced-motion mode is already respected automatically.</p>
@@ -268,8 +332,16 @@ function classicMarkup(): string {
 
       <section class="table" aria-label="Classic BlackJak table">
         <div class="hand-zone dealer-zone">
-          <div class="zone-label"><span>DEALER</span><strong>${dealerTotal}</strong></div>
+          <div class="dealer-identity-row">
+            <span class="dealer-avatar" aria-hidden="true">JG</span>
+            <span class="dealer-name"><b>JAK</b><small>HOUSE DEALER</small></span>
+            <strong class="dealer-total" aria-label="Dealer total">${dealerTotal}</strong>
+          </div>
           <div class="cards dealer-cards">${dealerCards.length ? dealerCards.map((card, index) => cardMarkup(card, index === 1 && !revealDealer, index)).join('') : '<div class="empty-cards" aria-hidden="true"><span>DEALER</span></div>'}</div>
+          <div class="dealer-commentary" role="status" aria-live="polite" aria-atomic="true" data-event="${model.commentary.event}">
+            <span class="dealer-quote-mark" aria-hidden="true">“</span>
+            <p>${model.commentary.text}</p>
+          </div>
         </div>
 
         <div class="table-mark" aria-hidden="true">BLACK<span>JAK</span></div>
@@ -311,6 +383,8 @@ function statusText(round: RoundState | null): string {
 function settleIfResolved(): void {
   if (!model.round || model.round.phase !== 'resolved') return;
   persistProfile(settleResults(model.profile, model.round.results));
+  updateResultStreaks(model.round);
+  say(resolutionDialogueEvent(model.round));
 }
 
 function dealRound(): void {
@@ -323,7 +397,11 @@ function dealRound(): void {
 
   try {
     model.round = startRound(stake);
-    settleIfResolved();
+    if (model.round.phase === 'resolved') {
+      settleIfResolved();
+    } else {
+      say('idle');
+    }
   } catch (error) {
     persistProfile(before);
     throw error;
@@ -334,6 +412,8 @@ function takePlayerAction(action: PlayerAction): void {
   if (!model.round || model.round.phase !== 'player-turn') throw new Error('Deal a hand first.');
 
   const hand = getActiveHand(model.round);
+  const startingTotal = evaluateHand(hand.cards).total;
+  const activeHandId = hand.id;
   const before = model.profile;
   const additionalStake = action === 'double' || action === 'split' ? hand.wager : 0;
 
@@ -345,7 +425,24 @@ function takePlayerAction(action: PlayerAction): void {
 
   try {
     performAction(model.round, action, before.chips);
-    settleIfResolved();
+
+    if (model.round.phase === 'resolved') {
+      settleIfResolved();
+    } else if (action === 'split') {
+      say('split_started');
+    } else if (action === 'hit') {
+      const updatedHand = model.round.hands.find((candidate) => candidate.id === activeHandId);
+      if (updatedHand) {
+        const updated = evaluateHand(updatedHand.cards);
+        if (updated.isBust) {
+          say('player_bust');
+        } else if (startingTotal >= 17 && startingTotal <= 20) {
+          say(`hit_${startingTotal}` as DialogueEvent);
+        } else if (startingTotal >= 16) {
+          say('survived_risky_hit');
+        }
+      }
+    }
   } catch (error) {
     if (additionalStake > 0) persistProfile(before);
     throw error;
@@ -379,6 +476,9 @@ function bindEvents(): void {
     element.addEventListener('click', () => {
       const screen = element.dataset.screen as AppScreen | undefined;
       if (!screen) return;
+      if (screen === 'classic' && model.screen !== 'classic') {
+        say(model.profile.stats.totalHands > 0 ? 'return_player' : 'game_start');
+      }
       model.screen = screen;
       model.error = null;
       render();
@@ -408,6 +508,7 @@ function bindEvents(): void {
           persistProfile(refillPracticeChips(model.profile));
           model.selectedStake = 25;
           model.round = null;
+          say('refill_chips');
         } else if (action) {
           takePlayerAction(action as PlayerAction);
         }

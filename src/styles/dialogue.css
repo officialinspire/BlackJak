@@ -1,0 +1,164 @@
+/* Prompt 4 — Jak dealer personality layer */
+
+.dealer-zone {
+  gap: .42rem;
+}
+
+.dealer-identity-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .48rem;
+  min-height: 34px;
+}
+
+.dealer-avatar {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-content: center;
+  border: 1px solid rgba(240,215,122,.58);
+  border-radius: 50%;
+  color: var(--bj-gold-bright);
+  background:
+    radial-gradient(circle at 38% 30%, rgba(240,215,122,.16), transparent 35%),
+    #0a0a09;
+  box-shadow: inset 0 0 0 2px rgba(214,182,80,.08), 0 5px 15px rgba(0,0,0,.3);
+  font-family: Georgia, serif;
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: -.05em;
+}
+
+.dealer-name {
+  display: grid;
+  line-height: 1;
+}
+
+.dealer-name b {
+  color: var(--bj-cream);
+  font-family: Georgia, serif;
+  font-size: .75rem;
+  letter-spacing: .12em;
+}
+
+.dealer-name small {
+  margin-top: .13rem;
+  color: var(--bj-muted);
+  font-size: .42rem;
+  font-weight: 800;
+  letter-spacing: .13em;
+}
+
+.dealer-total {
+  min-width: 27px;
+  height: 27px;
+  display: grid;
+  place-content: center;
+  margin-left: .15rem;
+  border: 1px solid rgba(214,182,80,.2);
+  border-radius: 999px;
+  color: var(--bj-gold-bright);
+  background: rgba(0,0,0,.25);
+  font-size: .72rem;
+}
+
+.dealer-commentary {
+  position: relative;
+  width: min(92%, 430px);
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: .38rem .7rem .38rem 1.15rem;
+  border: 1px solid rgba(214,182,80,.12);
+  border-radius: 999px;
+  background: rgba(6,6,6,.42);
+  box-shadow: inset 0 1px rgba(255,255,255,.018);
+}
+
+.dealer-commentary p {
+  margin: 0;
+  color: #d9d0bf;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(.66rem, 2.3vw, .82rem);
+  font-style: italic;
+  line-height: 1.25;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.dealer-quote-mark {
+  position: absolute;
+  left: .5rem;
+  top: .17rem;
+  color: rgba(240,215,122,.38);
+  font-family: Georgia, serif;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.dealer-commentary[data-event="player_blackjack"],
+.dealer-commentary[data-event="double_win"],
+.dealer-commentary[data-event="split_sweep"],
+.dealer-commentary[data-event="winning_streak"] {
+  border-color: rgba(240,215,122,.3);
+  background: linear-gradient(90deg, rgba(214,182,80,.055), rgba(6,6,6,.44), rgba(214,182,80,.055));
+}
+
+.dealer-commentary[data-event="player_bust"],
+.dealer-commentary[data-event="double_loss"],
+.dealer-commentary[data-event="split_disaster"],
+.dealer-commentary[data-event="losing_streak"] {
+  border-color: rgba(212,101,92,.2);
+}
+
+@media (max-width: 520px) {
+  .dealer-zone {
+    gap: .28rem;
+  }
+
+  .dealer-avatar {
+    width: 27px;
+    height: 27px;
+    font-size: .64rem;
+  }
+
+  .dealer-name b {
+    font-size: .68rem;
+  }
+
+  .dealer-name small {
+    font-size: .36rem;
+  }
+
+  .dealer-total {
+    width: 25px;
+    height: 25px;
+    min-width: 25px;
+    font-size: .66rem;
+  }
+
+  .dealer-commentary {
+    width: min(96%, 390px);
+    min-height: 30px;
+    padding: .3rem .55rem .3rem .95rem;
+  }
+
+  .dealer-commentary p {
+    font-size: .63rem;
+    line-height: 1.18;
+  }
+
+  .dealer-quote-mark {
+    left: .38rem;
+    top: .12rem;
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 350px) {
+  .dealer-commentary p {
+    font-size: .58rem;
+  }
+}

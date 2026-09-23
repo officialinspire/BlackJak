@@ -1,3 +1,4 @@
+export * from './dialogue';
 export * from './deck';
 export * from './hand';
 export * from './round';

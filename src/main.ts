@@ -1,5 +1,6 @@
 import './styles/main.css';
 import './styles/premium.css';
+import './styles/dialogue.css';
 import { initializeUI } from './ui/render';
 
 function boot(): void {
