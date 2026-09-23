@@ -6,6 +6,9 @@ import type { RoundState } from './types';
 export interface RoundProgressionContext {
   hitOn20: boolean;
   riskyHitSurvived: boolean;
+  riskyHits?: number;
+  doublesAttempted?: number;
+  splitsAttempted?: number;
 }
 
 export interface ProgressionUpdate {
@@ -17,6 +20,9 @@ export interface ProgressionUpdate {
 export const emptyRoundProgressionContext = (): RoundProgressionContext => ({
   hitOn20: false,
   riskyHitSurvived: false,
+  riskyHits: 0,
+  doublesAttempted: 0,
+  splitsAttempted: 0,
 });
 
 function cloneProgression(progression: ProgressionState): ProgressionState {
@@ -76,6 +82,20 @@ export function unlockAchievementIds(
   };
 }
 
+export function applyRepBonus(profile: PlayerProfile, amount: number): PlayerProfile {
+  const safe = Number.isFinite(amount) && amount > 0 ? Math.floor(amount) : 0;
+  if (safe === 0) return profile;
+
+  return {
+    ...profile,
+    rep: profile.rep + safe,
+    stats: {
+      ...profile.stats,
+      lifetimeRep: profile.stats.lifetimeRep + safe,
+    },
+  };
+}
+
 export function applyProgression(
   settledProfile: PlayerProfile,
   round: RoundState,
@@ -100,17 +120,38 @@ export function applyProgression(
   progression.recentBlackjackHands = [...progression.recentBlackjackHands, ...blackjackFlags].slice(-10);
 
   const repEarned = calculateRepReward(round, context);
-  let nextProfile: PlayerProfile = {
-    ...settledProfile,
-    rep: settledProfile.rep + repEarned,
-    progression,
-  };
-
-  const candidates: AchievementId[] = [];
   const splitSweep =
     round.hands.length > 1 &&
     round.results.length === round.hands.length &&
     round.results.every((result) => isWinningOutcome(result.outcome));
+
+  const stats = { ...settledProfile.stats };
+  stats.doublesAttempted += context.doublesAttempted ?? 0;
+  stats.splitsAttempted += context.splitsAttempted ?? 0;
+  stats.riskyHits += context.riskyHits ?? 0;
+  stats.doublesWon += round.hands.filter((hand) => {
+    const result = round.results.find((candidate) => candidate.handId === hand.id);
+    return hand.doubled && result ? isWinningOutcome(result.outcome) : false;
+  }).length;
+  if (splitSweep) stats.splitSweeps += 1;
+  stats.busts += round.hands.filter((hand) => evaluateHand(hand.cards).isBust).length;
+  stats.fiveCardWins += round.hands.filter((hand) => {
+    const result = round.results.find((candidate) => candidate.handId === hand.id);
+    return hand.cards.length >= 5 && result?.outcome === 'win';
+  }).length;
+  stats.longestWinStreak = Math.max(stats.longestWinStreak, progression.currentWinStreak);
+  stats.longestLossStreak = Math.max(stats.longestLossStreak, progression.currentLossStreak);
+  stats.highestChipBalance = Math.max(stats.highestChipBalance, settledProfile.chips);
+  stats.lifetimeRep += repEarned;
+
+  let nextProfile: PlayerProfile = {
+    ...settledProfile,
+    rep: settledProfile.rep + repEarned,
+    stats,
+    progression,
+  };
+
+  const candidates: AchievementId[] = [];
 
   if (round.results.some((result) => result.outcome === 'blackjack')) candidates.push('blackjak');
   if (context.hitOn20) candidates.push('why-would-you-do-that');

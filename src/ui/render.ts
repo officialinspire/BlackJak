@@ -1,16 +1,23 @@
 import { APP_NAME, APP_TAGLINE, MAX_STAKE, STAKE_OPTIONS } from '../config/constants';
+import { feedbackEngine, haptic, type FeedbackCue, type HapticCue } from '../feedback/feedback';
 import { HOUSE_MODIFIERS } from '../data/house';
 import { ACHIEVEMENTS, titleProgressForRep, type AchievementDefinition } from '../data/progression';
 import {
   allowedActions,
   applyProgression,
+  applyRepBonus,
+  completeDailyChallenge,
   completeHouseRound,
+  createDailyChallenge,
   createHouseState,
+  dailyShareText,
+  dailyStateForDate,
   emptyRoundProgressionContext,
   evaluateHand,
   getActiveHand,
   hotHandMultiplier,
   isGoldCard,
+  localDateKey,
   performAction,
   refillPracticeChips,
   replayHouseRound,
@@ -29,9 +36,11 @@ import {
   type RoundProgressionContext,
   type RoundState,
 } from '../game';
+import { loadFeedbackPreferences, saveFeedbackPreferences } from '../storage/preferences';
 import { loadProfile, saveProfile } from '../storage/profile';
 import type { AppScreen } from '../types/app';
-import type { PlayerProfile } from '../types/profile';
+import type { DailyOutcome, PlayerProfile } from '../types/profile';
+import type { FeedbackPreferences } from '../types/preferences';
 import { cardMarkup } from './card';
 
 interface AppModel {
@@ -48,11 +57,17 @@ interface AppModel {
   house: HouseState;
   houseLastBonusRep: number;
   houseTokenAwarded: boolean;
+  preferences: FeedbackPreferences;
+  dailyDateKey: string;
+  dailyRound: RoundState | null;
+  dailyShareStatus: string | null;
 }
 
 type RoundTone = 'idle' | 'playing' | 'blackjack' | 'win' | 'loss' | 'push' | 'mixed';
 
 const initialProfile = loadProfile();
+const initialPreferences = loadFeedbackPreferences();
+const initialDateKey = localDateKey();
 const initialDialogue = selectDialogue(initialProfile.stats.totalHands > 0 ? 'return_player' : 'game_start');
 
 const model: AppModel = {
@@ -69,6 +84,10 @@ const model: AppModel = {
   house: createHouseState(),
   houseLastBonusRep: 0,
   houseTokenAwarded: false,
+  preferences: initialPreferences,
+  dailyDateKey: initialDateKey,
+  dailyRound: null,
+  dailyShareStatus: null,
 };
 
 const app = (): HTMLElement => {
@@ -86,6 +105,35 @@ const formatChips = (value: number): string =>
 function persistProfile(profile: PlayerProfile): void {
   model.profile = profile;
   saveProfile(profile);
+}
+
+function persistPreferences(preferences: FeedbackPreferences): void {
+  model.preferences = preferences;
+  saveFeedbackPreferences(preferences);
+  feedbackEngine.syncAmbience(preferences, true);
+}
+
+function feedback(cue: FeedbackCue, vibration: HapticCue | null = 'tap'): void {
+  feedbackEngine.play(cue, model.preferences);
+  if (vibration) haptic(vibration, model.preferences);
+}
+
+function playRoundFeedback(round: RoundState, unlockedCount = 0): void {
+  const outcomes = round.results.map((result) => result.outcome);
+  if (outcomes.includes('blackjack')) {
+    feedback('blackjack', 'blackjack');
+  } else if (outcomes.length > 0 && outcomes.every((outcome) => outcome === 'win')) {
+    feedback('win', 'result');
+  } else if (outcomes.length > 0 && outcomes.every((outcome) => outcome === 'loss')) {
+    feedback('loss', 'result');
+  } else {
+    feedback('flip', 'result');
+  }
+
+  if (unlockedCount > 0 && typeof window !== 'undefined') {
+    window.setTimeout(() => feedbackEngine.play('achievement', model.preferences), 130);
+    haptic('achievement', model.preferences);
+  }
 }
 
 function say(event: DialogueEvent): void {
@@ -157,6 +205,7 @@ function menuMarkup(): string {
       <nav class="menu-grid" aria-label="BlackJak modes">
         ${button('Classic BlackJak · Standard', 'classic')}
         ${button("Jak's House · Arcade", 'house')}
+        ${button('Daily Hand · Challenge', 'daily')}
         ${button('Stats', 'stats')}
         ${button('Settings', 'settings')}
       </nav>
@@ -170,6 +219,13 @@ function menuMarkup(): string {
 }
 
 function settingsMarkup(): string {
+  const prefs = model.preferences;
+  const toggle = (key: 'master' | 'sfx' | 'ambience' | 'haptics', label: string, copy: string): string => `
+    <div class="setting-row">
+      <span><strong>${label}</strong><small>${copy}</small></span>
+      <button class="setting-toggle ${prefs[key] ? 'is-on' : ''}" data-setting-toggle="${key}" aria-pressed="${prefs[key]}">${prefs[key] ? 'ON' : 'OFF'}</button>
+    </div>`;
+
   return `
     <main id="app-main" class="screen panel-screen">
       <div class="ambient-lamp" aria-hidden="true"></div>
@@ -178,13 +234,19 @@ function settingsMarkup(): string {
         <p class="eyebrow">TABLE SETUP</p>
         <h1>Settings</h1>
         <div class="settings-list">
-          <div class="setting-row"><span><strong>Motion</strong><small>Animations follow your device preference.</small></span><b>System</b></div>
-          <div class="setting-row"><span><strong>Audio</strong><small>Sound and ambience arrive in Prompt 7.</small></span><b>Later</b></div>
-          <div class="setting-row"><span><strong>Haptics</strong><small>Mobile feedback arrives in Prompt 7.</small></span><b>Later</b></div>
+          <div class="setting-row"><span><strong>Motion</strong><small>Animations follow your device's reduced-motion preference.</small></span><b>System</b></div>
+          ${toggle('master', 'Master feedback', 'Master switch for synthesized sound and haptic feedback.')}
+          ${toggle('sfx', 'Sound effects', 'Cards, chips, buttons, results, and achievement stings.')}
+          ${toggle('ambience', 'Room ambience', 'Very quiet synthesized table-room hum after a user gesture.')}
+          ${toggle('haptics', 'Haptics', 'Defensive mobile vibration feedback where supported.')}
+          <div class="setting-row volume-setting">
+            <span><strong>Volume</strong><small>Synthesized sound level. The game remains fully usable muted.</small></span>
+            <label><span>${Math.round(prefs.volume * 100)}%</span><input type="range" min="0" max="100" step="5" value="${Math.round(prefs.volume * 100)}" data-setting-volume aria-label="Sound volume"></label>
+          </div>
           <div class="setting-row"><span><strong>Dealer commentary</strong><small>Reactive Jak lines are enabled and never block play.</small></span><b>On</b></div>
           <div class="setting-row"><span><strong>Classic rules</strong><small>3:2 blackjack · dealer stands on soft 17.</small></span><b>Locked</b></div>
         </div>
-        <p class="panel-footnote">Reduced-motion mode is already respected automatically.</p>
+        <p class="panel-footnote">Browser autoplay rules require a tap/click before audio can begin. No external audio files are used in this build.</p>
       </section>
     </main>`;
 }
@@ -193,6 +255,7 @@ function statsMarkup(): string {
   const stats = model.profile.stats;
   const title = titleProgressForRep(model.profile.rep);
   const unlocked = new Set(model.profile.progression.unlockedAchievements);
+  const winRate = stats.totalHands > 0 ? Math.round((stats.wins / stats.totalHands) * 100) : 0;
   return `
     <main id="app-main" class="screen panel-screen">
       <button class="back-button" data-screen="menu">← Menu</button>
@@ -217,6 +280,18 @@ function statsMarkup(): string {
           ${statCard('Losses', stats.losses)}
           ${statCard('Pushes', stats.pushes)}
           ${statCard('Blackjacks', stats.blackjacks)}
+          ${statCard('Win rate', `${winRate}%`)}
+          ${statCard('Doubles', stats.doublesAttempted)}
+          ${statCard('Doubles won', stats.doublesWon)}
+          ${statCard('Splits', stats.splitsAttempted)}
+          ${statCard('Split sweeps', stats.splitSweeps)}
+          ${statCard('Busts', stats.busts)}
+          ${statCard('Longest win streak', stats.longestWinStreak)}
+          ${statCard('Longest loss streak', stats.longestLossStreak)}
+          ${statCard('Peak chips', formatChips(stats.highestChipBalance))}
+          ${statCard('Lifetime REP', stats.lifetimeRep)}
+          ${statCard('Risky hits 16+', stats.riskyHits)}
+          ${statCard('Five-card wins', stats.fiveCardWins)}
         </div>
         <div class="achievement-section">
           <div class="section-heading"><span>ACHIEVEMENTS</span><b>${unlocked.size}/${ACHIEVEMENTS.length}</b></div>
@@ -532,6 +607,7 @@ function settleIfResolved(): void {
   model.lastRepEarned = progression.repEarned;
   model.achievementToasts = [...model.achievementToasts, ...progression.unlocked];
   say(resolutionDialogueEvent(model.round));
+  playRoundFeedback(model.round, progression.unlocked.length);
 }
 
 function settleHouseIfResolved(): void {
@@ -540,10 +616,7 @@ function settleHouseIfResolved(): void {
   const settled = settleResults(model.profile, model.round.results);
   const progression = applyProgression(settled, model.round, model.roundProgress);
   const houseResolution = completeHouseRound(model.house, model.round, progression.repEarned);
-  const withHouseBonus = {
-    ...progression.profile,
-    rep: progression.profile.rep + houseResolution.hotHandBonusRep,
-  };
+  const withHouseBonus = applyRepBonus(progression.profile, houseResolution.hotHandBonusRep);
 
   persistProfile(withHouseBonus);
   model.house = houseResolution.house;
@@ -552,6 +625,7 @@ function settleHouseIfResolved(): void {
   model.lastRepEarned = progression.repEarned + houseResolution.hotHandBonusRep;
   model.achievementToasts = [...model.achievementToasts, ...progression.unlocked];
   say(resolutionDialogueEvent(model.round));
+  playRoundFeedback(model.round, progression.unlocked.length);
 }
 
 function dealRound(): void {
@@ -576,6 +650,7 @@ function dealRound(): void {
 
   try {
     model.round = startRound(stake);
+    feedback('deal', 'deal');
     if (model.round.phase === 'resolved') {
       settleIfResolved();
     } else {
@@ -613,6 +688,7 @@ function dealHouseRound(): void {
     const started = startHouseRound(stake, model.house);
     model.house = started.house;
     model.round = started.round;
+    feedback('deal', 'deal');
 
     if (model.round.phase === 'resolved') {
       settleHouseIfResolved();
@@ -638,6 +714,7 @@ function runHouseReplay(): void {
     const replay = replayHouseRound(model.house);
     model.house = replay.house;
     model.round = replay.round;
+    feedback('deal', 'deal');
 
     if (model.round.phase === 'resolved') {
       settleHouseIfResolved();
@@ -663,6 +740,14 @@ function takePlayerAction(action: PlayerAction): void {
   if (!allowedActions(hand, before.chips).includes(action)) {
     throw new Error(`Action "${action}" is not currently allowed.`);
   }
+
+  if (action === 'hit' && startingTotal >= 16) model.roundProgress.riskyHits = (model.roundProgress.riskyHits ?? 0) + 1;
+  if (action === 'double') model.roundProgress.doublesAttempted = (model.roundProgress.doublesAttempted ?? 0) + 1;
+  if (action === 'split') model.roundProgress.splitsAttempted = (model.roundProgress.splitsAttempted ?? 0) + 1;
+
+  if (action === 'hit') feedback('flip', 'tap');
+  else if (action === 'double' || action === 'split') feedback('chip', 'tap');
+  else feedback('button', 'tap');
 
   if (additionalStake > 0) persistProfile(reserveStake(before, additionalStake));
 
@@ -713,6 +798,14 @@ function takeHouseAction(action: PlayerAction): void {
     throw new Error(`Action "${action}" is not currently allowed.`);
   }
 
+  if (action === 'hit' && startingTotal >= 16) model.roundProgress.riskyHits = (model.roundProgress.riskyHits ?? 0) + 1;
+  if (action === 'double') model.roundProgress.doublesAttempted = (model.roundProgress.doublesAttempted ?? 0) + 1;
+  if (action === 'split') model.roundProgress.splitsAttempted = (model.roundProgress.splitsAttempted ?? 0) + 1;
+
+  if (action === 'hit') feedback('flip', 'tap');
+  else if (action === 'double' || action === 'split') feedback('chip', 'tap');
+  else feedback('button', 'tap');
+
   if (additionalStake > 0) persistProfile(reserveStake(before, additionalStake));
 
   try {
@@ -748,6 +841,142 @@ function takeHouseAction(action: PlayerAction): void {
   }
 }
 
+function dailyOutcome(round: RoundState): DailyOutcome {
+  if (round.results.length === 1 && round.results[0]?.outcome === 'blackjack') return 'blackjack';
+  const net = round.results.reduce((sum, result) => sum + result.net, 0);
+  if (net > 0) return 'win';
+  if (net < 0) return 'loss';
+  return 'push';
+}
+
+function prepareDailyRound(): void {
+  model.dailyDateKey = localDateKey();
+  const state = dailyStateForDate(model.profile.daily, model.dailyDateKey);
+  if (state.completed) {
+    model.dailyRound = null;
+    return;
+  }
+  model.dailyRound = createDailyChallenge(model.dailyDateKey).round;
+  model.lastRepEarned = 0;
+  model.dailyShareStatus = null;
+}
+
+function completeDailyIfResolved(): void {
+  if (!model.dailyRound || model.dailyRound.phase !== 'resolved') return;
+  const outcome = dailyOutcome(model.dailyRound);
+  const completed = completeDailyChallenge(model.profile, model.dailyDateKey, outcome);
+  persistProfile(completed.profile);
+  model.lastRepEarned = completed.repAwarded;
+  playRoundFeedback(model.dailyRound, 0);
+}
+
+function takeDailyAction(action: PlayerAction): void {
+  if (!model.dailyRound || model.dailyRound.phase !== 'player-turn') throw new Error('Today\'s Daily Hand is not active.');
+  const hand = getActiveHand(model.dailyRound);
+  if (!allowedActions(hand, Number.POSITIVE_INFINITY).includes(action)) throw new Error(`Action "${action}" is not available.`);
+
+  if (action === 'hit') feedback('flip', 'tap');
+  else if (action === 'double' || action === 'split') feedback('chip', 'tap');
+  else feedback('button', 'tap');
+
+  performAction(model.dailyRound, action, Number.POSITIVE_INFINITY);
+  completeDailyIfResolved();
+}
+
+function dailyControlsMarkup(round: RoundState): string {
+  const hand = getActiveHand(round);
+  const valid = allowedActions(hand, Number.POSITIVE_INFINITY);
+  return `
+    <div class="action-bar daily-action-bar" aria-label="Daily Hand actions">
+      ${(['hit', 'stand', 'double', 'split'] as PlayerAction[])
+        .map((action) => `<button data-daily-action="${action}" ${valid.includes(action) ? '' : 'disabled'}>${action.toUpperCase()}</button>`)
+        .join('')}
+    </div>`;
+}
+
+function dailyMarkup(): string {
+  const today = localDateKey();
+  if (model.dailyDateKey !== today) {
+    model.dailyDateKey = today;
+    model.dailyRound = null;
+    model.dailyShareStatus = null;
+    model.lastRepEarned = 0;
+  }
+  const state = dailyStateForDate(model.profile.daily, today);
+  const challenge = createDailyChallenge(today);
+  const round = model.dailyRound;
+  const displayRound = round ?? challenge.round;
+  const revealDealer = Boolean(round?.phase === 'resolved');
+  const dealerCards = displayRound.dealer;
+  const playerHand = displayRound.hands[0];
+  const completed = state.completed;
+  const result = completed && state.outcome ? state.outcome.toUpperCase() : null;
+
+  return `
+    <main id="app-main" class="screen panel-screen daily-screen">
+      <div class="ambient-lamp" aria-hidden="true"></div>
+      <button class="back-button" data-screen="menu">← Menu</button>
+      <section class="glass-panel daily-panel">
+        <div class="daily-heading">
+          <div><p class="eyebrow">DAILY HAND · ${today}</p><h1>Same Table. Same Problem.</h1></div>
+          <span>+75 REP · ONCE TODAY</span>
+        </div>
+        <p class="daily-policy">The date + game version deterministically creates today's opening hand. Reloading before resolution regenerates the same challenge; once resolved, today's REP reward is locked.</p>
+        ${model.error ? `<p class="error-line" role="alert">${model.error}</p>` : ''}
+        <div class="daily-table">
+          <section>
+            <span>DEALER UP-CARD</span>
+            <div class="cards">${cardMarkup(dealerCards[0], false, 0)}${round ? cardMarkup(dealerCards[1], !revealDealer, 1) : ''}</div>
+          </section>
+          <div class="daily-vs">VS</div>
+          <section class="daily-player-zone">
+            <span>YOUR HAND</span>
+            ${round ? playerHandsMarkup(round) : `<div class="daily-starting-hand"><strong>${evaluateHand(playerHand.cards).total}</strong><div class="cards">${playerHand.cards.map((card,index)=>cardMarkup(card,false,index)).join('')}</div></div>`}
+          </section>
+        </div>
+        ${completed && !round ? `
+          <div class="daily-complete">
+            <small>TODAY'S RESULT</small><strong>${result}</strong>
+            <p>Daily streak: ${state.currentStreak} day${state.currentStreak === 1 ? '' : 's'} · Reward already claimed.</p>
+            <button class="primary-action" data-action="share-daily">Share Result</button>
+          </div>` : ''}
+        ${round ? `
+          <div class="daily-live">
+            <p class="status-line">${round.phase === 'resolved' ? `RESULT: ${dailyOutcome(round).toUpperCase()}${model.lastRepEarned ? ` · +${model.lastRepEarned} REP` : ''}` : `Your move · ${evaluateHand(getActiveHand(round).cards).total}`}</p>
+            ${round.phase === 'player-turn' ? dailyControlsMarkup(round) : '<button class="primary-action" data-action="share-daily">Share Result</button>'}
+          </div>` : ''}
+        ${!completed && !round ? '<button class="primary-action" data-action="start-daily">Play Today\'s Hand</button>' : ''}
+        ${model.dailyShareStatus ? `<p class="daily-share-status" role="status">${model.dailyShareStatus}</p>` : ''}
+      </section>
+    </main>`;
+}
+
+async function shareDailyResult(): Promise<void> {
+  const text = dailyShareText(model.profile, model.dailyDateKey);
+  try {
+    if (typeof navigator.share === 'function') {
+      await navigator.share({ text, title: 'BlackJak Daily Hand' });
+      model.dailyShareStatus = 'Shared.';
+    } else if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      model.dailyShareStatus = 'Result copied to clipboard.';
+    } else {
+      const area = document.createElement('textarea');
+      area.value = text;
+      area.style.position = 'fixed';
+      area.style.opacity = '0';
+      document.body.append(area);
+      area.select();
+      const copied = document.execCommand('copy');
+      area.remove();
+      model.dailyShareStatus = copied ? 'Result copied to clipboard.' : 'Copy is unavailable in this browser.';
+    }
+  } catch {
+    model.dailyShareStatus = 'Share cancelled or unavailable.';
+  }
+  render();
+}
+
 function render(): void {
   switch (model.screen) {
     case 'menu':
@@ -758,6 +987,9 @@ function render(): void {
       break;
     case 'house':
       app().innerHTML = houseMarkup();
+      break;
+    case 'daily':
+      app().innerHTML = dailyMarkup();
       break;
     case 'stats':
       app().innerHTML = statsMarkup();
@@ -775,6 +1007,8 @@ function bindEvents(): void {
     element.addEventListener('click', () => {
       const screen = element.dataset.screen as AppScreen | undefined;
       if (!screen) return;
+      feedbackEngine.activate();
+      feedback('button', 'tap');
       if ((screen === 'classic' || screen === 'house') && screen !== model.screen) {
         model.round = null;
         model.roundProgress = emptyRoundProgressionContext();
@@ -784,32 +1018,80 @@ function bindEvents(): void {
         model.houseTokenAwarded = false;
         say(model.profile.stats.totalHands > 0 ? 'return_player' : 'game_start');
       }
+      if (screen === 'daily' && screen !== model.screen) {
+        prepareDailyRound();
+        if (model.dailyRound) feedback('deal', 'deal');
+      }
       model.screen = screen;
       model.error = null;
+      feedbackEngine.syncAmbience(model.preferences, true);
       render();
     });
   });
 
   document.querySelectorAll<HTMLButtonElement>('[data-stake]').forEach((element) => {
     element.addEventListener('click', () => {
+      feedbackEngine.activate();
       const stake = element.dataset.stake;
       const next = stake === 'max' ? Math.min(model.profile.chips, MAX_STAKE) : Number(stake);
       if (Number.isFinite(next) && next > 0 && next <= model.profile.chips) {
         model.selectedStake = next;
         model.error = null;
+        feedback('chip', 'tap');
         render();
       }
     });
   });
 
+  document.querySelectorAll<HTMLButtonElement>('[data-setting-toggle]').forEach((element) => {
+    element.addEventListener('click', () => {
+      feedbackEngine.activate();
+      const key = element.dataset.settingToggle as 'master' | 'sfx' | 'ambience' | 'haptics' | undefined;
+      if (!key) return;
+      const next = { ...model.preferences, [key]: !model.preferences[key] };
+      persistPreferences(next);
+      feedback('button', 'tap');
+      render();
+    });
+  });
+
+  document.querySelectorAll<HTMLInputElement>('[data-setting-volume]').forEach((element) => {
+    element.addEventListener('input', () => {
+      const value = Math.max(0, Math.min(100, Number(element.value))) / 100;
+      persistPreferences({ ...model.preferences, volume: value });
+      const label = element.previousElementSibling;
+      if (label) label.textContent = `${Math.round(value * 100)}%`;
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-daily-action]').forEach((element) => {
+    element.addEventListener('click', () => {
+      feedbackEngine.activate();
+      model.error = null;
+      try {
+        const action = element.dataset.dailyAction as PlayerAction | undefined;
+        if (action) takeDailyAction(action);
+      } catch (error) {
+        model.error = error instanceof Error ? error.message : 'Unexpected Daily Hand error.';
+      }
+      render();
+    });
+  });
+
   document.querySelectorAll<HTMLButtonElement>('[data-action]').forEach((element) => {
     element.addEventListener('click', () => {
+      feedbackEngine.activate();
       const action = element.dataset.action;
       model.error = null;
       try {
         if (action === 'deal') {
           if (model.screen === 'house') dealHouseRound();
           else dealRound();
+        } else if (action === 'start-daily') {
+          prepareDailyRound();
+          feedback('deal', 'deal');
+        } else if (action === 'share-daily') {
+          void shareDailyResult();
         } else if (action === 'run-it-back') {
           runHouseReplay();
         } else if (action === 'refill') {
@@ -822,6 +1104,7 @@ function bindEvents(): void {
           model.houseLastBonusRep = 0;
           model.houseTokenAwarded = false;
           say('refill_chips');
+          feedback('chip', 'result');
         } else if (action) {
           if (model.screen === 'house') takeHouseAction(action as PlayerAction);
           else takePlayerAction(action as PlayerAction);

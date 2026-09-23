@@ -3,6 +3,7 @@ import './styles/premium.css';
 import './styles/dialogue.css';
 import './styles/progression.css';
 import './styles/house.css';
+import './styles/feedback-daily.css';
 import { initializeUI } from './ui/render';
 
 function boot(): void {

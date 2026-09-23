@@ -1,5 +1,6 @@
 export * from './dialogue';
 export * from './deck';
+export * from './daily';
 export * from './hand';
 export * from './house';
 export * from './progression';

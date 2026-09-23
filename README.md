@@ -6,7 +6,7 @@ BlackJak is a mobile-first blackjack game from OFFICIAL INSPIRE, inspired in per
 
 ## Current status
 
-**Prompts 0–6 implemented. Classic BlackJak remains standard, while Jak's House now provides a separate arcade rules mode with three isolated modifiers.**
+**Prompts 0–8 implemented. BlackJak now includes persistent synthesized audio/haptics settings, expanded lifetime stats, and a deterministic local Daily Hand challenge in addition to Classic and Jak's House.**
 
 Current demo features:
 
@@ -59,6 +59,16 @@ Current demo features:
 - **Hot Hand:** consecutive all-winning House rounds add +25% REP per win after the first, capped at a 2× REP multiplier; losses, pushes, and mixed split results reset it
 - live House modifier status cards, Gold Card presentation, Hot Hand bonus readout, and replay-token controls
 - House outcomes reuse the same chips, stats, achievements, and dealer personality while modifier logic stays separate
+- project-safe synthesized WebAudio cues for cards, chips, controls, wins, losses, blackjack, and achievements
+- optional synthesized room ambience with browser-autoplay-safe first-interaction activation
+- persistent master feedback, SFX, ambience, haptics, and volume preferences
+- defensive Vibration API feedback that silently degrades on unsupported browsers
+- expanded persistent stats: win rate, doubles attempted/won, splits, split sweeps, busts, longest streaks, peak chips, lifetime REP, risky 16+ hits, and five-card wins
+- deterministic **Daily Hand** challenge generated from local calendar date + stable challenge version
+- Daily Hand always generates a playable decision state rather than an auto-resolved opening natural
+- one scored Daily completion per local date with a flat +75 REP award; refreshes cannot repeatedly farm the reward
+- Daily Hand uses a virtual wager and does not alter practice chips or ordinary Classic/House win-loss stats
+- local Daily completion streak plus Web Share API result sharing with clipboard fallback
 - accessible focus states, semantic controls, live result feedback, and 44px+ touch targets
 - Vitest coverage for deck, hands, rules, round state, storage fallback, and session economy
 
@@ -66,7 +76,7 @@ Current demo features:
 
 See **[BlackJak-Development-Prompts.md](./BlackJak-Development-Prompts.md)**.
 
-Prompt 6 is complete. Prompt 7 adds audio, haptics, and the next game-feel pass.
+Prompts 7 and 8 are complete. Prompt 9 adds PWA/offline support and installability.
 
 ## Local development
 
@@ -138,6 +148,37 @@ Hot Hand changes **REP rewards only**, never deck order, card values, payouts, o
 - fifth and beyond: 2× cap
 
 A loss, push, or mixed split result resets the House Hot Hand streak.
+
+
+## Audio, haptics, and game feel
+
+Prompt 7 uses the browser's Web Audio API to synthesize lightweight original cues at runtime rather than downloading third-party sound packs. Supported cues include card/deal movement, chip/button feedback, win/loss/blackjack stings, and achievement unlocks.
+
+Audio begins only after a user gesture because browsers restrict autoplay. Settings persist locally:
+
+- Master feedback
+- SFX
+- Room ambience
+- Haptics
+- Volume
+
+Haptics use `navigator.vibrate()` defensively and never block gameplay when unsupported. Reduced-motion behavior remains independent of audio/haptic settings.
+
+## Daily Hand
+
+The **Daily Hand** is a local deterministic challenge and requires no backend.
+
+- Seed input: local `YYYY-MM-DD` date + `daily-v1` challenge version.
+- Everyone using the same build/date receives the same starting player hand and dealer up-card.
+- The generator skips opening states that auto-resolve so each Daily Hand contains an actual player decision.
+- Reloading before resolution recreates the same challenge.
+- The first resolved completion for a local date awards **+75 REP**.
+- Further refreshes/replays that date cannot award more Daily REP.
+- Daily uses a virtual 25-chip rules-engine wager for outcome math; it does **not** debit/credit the player's practice-chip bankroll.
+- Daily results do not inflate ordinary Classic/House win/loss statistics.
+- Completion streaks persist locally.
+- Sharing uses Web Share API when available and clipboard copy as fallback; no personal information is included.
+
 
 ## Practice-chip economy
 

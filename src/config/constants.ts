@@ -6,3 +6,5 @@ export const DEFAULT_CHIPS = 1000;
 export const DEFAULT_REP = 0;
 export const STAKE_OPTIONS = [10, 25, 50, 100] as const;
 export const MAX_STAKE = 250;
+export const DAILY_CHALLENGE_VERSION = 'daily-v1';
+export const DAILY_CHALLENGE_REP = 75;

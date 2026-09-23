@@ -1,0 +1,257 @@
+/* Prompts 7–8 — feedback settings, expanded stats, Daily Hand */
+
+.setting-toggle {
+  min-width: 58px;
+  min-height: 36px;
+  padding: .35rem .55rem;
+  border: 1px solid rgba(214,182,80,.2);
+  border-radius: 999px;
+  color: var(--bj-muted);
+  background: rgba(0,0,0,.26);
+  font-size: .58rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
+.setting-toggle.is-on {
+  color: #120e05;
+  border-color: var(--bj-gold-bright);
+  background: linear-gradient(180deg, #ecd36d, #ac8224);
+}
+
+.volume-setting label {
+  display: grid;
+  grid-template-columns: auto minmax(100px, 170px);
+  gap: .55rem;
+  align-items: center;
+}
+
+.volume-setting label > span {
+  min-width: 34px;
+  color: var(--bj-gold-bright);
+  font-size: .58rem;
+  font-weight: 900;
+  text-align: right;
+}
+
+.volume-setting input[type="range"] {
+  width: 100%;
+  accent-color: var(--bj-gold);
+}
+
+.daily-screen {
+  align-content: start;
+}
+
+.daily-panel {
+  width: min(100%, 820px);
+}
+
+.daily-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+}
+
+.daily-heading h1 {
+  margin-top: .3rem;
+  font-size: clamp(1.7rem, 7vw, 3.2rem);
+}
+
+.daily-heading > span {
+  flex: 0 0 auto;
+  padding: .34rem .5rem;
+  border: 1px solid rgba(240,215,122,.3);
+  border-radius: 999px;
+  color: var(--bj-gold-bright);
+  background: rgba(214,182,80,.05);
+  font-size: .5rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
+.daily-policy {
+  margin: .5rem 0 1rem !important;
+  color: var(--bj-muted) !important;
+  font-size: .68rem !important;
+  line-height: 1.45 !important;
+}
+
+.daily-table {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto minmax(0,1fr);
+  gap: .7rem;
+  align-items: center;
+  padding: .85rem;
+  border: 1px solid rgba(214,182,80,.22);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(214,182,80,.06), transparent 38%),
+    radial-gradient(ellipse at center, #171812, #0e0f0c 74%);
+  box-shadow: inset 0 0 50px rgba(0,0,0,.4);
+}
+
+.daily-table > section {
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: .42rem;
+}
+
+.daily-table > section > span {
+  color: var(--bj-muted);
+  font-size: .48rem;
+  font-weight: 900;
+  letter-spacing: .12em;
+}
+
+.daily-table > section > strong,
+.daily-starting-hand > strong {
+  color: var(--bj-gold-bright);
+  font-family: Georgia, serif;
+  font-size: 1rem;
+}
+
+.daily-starting-hand {
+  display: grid;
+  justify-items: center;
+  gap: .35rem;
+}
+
+.daily-vs {
+  color: rgba(240,215,122,.4);
+  font-family: Georgia, serif;
+  font-size: .78rem;
+  font-weight: 900;
+}
+
+.daily-player-zone {
+  width: 100%;
+}
+
+.daily-player-zone .player-hands {
+  width: 100%;
+}
+
+.daily-player-zone .player-hand {
+  padding: .25rem;
+}
+
+.daily-player-zone .hand-wager {
+  display: none;
+}
+
+.daily-player-zone .playing-card {
+  width: clamp(58px, 12vw, 82px);
+}
+
+.daily-live,
+.daily-complete {
+  display: grid;
+  gap: .55rem;
+  margin-top: .75rem;
+  padding: .75rem;
+  border: 1px solid rgba(214,182,80,.16);
+  border-radius: 12px;
+  background: rgba(0,0,0,.2);
+}
+
+.daily-complete {
+  justify-items: center;
+  text-align: center;
+}
+
+.daily-complete small {
+  color: var(--bj-muted);
+  font-size: .48rem;
+  font-weight: 900;
+  letter-spacing: .13em;
+}
+
+.daily-complete strong {
+  color: var(--bj-gold-bright);
+  font-family: Georgia, serif;
+  font-size: 1.55rem;
+}
+
+.daily-complete p {
+  margin: 0;
+  color: var(--bj-muted);
+  font-size: .64rem;
+}
+
+.daily-share-status {
+  margin: .55rem 0 0 !important;
+  color: var(--bj-gold-bright) !important;
+  font-size: .62rem !important;
+  text-align: center;
+}
+
+.daily-action-bar {
+  margin-top: .15rem;
+}
+
+.stats-panel {
+  width: min(100%, 880px);
+}
+
+@media (max-width: 620px) {
+  .daily-heading {
+    display: grid;
+  }
+
+  .daily-heading > span {
+    justify-self: start;
+  }
+
+  .daily-table {
+    grid-template-columns: 1fr;
+    gap: .3rem;
+  }
+
+  .daily-vs {
+    transform: rotate(90deg);
+  }
+
+  .daily-player-zone .player-hands.is-split {
+    gap: .15rem;
+  }
+
+  .daily-player-zone .player-hands.is-split .playing-card {
+    width: clamp(44px, 13vw, 58px);
+  }
+
+  .volume-setting {
+    align-items: start;
+  }
+
+  .volume-setting label {
+    grid-template-columns: 1fr;
+    justify-items: end;
+    min-width: 120px;
+  }
+
+  .volume-setting input[type="range"] {
+    min-width: 120px;
+  }
+}
+
+@media (max-width: 360px) {
+  .daily-panel {
+    padding-inline: .9rem;
+  }
+
+  .daily-table {
+    padding: .55rem;
+  }
+
+  .daily-player-zone .playing-card,
+  .daily-starting-hand .playing-card {
+    width: 54px;
+  }
+
+  .setting-row {
+    gap: .5rem;
+  }
+}

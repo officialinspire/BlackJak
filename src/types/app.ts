@@ -1,1 +1,1 @@
-export type AppScreen = 'menu' | 'classic' | 'house' | 'stats' | 'settings';
+export type AppScreen = 'menu' | 'classic' | 'house' | 'daily' | 'stats' | 'settings';
