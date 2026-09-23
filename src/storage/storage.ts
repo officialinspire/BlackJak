@@ -12,9 +12,15 @@ export const storage = {
     try {
       const raw = window.localStorage.getItem(keyFor(key));
       if (!raw) return fallback;
-      const parsed = JSON.parse(raw) as StoredEnvelope<T>;
-      if (parsed.version !== STORAGE_VERSION) return fallback;
-      return parsed.value;
+      const parsed = JSON.parse(raw) as unknown;
+      if (!parsed || typeof parsed !== 'object') return fallback;
+
+      const envelope = parsed as Partial<StoredEnvelope<T>>;
+      if (envelope.version !== STORAGE_VERSION || !Object.prototype.hasOwnProperty.call(envelope, 'value')) {
+        return fallback;
+      }
+
+      return envelope.value as T;
     } catch {
       return fallback;
     }

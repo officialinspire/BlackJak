@@ -6,7 +6,7 @@ BlackJak is a mobile-first blackjack game from OFFICIAL INSPIRE, inspired in per
 
 ## Current status
 
-**Prompts 0–9 implemented. BlackJak is now an installable offline-capable PWA with a GitHub Pages production build/deployment path in addition to Classic, Jak's House, progression, feedback, stats, and Daily Hand.**
+**Prompts 0–10 implemented. BlackJak now includes the dedicated accessibility/mobile QA and robustness pass on top of the installable offline PWA, Classic, Jak's House, progression, feedback, stats, and Daily Hand.**
 
 Current demo features:
 
@@ -78,13 +78,23 @@ Current demo features:
 - install prompt, offline-mode status, and update-available UI
 - GitHub Pages Actions workflow that installs dependencies, tests, typechecks, builds the PWA, uploads `dist/`, and deploys Pages
 - accessible focus states, semantic controls, live result feedback, and 44px+ touch targets
-- Vitest coverage for deck, hands, rules, round state, storage fallback, and session economy
+- stable keyboard focus restoration across full-screen rerenders and mode changes
+- keyboard shortcuts: **H** Hit, **S** Stand, **D** Double, **P** Split, **N** new/deal hand, **Esc** back to menu
+- screen-reader card objects with rank/suit names while visible suit symbols preserve non-color distinction
+- consolidated game-state live regions to avoid dealer/result/status announcement spam
+- stale-control guards that ignore detached buttons after rapid double taps/rerenders
+- unresolved Classic/House stakes stay in memory until resolution, so refresh/abandon does not permanently consume an unfinished wager
+- House modifier/session state rolls back when an unresolved House hand is abandoned
+- 320px/mobile text-overflow hardening, compact split-hand containment, safe-area/landscape fallbacks, and touch-action tuning
+- corrupted/malformed local-storage envelopes safely fall back instead of leaking invalid state
+- GitHub Actions now separates build health from Pages availability so a disabled Pages site does not turn a valid build into a failed workflow
+- Vitest coverage for deck, hands, rules, round state, storage corruption/fallback, accessible card markup, and session economy
 
 ## Development Roadmap
 
 See **[BlackJak-Development-Prompts.md](./BlackJak-Development-Prompts.md)**.
 
-Prompt 9 is complete. Prompt 10 is the dedicated accessibility, mobile QA, and bug-fix pass.
+Prompt 10 is complete. Prompt 11 is the demo release-candidate and repository-cleanup pass.
 
 ## Local development
 
@@ -235,15 +245,48 @@ The manifest includes standalone display mode, BlackJak theme/background colors,
 
 ### GitHub Pages deployment
 
-`.github/workflows/pages.yml` runs on pushes to `main` and manual dispatch. It:
+`.github/workflows/pages.yml` runs CI on pull requests, pushes to `main`, and manual dispatch. It:
 
 - installs dependencies with Node 22
 - runs Vitest
 - runs TypeScript typecheck
 - builds the PWA and generated service worker
-- configures GitHub Pages
-- uploads `dist/`
-- deploys using the official Pages action
+- verifies the expected production files exist
+- checks whether this repository's GitHub Pages site is already enabled
+- configures/uploads/deploys Pages only when Pages is available
+- preserves a normal `dist/` artifact and finishes successfully when Pages has not yet been enabled
+
+This prevents a repository-administration limitation from masking a healthy application build. The connected workflow token can deploy an existing Pages site, but it cannot create/enable Pages for the first time. If Pages is still disabled, use **Settings → Pages → Build and deployment → GitHub Actions** once; a later push or manual run will deploy automatically. The workflow uses `cancel-in-progress: false`, so rapid successive commits queue rather than cancelling one another.
+
+
+## Accessibility, keyboard, and mobile QA
+
+Prompt 10 is a hardening pass rather than a feature expansion.
+
+### Keyboard controls
+
+Normal Tab / Shift+Tab navigation works throughout the app. At an active table:
+
+- **H** — Hit
+- **S** — Stand
+- **D** — Double
+- **P** — Split
+- **N** — Deal / Deal Again / start the Daily Hand when that control is available
+- **Esc** — return to the menu
+
+Keyboard shortcuts are ignored while typing or adjusting form controls, and key-repeat is ignored to avoid accidental repeated actions.
+
+### Focus and screen readers
+
+Full-screen DOM rerenders preserve the focused control when an equivalent control still exists. On a real screen change, focus moves to the new main region instead of disappearing back to the browser body. Cards expose rank/suit names as playing-card objects, active player hands expose total/wager/state, and the current game-status line is the primary polite live region. Dealer commentary and the visual result banner remain readable without competing with that status announcement.
+
+### Mobile and touch behavior
+
+The responsive QA layer keeps controls at roughly 44px or larger, applies `touch-action: manipulation` to tap controls, ignores stale detached controls after rerenders, tightens split hands at 320–360px, prevents horizontal page overflow, wraps long commentary/control text, respects safe-area insets, and allows short landscape screens to scroll instead of compressing the table into overlapping content.
+
+### Refresh and corrupted storage behavior
+
+An unfinished Classic or House wager is held in memory and committed only when the round resolves. Refreshing or abandoning an unresolved hand therefore restores the last committed bankroll rather than charging for a round that no longer exists. Malformed JSON, wrong-version storage envelopes, missing values, and blocked browser storage all fall back safely.
 
 
 ## Practice-chip economy
