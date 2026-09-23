@@ -4,6 +4,8 @@ import './styles/dialogue.css';
 import './styles/progression.css';
 import './styles/house.css';
 import './styles/feedback-daily.css';
+import './styles/pwa.css';
+import { registerPWA } from './pwa/register';
 import { initializeUI } from './ui/render';
 
 function boot(): void {
@@ -29,3 +31,5 @@ if (document.readyState === 'loading') {
 } else {
   boot();
 }
+
+registerPWA();

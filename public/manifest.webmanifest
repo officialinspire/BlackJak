@@ -1,0 +1,27 @@
+{
+  "id": "/BlackJak/",
+  "name": "BLACKJAK",
+  "short_name": "BLACKJAK",
+  "description": "House Rules. Bad Decisions. One More Hand. A mobile-first blackjack game from OFFICIAL INSPIRE.",
+  "start_url": "/BlackJak/",
+  "scope": "/BlackJak/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#090909",
+  "theme_color": "#090909",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

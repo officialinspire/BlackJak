@@ -6,7 +6,7 @@ BlackJak is a mobile-first blackjack game from OFFICIAL INSPIRE, inspired in per
 
 ## Current status
 
-**Prompts 0–8 implemented. BlackJak now includes persistent synthesized audio/haptics settings, expanded lifetime stats, and a deterministic local Daily Hand challenge in addition to Classic and Jak's House.**
+**Prompts 0–9 implemented. BlackJak is now an installable offline-capable PWA with a GitHub Pages production build/deployment path in addition to Classic, Jak's House, progression, feedback, stats, and Daily Hand.**
 
 Current demo features:
 
@@ -69,6 +69,14 @@ Current demo features:
 - one scored Daily completion per local date with a flat +75 REP award; refreshes cannot repeatedly farm the reward
 - Daily Hand uses a virtual wager and does not alter practice chips or ordinary Classic/House win-loss stats
 - local Daily completion streak plus Web Share API result sharing with clipboard fallback
+- installable PWA manifest with dedicated 192×192 and 512×512 black/gold app icons
+- production Vite base path pinned to `/BlackJak/` for GitHub Pages asset correctness
+- generated versioned service worker that precaches the actual hashed production JS/CSS/app-shell files
+- offline navigation fallback plus cached static asset delivery after first successful PWA install/load
+- content-hashed cache names and automatic removal of obsolete BlackJak caches
+- safe update flow: new service workers wait until the player explicitly accepts the in-app update prompt
+- install prompt, offline-mode status, and update-available UI
+- GitHub Pages Actions workflow that installs dependencies, tests, typechecks, builds the PWA, uploads `dist/`, and deploys Pages
 - accessible focus states, semantic controls, live result feedback, and 44px+ touch targets
 - Vitest coverage for deck, hands, rules, round state, storage fallback, and session economy
 
@@ -76,7 +84,7 @@ Current demo features:
 
 See **[BlackJak-Development-Prompts.md](./BlackJak-Development-Prompts.md)**.
 
-Prompts 7 and 8 are complete. Prompt 9 adds PWA/offline support and installability.
+Prompt 9 is complete. Prompt 10 is the dedicated accessibility, mobile QA, and bug-fix pass.
 
 ## Local development
 
@@ -178,6 +186,64 @@ The **Daily Hand** is a local deterministic challenge and requires no backend.
 - Daily results do not inflate ordinary Classic/House win/loss statistics.
 - Completion streaks persist locally.
 - Sharing uses Web Share API when available and clipboard copy as fallback; no personal information is included.
+
+
+
+## PWA, offline support, and GitHub Pages
+
+Prompt 9 makes BlackJak installable and offline-capable without adding a third-party PWA runtime dependency.
+
+### Production URL and base path
+
+The production build uses Vite base path:
+
+```text
+/BlackJak/
+```
+
+Target GitHub Pages URL:
+
+```text
+https://officialinspire.github.io/BlackJak/
+```
+
+This keeps generated JS, CSS, manifest, icon, and service-worker URLs inside the repository's Pages subpath.
+
+### Offline strategy
+
+`npm run build` now performs three steps:
+
+1. TypeScript validation.
+2. Vite production build.
+3. `scripts/build-sw.mjs` scans the completed `dist/` tree and generates `dist/sw.js`.
+
+Generating the service worker **after** Vite is important because Vite fingerprints production JS/CSS filenames. The generated worker precaches the real output filenames rather than guessing them.
+
+Each build creates a content-derived cache name. On activation, older BlackJak app caches are removed. Same-origin requests outside `/BlackJak/` are ignored.
+
+After the first successful production load/service-worker install, the cached app shell includes the built application, manifest, icons, and hashed assets. Local progress remains in browser local storage, so Classic play, House play, chips, REP, achievements, settings, stats, and deterministic Daily Hand data remain local.
+
+### Safe updates
+
+A new service worker does **not** immediately replace an active worker during a running game. When a newer build finishes installing, BlackJak shows an update notice. Choosing **Update** sends `SKIP_WAITING` to the waiting worker and reloads only after it takes control.
+
+This avoids mixing old HTML/JavaScript with a new cache in the middle of a hand.
+
+### Installability
+
+The manifest includes standalone display mode, BlackJak theme/background colors, and dedicated 192×192 / 512×512 PNG icons. Supporting browsers may expose BlackJak as an installable app; the UI also listens for `beforeinstallprompt` and surfaces an Install control when the browser provides that event.
+
+### GitHub Pages deployment
+
+`.github/workflows/pages.yml` runs on pushes to `main` and manual dispatch. It:
+
+- installs dependencies with Node 22
+- runs Vitest
+- runs TypeScript typecheck
+- builds the PWA and generated service worker
+- configures GitHub Pages
+- uploads `dist/`
+- deploys using the official Pages action
 
 
 ## Practice-chip economy
