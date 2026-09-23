@@ -752,16 +752,17 @@ function takePlayerAction(action: PlayerAction): void {
   if (additionalStake > 0) persistProfile(reserveStake(before, additionalStake));
 
   try {
-    performAction(model.round, action, before.chips);
+    const updatedRound = performAction(model.round, action, before.chips);
+    model.round = updatedRound;
 
     if (action === 'hit') {
-      const updatedHand = model.round.hands.find((candidate) => candidate.id === activeHandId);
+      const updatedHand = updatedRound.hands.find((candidate) => candidate.id === activeHandId);
       if (updatedHand && !evaluateHand(updatedHand.cards).isBust && startingTotal >= 16) {
         model.roundProgress.riskyHitSurvived = true;
       }
     }
 
-    if (model.round.phase === 'resolved') {
+    if (updatedRound.phase === 'resolved') {
       settleIfResolved();
     } else if (action === 'split') {
       say('split_started');
@@ -809,16 +810,17 @@ function takeHouseAction(action: PlayerAction): void {
   if (additionalStake > 0) persistProfile(reserveStake(before, additionalStake));
 
   try {
-    performAction(model.round, action, before.chips);
+    const updatedRound = performAction(model.round, action, before.chips);
+    model.round = updatedRound;
 
     if (action === 'hit') {
-      const updatedHand = model.round.hands.find((candidate) => candidate.id === activeHandId);
+      const updatedHand = updatedRound.hands.find((candidate) => candidate.id === activeHandId);
       if (updatedHand && !evaluateHand(updatedHand.cards).isBust && startingTotal >= 16) {
         model.roundProgress.riskyHitSurvived = true;
       }
     }
 
-    if (model.round.phase === 'resolved') {
+    if (updatedRound.phase === 'resolved') {
       settleHouseIfResolved();
     } else if (action === 'split') {
       say('split_started');
