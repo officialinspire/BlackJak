@@ -19,7 +19,7 @@ export function cardMarkup(
 
   if (hidden) {
     return `
-      <div class="playing-card card-back" style="--deal-delay:${delay}ms" aria-label="Hidden dealer card">
+      <div class="playing-card card-back" role="img" aria-roledescription="playing card" style="--deal-delay:${delay}ms" aria-label="Hidden dealer card">
         <div class="card-back-frame" aria-hidden="true">
           <span class="back-monogram">BJ</span>
           <span class="back-wordmark">BLACKJAK</span>
@@ -32,7 +32,7 @@ export function cardMarkup(
   const gold = variant === 'gold';
 
   return `
-    <div class="playing-card ${red ? 'red-suit' : 'black-suit'} ${gold ? 'gold-card' : ''}" style="--deal-delay:${delay}ms" aria-label="${gold ? 'Gold Card, counts as Ace, ' : ''}${card.rank} of ${card.suit}">
+    <div class="playing-card ${red ? 'red-suit' : 'black-suit'} ${gold ? 'gold-card' : ''}" role="img" aria-roledescription="playing card" data-suit="${card.suit}" style="--deal-delay:${delay}ms" aria-label="${gold ? 'Gold Card, counts as Ace, ' : ''}${card.rank} of ${card.suit}">
       ${gold ? '<span class="gold-card-label" aria-hidden="true">GOLD</span>' : ''}
       <span class="card-corner card-corner-top" aria-hidden="true"><b>${card.rank}</b><i>${suit}</i></span>
       <span class="card-center-suit" aria-hidden="true">${suit}</span>

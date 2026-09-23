@@ -1,0 +1,283 @@
+/* Prompt 10 — accessibility, mobile QA, and robustness overrides */
+
+html,
+body,
+#app {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+@supports (overflow: clip) {
+  html,
+  body,
+  #app {
+    overflow-x: clip;
+  }
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  min-width: 0;
+}
+
+#app {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.screen {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.screen:focus {
+  outline: none;
+}
+
+button,
+a,
+input,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+a,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+input[type="range"] {
+  min-height: 44px;
+  touch-action: pan-x;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+[role="button"]:focus-visible {
+  outline: 3px solid var(--cream);
+  outline-offset: 3px;
+}
+
+.table-header,
+.hud,
+.table,
+.hand-zone,
+.player-hands,
+.player-hand,
+.cards,
+.game-controls,
+.betting-panel,
+.action-bar,
+.dealer-commentary,
+.house-mode-banner,
+.house-modifier-grid,
+.daily-table,
+.glass-panel {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.table-header {
+  flex-wrap: wrap;
+}
+
+.hud {
+  min-width: 0;
+}
+
+.playing-card {
+  flex: 0 0 auto;
+}
+
+.dealer-commentary,
+.dealer-commentary p,
+.status-line,
+.error-line,
+.practice-note,
+.house-mode-banner p,
+.house-modifier p,
+.daily-policy,
+.daily-share-status,
+.menu-button,
+.back-button,
+.action-bar button,
+.primary-action,
+.house-special-action,
+.setting-toggle {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.dealer-commentary p {
+  max-width: min(100%, 42rem);
+}
+
+.action-bar button,
+.primary-action,
+.house-special-action,
+.back-button,
+.menu-button,
+.setting-toggle {
+  white-space: normal;
+}
+
+@media (hover: none) {
+  .menu-button:hover:not(:disabled),
+  .action-bar button:hover:not(:disabled),
+  .back-button:hover,
+  .stake-button:hover:not(:disabled),
+  .primary-action:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .table-header {
+    align-items: flex-start;
+  }
+
+  .hud {
+    flex: 1 1 180px;
+  }
+
+  .dealer-commentary {
+    width: min(100%, 94vw);
+  }
+
+  .house-mode-banner {
+    flex-wrap: wrap;
+  }
+
+  .house-mode-banner > b {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 360px) {
+  .screen {
+    padding-inline:
+      max(.45rem, env(safe-area-inset-left))
+      max(.45rem, env(safe-area-inset-right));
+  }
+
+  .table {
+    padding-inline: .35rem;
+  }
+
+  .action-bar {
+    gap: .2rem;
+  }
+
+  .action-bar button {
+    min-width: 0;
+    min-height: 48px;
+    padding-inline: .1rem;
+    font-size: .62rem;
+    letter-spacing: .025em;
+  }
+
+  .stake-row {
+    gap: .15rem;
+  }
+
+  .stake-button {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+  }
+
+  .player-hands.is-split {
+    gap: .08rem;
+  }
+
+  .player-hands.is-split .player-hand {
+    flex-basis: 50%;
+  }
+
+  .player-hands.is-split .playing-card {
+    width: clamp(40px, 12.5vw, 46px);
+    margin-left: -12px;
+  }
+
+  .player-hands.is-split .cards {
+    padding-left: 12px;
+  }
+
+  .dealer-commentary p,
+  .status-line {
+    font-size: max(.72rem, 12px);
+  }
+}
+
+@supports selector(:has(*)) {
+  @media (max-width: 520px) {
+    .player-hands.is-split .cards:has(.playing-card:nth-child(4)) .playing-card {
+      margin-left: -20px;
+    }
+
+    .player-hands.is-split .cards:has(.playing-card:nth-child(4)) {
+      padding-left: 20px;
+    }
+  }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .screen {
+    min-height: 100dvh;
+    padding-top: max(.5rem, env(safe-area-inset-top));
+    padding-bottom: max(.5rem, env(safe-area-inset-bottom));
+  }
+
+  .menu-screen {
+    align-content: start;
+  }
+
+  .table,
+  .house-table {
+    min-height: 360px;
+  }
+
+  .panel-screen {
+    gap: 1rem;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --muted: #d8d0c1;
+    --bj-muted: #d8d0c1;
+  }
+
+  .playing-card,
+  button,
+  .glass-panel,
+  .table {
+    border-width: 2px;
+  }
+}
+
+@media (forced-colors: active) {
+  button,
+  .playing-card,
+  .glass-panel,
+  .table,
+  .house-modifier {
+    forced-color-adjust: auto;
+  }
+
+  .playing-card.red-suit,
+  .playing-card.black-suit {
+    color: CanvasText;
+  }
+}

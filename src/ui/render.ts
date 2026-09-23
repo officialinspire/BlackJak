@@ -55,6 +55,7 @@ interface AppModel {
   achievementToasts: AchievementDefinition[];
   lastRepEarned: number;
   house: HouseState;
+  houseCheckpoint: HouseState | null;
   houseLastBonusRep: number;
   houseTokenAwarded: boolean;
   preferences: FeedbackPreferences;
@@ -64,6 +65,32 @@ interface AppModel {
 }
 
 type RoundTone = 'idle' | 'playing' | 'blackjack' | 'win' | 'loss' | 'push' | 'mixed';
+
+const ACTION_SHORTCUTS: Record<PlayerAction, string> = {
+  hit: 'H',
+  stand: 'S',
+  double: 'D',
+  split: 'P',
+};
+
+const FOCUS_ATTRIBUTES = [
+  'data-action',
+  'data-daily-action',
+  'data-stake',
+  'data-setting-toggle',
+  'data-setting-volume',
+  'data-screen',
+] as const;
+
+type FocusAttribute = (typeof FOCUS_ATTRIBUTES)[number];
+
+interface FocusKey {
+  attribute: FocusAttribute;
+  value: string;
+}
+
+let lastRenderedScreen: AppScreen | null = null;
+let globalKeyboardBound = false;
 
 const initialProfile = loadProfile();
 const initialPreferences = loadFeedbackPreferences();
@@ -82,6 +109,7 @@ const model: AppModel = {
   achievementToasts: [],
   lastRepEarned: 0,
   house: createHouseState(),
+  houseCheckpoint: null,
   houseLastBonusRep: 0,
   houseTokenAwarded: false,
   preferences: initialPreferences,
@@ -95,6 +123,94 @@ const app = (): HTMLElement => {
   if (!root) throw new Error('App root #app was not found.');
   return root;
 };
+
+function captureFocusKey(): FocusKey | null {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement) || active === document.body) return null;
+
+  for (const attribute of FOCUS_ATTRIBUTES) {
+    const value = active.getAttribute(attribute);
+    if (value !== null) return { attribute, value };
+  }
+
+  return null;
+}
+
+function matchingFocusTarget(key: FocusKey | null): HTMLElement | null {
+  if (!key) return null;
+  return [...document.querySelectorAll<HTMLElement>(`[${key.attribute}]`)]
+    .find((element) => element.getAttribute(key.attribute) === key.value && !element.hasAttribute('disabled')) ?? null;
+}
+
+function focusAfterRender(key: FocusKey | null, screenChanged: boolean, hadInteractiveFocus: boolean): void {
+  if (screenChanged) {
+    document.querySelector<HTMLElement>('#app-main')?.focus({ preventScroll: true });
+    return;
+  }
+
+  if (!hadInteractiveFocus) return;
+
+  const exact = matchingFocusTarget(key);
+  if (exact) {
+    exact.focus({ preventScroll: true });
+    return;
+  }
+
+  const fallback =
+    document.querySelector<HTMLElement>('.action-bar button:not(:disabled)') ??
+    document.querySelector<HTMLElement>('[data-action="deal"]:not(:disabled)') ??
+    document.querySelector<HTMLElement>('[data-action="start-daily"]:not(:disabled)') ??
+    document.querySelector<HTMLElement>('[data-stake].is-selected:not(:disabled)') ??
+    document.querySelector<HTMLElement>('.back-button');
+
+  fallback?.focus({ preventScroll: true });
+}
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.matches('input, textarea, select, [contenteditable="true"]');
+}
+
+function clickShortcut(selector: string): boolean {
+  const control = document.querySelector<HTMLButtonElement>(selector);
+  if (!control || control.disabled) return false;
+  control.click();
+  return true;
+}
+
+function handleGlobalKeyboard(event: KeyboardEvent): void {
+  if (event.defaultPrevented || event.repeat || event.ctrlKey || event.metaKey || event.altKey || isEditableTarget(event.target)) return;
+
+  if (event.key === 'Escape' && model.screen !== 'menu') {
+    if (clickShortcut('.back-button[data-screen="menu"]')) event.preventDefault();
+    return;
+  }
+
+  const key = event.key.toUpperCase();
+  const action = (Object.entries(ACTION_SHORTCUTS).find(([, shortcut]) => shortcut === key)?.[0] ?? null) as PlayerAction | null;
+  if (action) {
+    const selector = model.screen === 'daily'
+      ? `[data-daily-action="${action}"]:not(:disabled)`
+      : `[data-action="${action}"]:not(:disabled)`;
+    if (clickShortcut(selector)) event.preventDefault();
+    return;
+  }
+
+  if (key === 'N') {
+    if (
+      clickShortcut('[data-action="deal"]:not(:disabled)') ||
+      clickShortcut('[data-action="start-daily"]:not(:disabled)')
+    ) {
+      event.preventDefault();
+    }
+  }
+}
+
+function bindGlobalKeyboardOnce(): void {
+  if (globalKeyboardBound) return;
+  document.addEventListener('keydown', handleGlobalKeyboard);
+  globalKeyboardBound = true;
+}
 
 const button = (label: string, screen: AppScreen): string =>
   `<button class="menu-button" data-screen="${screen}">${label}</button>`;
@@ -194,7 +310,7 @@ function resolutionDialogueEvent(round: RoundState): DialogueEvent {
 function menuMarkup(): string {
   const title = titleProgressForRep(model.profile.rep);
   return `
-    <main id="app-main" class="screen menu-screen">
+    <main id="app-main" tabindex="-1" class="screen menu-screen">
       <div class="ambient-lamp ambient-lamp-menu" aria-hidden="true"></div>
       <section class="brand-lockup" aria-labelledby="game-title">
         <div class="brand-kicker"><span></span><p>OFFICIAL INSPIRE PRESENTS</p><span></span></div>
@@ -227,9 +343,9 @@ function settingsMarkup(): string {
     </div>`;
 
   return `
-    <main id="app-main" class="screen panel-screen">
+    <main id="app-main" tabindex="-1" class="screen panel-screen">
       <div class="ambient-lamp" aria-hidden="true"></div>
-      <button class="back-button" data-screen="menu">← Menu</button>
+      <button class="back-button" data-screen="menu" aria-keyshortcuts="Escape">← Menu</button>
       <section class="glass-panel settings-panel">
         <p class="eyebrow">TABLE SETUP</p>
         <h1>Settings</h1>
@@ -257,8 +373,8 @@ function statsMarkup(): string {
   const unlocked = new Set(model.profile.progression.unlockedAchievements);
   const winRate = stats.totalHands > 0 ? Math.round((stats.wins / stats.totalHands) * 100) : 0;
   return `
-    <main id="app-main" class="screen panel-screen">
-      <button class="back-button" data-screen="menu">← Menu</button>
+    <main id="app-main" tabindex="-1" class="screen panel-screen">
+      <button class="back-button" data-screen="menu" aria-keyshortcuts="Escape">← Menu</button>
       <section class="glass-panel stats-panel">
         <p class="eyebrow">CLASSIC BLACKJAK</p>
         <h1>Stats</h1>
@@ -351,7 +467,7 @@ function playerHandsMarkup(round: RoundState | null, house: HouseState | null = 
       const evaluation = evaluateHand(hand.cards);
       const active = round.phase === 'player-turn' && index === round.activeHandIndex;
       return `
-        <section class="player-hand ${active ? 'is-active' : ''} ${evaluation.isBust ? 'is-bust' : ''} ${outcomeClass(round, hand)}" aria-label="Player hand ${index + 1}${active ? ', active' : ''}">
+        <section class="player-hand ${active ? 'is-active' : ''} ${evaluation.isBust ? 'is-bust' : ''} ${outcomeClass(round, hand)}" aria-label="Player hand ${index + 1}${active ? ', active' : ''}, total ${evaluation.total}, wager ${formatChips(hand.wager)} chips, ${handResultLabel(round, hand).toLowerCase()}">
           <div class="hand-meta">
             <span>HAND ${index + 1}${round.hands.length > 1 ? ` / ${round.hands.length}` : ''}</span>
             <strong>${evaluation.total}</strong>
@@ -382,7 +498,7 @@ function resultBannerMarkup(round: RoundState | null): string {
   const repLine = model.lastRepEarned > 0 ? `+${model.lastRepEarned} REP` : '';
 
   return `
-    <div class="result-banner result-${tone}" aria-live="polite">
+    <div class="result-banner result-${tone}" role="group" aria-label="Round result: ${titleMap[tone as Exclude<RoundTone, 'idle' | 'playing'>]}, ${netLabel} chips${repLine ? `, ${repLine}` : ''}">
       <span>ROUND RESULT</span>
       <strong>${titleMap[tone as Exclude<RoundTone, 'idle' | 'playing'>]}</strong>
       <b>${netLabel} chips</b>
@@ -411,7 +527,7 @@ function bettingControlsMarkup(): string {
           <button class="stake-button ${selected === stake ? 'is-selected' : ''}" data-stake="${stake}" aria-pressed="${selected === stake}" ${stake > model.profile.chips ? 'disabled' : ''}>${stake}</button>`).join('')}
         <button class="stake-button ${selected === maxValue ? 'is-selected' : ''}" data-stake="max" aria-pressed="${selected === maxValue}">MAX</button>
       </div>
-      <button class="primary-action deal-button" data-action="deal">${model.round?.phase === 'resolved' ? 'Deal Again' : 'Deal Hand'}</button>
+      <button class="primary-action deal-button" data-action="deal" aria-keyshortcuts="N">${model.round?.phase === 'resolved' ? 'Deal Again' : 'Deal Hand'}</button>
     </div>`;
 }
 
@@ -455,7 +571,7 @@ function actionControlsMarkup(round: RoundState): string {
   return `
     <div class="action-bar" aria-label="Blackjack actions">
       ${(['hit', 'stand', 'double', 'split'] as PlayerAction[])
-        .map((action) => `<button data-action="${action}" ${valid.includes(action) ? '' : 'disabled'}>${action.toUpperCase()}</button>`)
+        .map((action) => `<button data-action="${action}" aria-label="${action.toUpperCase()}" aria-keyshortcuts="${ACTION_SHORTCUTS[action]}" ${valid.includes(action) ? '' : 'disabled'}>${action.toUpperCase()}</button>`)
         .join('')}
     </div>`;
 }
@@ -470,10 +586,10 @@ function classicMarkup(): string {
   const progression = titleProgressForRep(model.profile.rep);
 
   return `
-    <main id="app-main" class="screen table-screen round-${tone}">
+    <main id="app-main" tabindex="-1" class="screen table-screen round-${tone}">
       <div class="ambient-lamp ambient-lamp-table" aria-hidden="true"></div>
       <header class="table-header">
-        <button class="back-button" data-screen="menu">← Menu</button>
+        <button class="back-button" data-screen="menu" aria-keyshortcuts="Escape">← Menu</button>
         <div class="hud" aria-label="Player resources and progression">
           <span>CHIPS <strong>${formatChips(model.profile.chips)}</strong></span>
           <span class="title-pill">${progression.current.name}</span>
@@ -486,10 +602,10 @@ function classicMarkup(): string {
           <div class="dealer-identity-row">
             <span class="dealer-avatar" aria-hidden="true">JG</span>
             <span class="dealer-name"><b>JAK</b><small>HOUSE DEALER</small></span>
-            <strong class="dealer-total" aria-label="Dealer total">${dealerTotal}</strong>
+            <strong class="dealer-total" aria-label="${revealDealer ? `Dealer total ${dealerTotal}` : 'Dealer total hidden'}">${dealerTotal}</strong>
           </div>
           <div class="cards dealer-cards">${dealerCards.length ? dealerCards.map((card, index) => cardMarkup(card, index === 1 && !revealDealer, index)).join('') : '<div class="empty-cards" aria-hidden="true"><span>DEALER</span></div>'}</div>
-          <div class="dealer-commentary" role="status" aria-live="polite" aria-atomic="true" data-event="${model.commentary.event}">
+          <div class="dealer-commentary" aria-label="Dealer commentary" data-event="${model.commentary.event}">
             <span class="dealer-quote-mark" aria-hidden="true">“</span>
             <p>${model.commentary.text}</p>
           </div>
@@ -504,7 +620,7 @@ function classicMarkup(): string {
       </section>
 
       <section class="game-controls" aria-label="Classic BlackJak controls">
-        <p class="status-line" aria-live="polite">${statusText(round)}</p>
+        <p class="status-line" role="status" aria-live="polite" aria-atomic="true">${statusText(round)}</p>
         ${model.error ? `<p class="error-line" role="alert">${model.error}</p>` : ''}
         ${showActions && round ? actionControlsMarkup(round) : bettingControlsMarkup()}
         <p class="practice-note">Practice chips have no monetary value.</p>
@@ -523,10 +639,10 @@ function houseMarkup(): string {
   const progression = titleProgressForRep(model.profile.rep);
 
   return `
-    <main id="app-main" class="screen table-screen house-screen round-${tone}">
+    <main id="app-main" tabindex="-1" class="screen table-screen house-screen round-${tone}">
       <div class="ambient-lamp ambient-lamp-table house-lamp" aria-hidden="true"></div>
       <header class="table-header">
-        <button class="back-button" data-screen="menu">← Menu</button>
+        <button class="back-button" data-screen="menu" aria-keyshortcuts="Escape">← Menu</button>
         <div class="hud" aria-label="Player resources and progression">
           <span>CHIPS <strong>${formatChips(model.profile.chips)}</strong></span>
           <span class="title-pill">${progression.current.name}</span>
@@ -550,10 +666,10 @@ function houseMarkup(): string {
           <div class="dealer-identity-row">
             <span class="dealer-avatar house-avatar" aria-hidden="true">JG</span>
             <span class="dealer-name"><b>JAK</b><small>HOUSE RULES ACTIVE</small></span>
-            <strong class="dealer-total" aria-label="Dealer total">${dealerTotal}</strong>
+            <strong class="dealer-total" aria-label="${revealDealer ? `Dealer total ${dealerTotal}` : 'Dealer total hidden'}">${dealerTotal}</strong>
           </div>
           <div class="cards dealer-cards">${dealerCards.length ? dealerCards.map((card, index) => cardMarkup(card, index === 1 && !revealDealer, index)).join('') : '<div class="empty-cards" aria-hidden="true"><span>DEALER</span></div>'}</div>
-          <div class="dealer-commentary" role="status" aria-live="polite" aria-atomic="true" data-event="${model.commentary.event}">
+          <div class="dealer-commentary" aria-label="Dealer commentary" data-event="${model.commentary.event}">
             <span class="dealer-quote-mark" aria-hidden="true">“</span>
             <p>${model.commentary.text}</p>
           </div>
@@ -568,7 +684,7 @@ function houseMarkup(): string {
       </section>
 
       <section class="game-controls house-controls" aria-label="Jak's House controls">
-        <p class="status-line" aria-live="polite">${statusText(round)}</p>
+        <p class="status-line" role="status" aria-live="polite" aria-atomic="true">${statusText(round)}</p>
         ${model.houseLastBonusRep > 0 ? `<p class="house-bonus-line">HOT HAND BONUS +${model.houseLastBonusRep} REP</p>` : ''}
         ${model.houseTokenAwarded ? '<p class="house-token-line">RUN IT BACK TOKEN EARNED</p>' : ''}
         ${model.error ? `<p class="error-line" role="alert">${model.error}</p>` : ''}
@@ -620,6 +736,7 @@ function settleHouseIfResolved(): void {
 
   persistProfile(withHouseBonus);
   model.house = houseResolution.house;
+  model.houseCheckpoint = null;
   model.houseLastBonusRep = houseResolution.hotHandBonusRep;
   model.houseTokenAwarded = houseResolution.tokenAwarded;
   model.lastRepEarned = progression.repEarned + houseResolution.hotHandBonusRep;
@@ -629,6 +746,7 @@ function settleHouseIfResolved(): void {
 }
 
 function dealRound(): void {
+  if (model.round && model.round.phase !== 'resolved') throw new Error('Finish the current hand before dealing again.');
   const stake = normalizedStake();
   if (stake <= 0) throw new Error('Refill practice chips before dealing.');
 
@@ -646,7 +764,7 @@ function dealRound(): void {
 
   const before = model.profile;
   const reserved = reserveStake(before, stake);
-  persistProfile(reserved);
+  model.profile = reserved;
 
   try {
     model.round = startRound(stake);
@@ -663,6 +781,7 @@ function dealRound(): void {
 }
 
 function dealHouseRound(): void {
+  if (model.round && model.round.phase !== 'resolved') throw new Error('Finish the current House hand before dealing again.');
   const stake = normalizedStake();
   if (stake <= 0) throw new Error('Refill practice chips before dealing.');
 
@@ -682,7 +801,8 @@ function dealHouseRound(): void {
 
   const beforeProfile = model.profile;
   const beforeHouse = model.house;
-  persistProfile(reserveStake(beforeProfile, stake));
+  model.houseCheckpoint = beforeHouse;
+  model.profile = reserveStake(beforeProfile, stake);
 
   try {
     const started = startHouseRound(stake, model.house);
@@ -698,6 +818,7 @@ function dealHouseRound(): void {
   } catch (error) {
     persistProfile(beforeProfile);
     model.house = beforeHouse;
+    model.houseCheckpoint = null;
     throw error;
   }
 }
@@ -710,6 +831,7 @@ function runHouseReplay(): void {
   model.roundProgress = emptyRoundProgressionContext();
 
   const beforeHouse = model.house;
+  model.houseCheckpoint = beforeHouse;
   try {
     const replay = replayHouseRound(model.house);
     model.house = replay.house;
@@ -723,6 +845,7 @@ function runHouseReplay(): void {
     }
   } catch (error) {
     model.house = beforeHouse;
+    model.houseCheckpoint = null;
     throw error;
   }
 }
@@ -749,7 +872,7 @@ function takePlayerAction(action: PlayerAction): void {
   else if (action === 'double' || action === 'split') feedback('chip', 'tap');
   else feedback('button', 'tap');
 
-  if (additionalStake > 0) persistProfile(reserveStake(before, additionalStake));
+  if (additionalStake > 0) model.profile = reserveStake(before, additionalStake);
 
   try {
     const updatedRound = performAction(model.round, action, before.chips);
@@ -780,7 +903,7 @@ function takePlayerAction(action: PlayerAction): void {
       }
     }
   } catch (error) {
-    if (additionalStake > 0) persistProfile(before);
+    if (additionalStake > 0) model.profile = before;
     throw error;
   }
 }
@@ -807,7 +930,7 @@ function takeHouseAction(action: PlayerAction): void {
   else if (action === 'double' || action === 'split') feedback('chip', 'tap');
   else feedback('button', 'tap');
 
-  if (additionalStake > 0) persistProfile(reserveStake(before, additionalStake));
+  if (additionalStake > 0) model.profile = reserveStake(before, additionalStake);
 
   try {
     const updatedRound = performAction(model.round, action, before.chips);
@@ -838,7 +961,7 @@ function takeHouseAction(action: PlayerAction): void {
       }
     }
   } catch (error) {
-    if (additionalStake > 0) persistProfile(before);
+    if (additionalStake > 0) model.profile = before;
     throw error;
   }
 }
@@ -881,7 +1004,7 @@ function takeDailyAction(action: PlayerAction): void {
   else if (action === 'double' || action === 'split') feedback('chip', 'tap');
   else feedback('button', 'tap');
 
-  performAction(model.dailyRound, action, Number.POSITIVE_INFINITY);
+  model.dailyRound = performAction(model.dailyRound, action, Number.POSITIVE_INFINITY);
   completeDailyIfResolved();
 }
 
@@ -891,7 +1014,7 @@ function dailyControlsMarkup(round: RoundState): string {
   return `
     <div class="action-bar daily-action-bar" aria-label="Daily Hand actions">
       ${(['hit', 'stand', 'double', 'split'] as PlayerAction[])
-        .map((action) => `<button data-daily-action="${action}" ${valid.includes(action) ? '' : 'disabled'}>${action.toUpperCase()}</button>`)
+        .map((action) => `<button data-daily-action="${action}" aria-label="${action.toUpperCase()}" aria-keyshortcuts="${ACTION_SHORTCUTS[action]}" ${valid.includes(action) ? '' : 'disabled'}>${action.toUpperCase()}</button>`)
         .join('')}
     </div>`;
 }
@@ -915,9 +1038,9 @@ function dailyMarkup(): string {
   const result = completed && state.outcome ? state.outcome.toUpperCase() : null;
 
   return `
-    <main id="app-main" class="screen panel-screen daily-screen">
+    <main id="app-main" tabindex="-1" class="screen panel-screen daily-screen">
       <div class="ambient-lamp" aria-hidden="true"></div>
-      <button class="back-button" data-screen="menu">← Menu</button>
+      <button class="back-button" data-screen="menu" aria-keyshortcuts="Escape">← Menu</button>
       <section class="glass-panel daily-panel">
         <div class="daily-heading">
           <div><p class="eyebrow">DAILY HAND · ${today}</p><h1>Same Table. Same Problem.</h1></div>
@@ -944,7 +1067,7 @@ function dailyMarkup(): string {
           </div>` : ''}
         ${round ? `
           <div class="daily-live">
-            <p class="status-line">${round.phase === 'resolved' ? `RESULT: ${dailyOutcome(round).toUpperCase()}${model.lastRepEarned ? ` · +${model.lastRepEarned} REP` : ''}` : `Your move · ${evaluateHand(getActiveHand(round).cards).total}`}</p>
+            <p class="status-line" role="status" aria-live="polite" aria-atomic="true">${round.phase === 'resolved' ? `RESULT: ${dailyOutcome(round).toUpperCase()}${model.lastRepEarned ? ` · +${model.lastRepEarned} REP` : ''}` : `Your move · ${evaluateHand(getActiveHand(round).cards).total}`}</p>
             ${round.phase === 'player-turn' ? dailyControlsMarkup(round) : '<button class="primary-action" data-action="share-daily">Share Result</button>'}
           </div>` : ''}
         ${!completed && !round ? '<button class="primary-action" data-action="start-daily">Play Today\'s Hand</button>' : ''}
@@ -980,6 +1103,11 @@ async function shareDailyResult(): Promise<void> {
 }
 
 function render(): void {
+  const previousScreen = lastRenderedScreen;
+  const activeBeforeRender = document.activeElement;
+  const hadInteractiveFocus = activeBeforeRender instanceof HTMLElement && activeBeforeRender !== document.body;
+  const focusKey = captureFocusKey();
+
   switch (model.screen) {
     case 'menu':
       app().innerHTML = menuMarkup();
@@ -1002,15 +1130,27 @@ function render(): void {
   }
 
   bindEvents();
+  const screenChanged = previousScreen !== null && previousScreen !== model.screen;
+  lastRenderedScreen = model.screen;
+  focusAfterRender(focusKey, screenChanged, hadInteractiveFocus);
 }
 
 function bindEvents(): void {
   document.querySelectorAll<HTMLElement>('[data-screen]').forEach((element) => {
     element.addEventListener('click', () => {
+      if (!element.isConnected) return;
       const screen = element.dataset.screen as AppScreen | undefined;
       if (!screen) return;
       feedbackEngine.activate();
       feedback('button', 'tap');
+      if (screen === 'menu' && (model.screen === 'classic' || model.screen === 'house') && model.round?.phase !== 'resolved') {
+        model.profile = loadProfile();
+        model.selectedStake = model.profile.chips > 0 ? Math.min(model.selectedStake || 25, model.profile.chips) : 0;
+        if (model.screen === 'house' && model.houseCheckpoint) {
+          model.house = model.houseCheckpoint;
+          model.houseCheckpoint = null;
+        }
+      }
       if ((screen === 'classic' || screen === 'house') && screen !== model.screen) {
         model.round = null;
         model.roundProgress = emptyRoundProgressionContext();
@@ -1033,6 +1173,7 @@ function bindEvents(): void {
 
   document.querySelectorAll<HTMLButtonElement>('[data-stake]').forEach((element) => {
     element.addEventListener('click', () => {
+      if (!element.isConnected) return;
       feedbackEngine.activate();
       const stake = element.dataset.stake;
       const next = stake === 'max' ? Math.min(model.profile.chips, MAX_STAKE) : Number(stake);
@@ -1047,6 +1188,7 @@ function bindEvents(): void {
 
   document.querySelectorAll<HTMLButtonElement>('[data-setting-toggle]').forEach((element) => {
     element.addEventListener('click', () => {
+      if (!element.isConnected) return;
       feedbackEngine.activate();
       const key = element.dataset.settingToggle as 'master' | 'sfx' | 'ambience' | 'haptics' | undefined;
       if (!key) return;
@@ -1068,6 +1210,7 @@ function bindEvents(): void {
 
   document.querySelectorAll<HTMLButtonElement>('[data-daily-action]').forEach((element) => {
     element.addEventListener('click', () => {
+      if (!element.isConnected) return;
       feedbackEngine.activate();
       model.error = null;
       try {
@@ -1082,6 +1225,7 @@ function bindEvents(): void {
 
   document.querySelectorAll<HTMLButtonElement>('[data-action]').forEach((element) => {
     element.addEventListener('click', () => {
+      if (!element.isConnected) return;
       feedbackEngine.activate();
       const action = element.dataset.action;
       model.error = null;
@@ -1120,5 +1264,6 @@ function bindEvents(): void {
 }
 
 export function initializeUI(): void {
+  bindGlobalKeyboardOnce();
   render();
 }

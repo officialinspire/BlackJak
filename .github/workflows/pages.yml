@@ -1,22 +1,27 @@
-name: Deploy BlackJak to GitHub Pages
+name: BlackJak CI and Pages
 
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 concurrency:
-  group: pages
+  group: blackjak-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    outputs:
+      pages_enabled: ${{ steps.pages.outputs.enabled }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,22 +43,75 @@ jobs:
       - name: Build PWA
         run: npm run build
 
+      - name: Verify production artifact
+        run: |
+          test -f dist/index.html
+          test -f dist/sw.js
+          test -f dist/manifest.webmanifest
+          test -f dist/icons/icon-192.png
+          test -f dist/icons/icon-512.png
+
+      - name: Check GitHub Pages availability
+        if: github.event_name != 'pull_request'
+        id: pages
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          status="$(curl --silent --show-error             --output /tmp/pages.json             --write-out "%{http_code}"             -H "Accept: application/vnd.github+json"             -H "Authorization: Bearer ${GH_TOKEN}"             -H "X-GitHub-Api-Version: 2022-11-28"             "https://api.github.com/repos/${REPOSITORY}/pages" || true)"
+
+          if [ "$status" = "200" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "GitHub Pages is enabled; deployment will continue."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "GitHub Pages is not enabled for Actions (HTTP $status)."
+            echo "The app still passed tests, typecheck, and production build."
+          fi
+
       - name: Configure Pages
+        if: github.event_name != 'pull_request' && steps.pages.outputs.enabled == 'true'
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: Upload Pages artifact
+        if: github.event_name != 'pull_request' && steps.pages.outputs.enabled == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
 
+      - name: Preserve build artifact when Pages is unavailable
+        if: github.event_name != 'pull_request' && steps.pages.outputs.enabled != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: blackjak-dist-${{ github.sha }}
+          path: ./dist
+          retention-days: 7
+
+      - name: Pages setup note
+        if: github.event_name != 'pull_request' && steps.pages.outputs.enabled != 'true'
+        run: |
+          {
+            echo "### GitHub Pages deployment skipped safely"
+            echo
+            echo "BlackJak passed tests, typecheck, and the production PWA build."
+            echo "Enable **Settings → Pages → Build and deployment → GitHub Actions** once."
+            echo "A later push or manual workflow run will deploy automatically."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   deploy:
+    if: github.event_name != 'pull_request' && needs.build.outputs.pages_enabled == 'true'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: build
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
