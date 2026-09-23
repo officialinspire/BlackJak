@@ -95,7 +95,7 @@ self.addEventListener('fetch', (event) => {
           return (
             await cache.match(request, { ignoreSearch: true }) ||
             await cache.match(BASE_PATH) ||
-            await cache.match(`${BASE_PATH}index.html`) ||
+            await cache.match(BASE_PATH + 'index.html') ||
             Response.error()
           );
         })
