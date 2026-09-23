@@ -1,21 +1,29 @@
 import { APP_NAME, APP_TAGLINE, MAX_STAKE, STAKE_OPTIONS } from '../config/constants';
+import { HOUSE_MODIFIERS } from '../data/house';
 import { ACHIEVEMENTS, titleProgressForRep, type AchievementDefinition } from '../data/progression';
 import {
   allowedActions,
   applyProgression,
+  completeHouseRound,
+  createHouseState,
   emptyRoundProgressionContext,
   evaluateHand,
   getActiveHand,
+  hotHandMultiplier,
+  isGoldCard,
   performAction,
   refillPracticeChips,
+  replayHouseRound,
   reserveStake,
   settleResults,
   selectDialogue,
+  startHouseRound,
   unlockAchievementIds,
   startRound,
   type DialogueEvent,
   type DialogueMemory,
   type DialogueSelection,
+  type HouseState,
   type PlayerAction,
   type PlayerHand,
   type RoundProgressionContext,
@@ -37,6 +45,9 @@ interface AppModel {
   roundProgress: RoundProgressionContext;
   achievementToasts: AchievementDefinition[];
   lastRepEarned: number;
+  house: HouseState;
+  houseLastBonusRep: number;
+  houseTokenAwarded: boolean;
 }
 
 type RoundTone = 'idle' | 'playing' | 'blackjack' | 'win' | 'loss' | 'push' | 'mixed';
@@ -55,6 +66,9 @@ const model: AppModel = {
   roundProgress: emptyRoundProgressionContext(),
   achievementToasts: [],
   lastRepEarned: 0,
+  house: createHouseState(),
+  houseLastBonusRep: 0,
+  houseTokenAwarded: false,
 };
 
 const app = (): HTMLElement => {
@@ -141,8 +155,8 @@ function menuMarkup(): string {
         <p class="brand-note">Private table. Fictional chips. Questionable judgment.</p>
       </section>
       <nav class="menu-grid" aria-label="BlackJak modes">
-        ${button('Classic BlackJak', 'classic')}
-        ${button("Jak's House", 'house')}
+        ${button('Classic BlackJak · Standard', 'classic')}
+        ${button("Jak's House · Arcade", 'house')}
         ${button('Stats', 'stats')}
         ${button('Settings', 'settings')}
       </nav>
@@ -152,18 +166,6 @@ function menuMarkup(): string {
       </div>
       <div class="menu-bankroll" aria-label="Saved Classic BlackJak bankroll">Practice chips <strong>${formatChips(model.profile.chips)}</strong></div>
       <p class="fine-print">Fictional practice chips only. No purchases, cash-out, or real-money wagering.</p>
-    </main>`;
-}
-
-function placeholderMarkup(title: string, copy: string): string {
-  return `
-    <main id="app-main" class="screen panel-screen">
-      <button class="back-button" data-screen="menu">← Menu</button>
-      <section class="glass-panel">
-        <p class="eyebrow">COMING IN A LATER PHASE</p>
-        <h1>${title}</h1>
-        <p>${copy}</p>
-      </section>
     </main>`;
 }
 
@@ -264,7 +266,7 @@ function outcomeClass(round: RoundState, hand: PlayerHand): string {
   return outcome ? `is-${outcome}` : '';
 }
 
-function playerHandsMarkup(round: RoundState | null): string {
+function playerHandsMarkup(round: RoundState | null, house: HouseState | null = null): string {
   if (!round?.hands.length) {
     return `<div class="empty-hand" aria-hidden="true"><span>PLACE YOUR STAKE</span></div>`;
   }
@@ -280,7 +282,7 @@ function playerHandsMarkup(round: RoundState | null): string {
             <strong>${evaluation.total}</strong>
             <span class="hand-wager">${formatChips(hand.wager)} chips</span>
           </div>
-          <div class="cards">${hand.cards.map((card, cardIndex) => cardMarkup(card, false, cardIndex + index * 2)).join('')}</div>
+          <div class="cards">${hand.cards.map((card, cardIndex) => cardMarkup(card, false, cardIndex + index * 2, house && isGoldCard(house, hand.id, cardIndex) ? 'gold' : 'standard')).join('')}</div>
           <span class="hand-state">${handResultLabel(round, hand)}</span>
         </section>`;
     }).join('')}
@@ -335,6 +337,40 @@ function bettingControlsMarkup(): string {
         <button class="stake-button ${selected === maxValue ? 'is-selected' : ''}" data-stake="max" aria-pressed="${selected === maxValue}">MAX</button>
       </div>
       <button class="primary-action deal-button" data-action="deal">${model.round?.phase === 'resolved' ? 'Deal Again' : 'Deal Hand'}</button>
+    </div>`;
+}
+
+function houseBettingControlsMarkup(): string {
+  const replay = model.house.replayAvailable && model.house.currentStake
+    ? `
+      <div class="run-it-back-panel">
+        <div><span>RUN IT BACK</span><strong>FREE REDEAL · ${formatChips(model.house.currentStake)} CHIP BASE STAKE</strong></div>
+        <button class="house-special-action" data-action="run-it-back">Use Token (${model.house.runItBackTokens})</button>
+      </div>`
+    : '';
+
+  return `${replay}${bettingControlsMarkup()}`;
+}
+
+function houseModifierStripMarkup(): string {
+  const nextGoldIn = model.house.roundNumber % 3 === 0 ? 3 : 3 - (model.house.roundNumber % 3);
+  const nextHotMultiplier = hotHandMultiplier(model.house.hotHandStreak + 1);
+  const goldActive = Boolean(model.round && model.house.goldRound);
+
+  const statusById: Record<string, string> = {
+    'gold-card': goldActive ? 'ACTIVE THIS HAND' : `IN ${nextGoldIn} PAID HAND${nextGoldIn === 1 ? '' : 'S'}`,
+    'run-it-back': `${model.house.runItBackTokens} TOKEN${model.house.runItBackTokens === 1 ? '' : 'S'}`,
+    'hot-hand': `NEXT WIN ×${nextHotMultiplier.toFixed(2)} REP`,
+  };
+
+  return `
+    <div class="house-modifier-grid" aria-label="Jak's House active modifier rules">
+      ${HOUSE_MODIFIERS.map((modifier) => `
+        <article class="house-modifier ${modifier.id === 'gold-card' && goldActive ? 'is-active' : ''}">
+          <span>${modifier.name}</span>
+          <strong>${statusById[modifier.id]}</strong>
+          <p>${modifier.shortDescription}</p>
+        </article>`).join('')}
     </div>`;
 }
 
@@ -402,6 +438,72 @@ function classicMarkup(): string {
     </main>`;
 }
 
+function houseMarkup(): string {
+  const round = model.round;
+  const dealerCards = round?.dealer ?? [];
+  const revealDealer = round?.phase === 'resolved';
+  const dealerTotal = dealerCards.length ? (revealDealer ? evaluateHand(dealerCards).total : '?') : '—';
+  const showActions = round?.phase === 'player-turn';
+  const tone = roundTone(round);
+  const progression = titleProgressForRep(model.profile.rep);
+
+  return `
+    <main id="app-main" class="screen table-screen house-screen round-${tone}">
+      <div class="ambient-lamp ambient-lamp-table house-lamp" aria-hidden="true"></div>
+      <header class="table-header">
+        <button class="back-button" data-screen="menu">← Menu</button>
+        <div class="hud" aria-label="Player resources and progression">
+          <span>CHIPS <strong>${formatChips(model.profile.chips)}</strong></span>
+          <span class="title-pill">${progression.current.name}</span>
+          <span class="rep-pill">REP <strong>${model.profile.rep}</strong><i class="rep-mini-track" aria-hidden="true"><i style="width:${progression.percent}%"></i></i></span>
+        </div>
+      </header>
+
+      <section class="house-mode-banner" aria-labelledby="house-mode-title">
+        <div>
+          <span class="house-kicker">ARCADE RULES · NOT STANDARD BLACKJACK</span>
+          <h1 id="house-mode-title">JAK'S HOUSE</h1>
+          <p>Blackjack-inspired arcade play. House modifiers can change a hand, but Classic BlackJak remains standard and separate.</p>
+        </div>
+        <b>HOUSE HAND ${model.house.roundNumber || '—'}</b>
+      </section>
+
+      ${houseModifierStripMarkup()}
+
+      <section class="table house-table" aria-label="Jak's House arcade blackjack table">
+        <div class="hand-zone dealer-zone">
+          <div class="dealer-identity-row">
+            <span class="dealer-avatar house-avatar" aria-hidden="true">JG</span>
+            <span class="dealer-name"><b>JAK</b><small>HOUSE RULES ACTIVE</small></span>
+            <strong class="dealer-total" aria-label="Dealer total">${dealerTotal}</strong>
+          </div>
+          <div class="cards dealer-cards">${dealerCards.length ? dealerCards.map((card, index) => cardMarkup(card, index === 1 && !revealDealer, index)).join('') : '<div class="empty-cards" aria-hidden="true"><span>DEALER</span></div>'}</div>
+          <div class="dealer-commentary" role="status" aria-live="polite" aria-atomic="true" data-event="${model.commentary.event}">
+            <span class="dealer-quote-mark" aria-hidden="true">“</span>
+            <p>${model.commentary.text}</p>
+          </div>
+        </div>
+
+        <div class="table-mark house-table-mark" aria-hidden="true">JAK'S<span>HOUSE</span></div>
+
+        <div class="hand-zone player-zone">
+          ${playerHandsMarkup(round, model.house)}
+        </div>
+        ${resultBannerMarkup(round)}
+      </section>
+
+      <section class="game-controls house-controls" aria-label="Jak's House controls">
+        <p class="status-line" aria-live="polite">${statusText(round)}</p>
+        ${model.houseLastBonusRep > 0 ? `<p class="house-bonus-line">HOT HAND BONUS +${model.houseLastBonusRep} REP</p>` : ''}
+        ${model.houseTokenAwarded ? '<p class="house-token-line">RUN IT BACK TOKEN EARNED</p>' : ''}
+        ${model.error ? `<p class="error-line" role="alert">${model.error}</p>` : ''}
+        ${showActions && round ? actionControlsMarkup(round) : houseBettingControlsMarkup()}
+        <p class="practice-note">Jak's House uses fictional practice chips and arcade modifiers. No monetary value.</p>
+      </section>
+      ${achievementToastMarkup()}
+    </main>`;
+}
+
 function statusText(round: RoundState | null): string {
   if (!round) return 'Choose a stake and deal your first hand.';
   if (round.phase === 'resolved') {
@@ -428,6 +530,26 @@ function settleIfResolved(): void {
   const progression = applyProgression(settled, model.round, model.roundProgress);
   persistProfile(progression.profile);
   model.lastRepEarned = progression.repEarned;
+  model.achievementToasts = [...model.achievementToasts, ...progression.unlocked];
+  say(resolutionDialogueEvent(model.round));
+}
+
+function settleHouseIfResolved(): void {
+  if (!model.round || model.round.phase !== 'resolved') return;
+
+  const settled = settleResults(model.profile, model.round.results);
+  const progression = applyProgression(settled, model.round, model.roundProgress);
+  const houseResolution = completeHouseRound(model.house, model.round, progression.repEarned);
+  const withHouseBonus = {
+    ...progression.profile,
+    rep: progression.profile.rep + houseResolution.hotHandBonusRep,
+  };
+
+  persistProfile(withHouseBonus);
+  model.house = houseResolution.house;
+  model.houseLastBonusRep = houseResolution.hotHandBonusRep;
+  model.houseTokenAwarded = houseResolution.tokenAwarded;
+  model.lastRepEarned = progression.repEarned + houseResolution.hotHandBonusRep;
   model.achievementToasts = [...model.achievementToasts, ...progression.unlocked];
   say(resolutionDialogueEvent(model.round));
 }
@@ -461,6 +583,69 @@ function dealRound(): void {
     }
   } catch (error) {
     persistProfile(before);
+    throw error;
+  }
+}
+
+function dealHouseRound(): void {
+  const stake = normalizedStake();
+  if (stake <= 0) throw new Error('Refill practice chips before dealing.');
+
+  model.achievementToasts = [];
+  model.lastRepEarned = 0;
+  model.houseLastBonusRep = 0;
+  model.houseTokenAwarded = false;
+  model.roundProgress = emptyRoundProgressionContext();
+
+  if (model.profile.progression.currentLossStreak >= 5) {
+    const again = unlockAchievementIds(model.profile, ['again']);
+    if (again.unlocked.length > 0) {
+      persistProfile(again.profile);
+      model.achievementToasts = again.unlocked;
+    }
+  }
+
+  const beforeProfile = model.profile;
+  const beforeHouse = model.house;
+  persistProfile(reserveStake(beforeProfile, stake));
+
+  try {
+    const started = startHouseRound(stake, model.house);
+    model.house = started.house;
+    model.round = started.round;
+
+    if (model.round.phase === 'resolved') {
+      settleHouseIfResolved();
+    } else {
+      say('idle');
+    }
+  } catch (error) {
+    persistProfile(beforeProfile);
+    model.house = beforeHouse;
+    throw error;
+  }
+}
+
+function runHouseReplay(): void {
+  model.achievementToasts = [];
+  model.lastRepEarned = 0;
+  model.houseLastBonusRep = 0;
+  model.houseTokenAwarded = false;
+  model.roundProgress = emptyRoundProgressionContext();
+
+  const beforeHouse = model.house;
+  try {
+    const replay = replayHouseRound(model.house);
+    model.house = replay.house;
+    model.round = replay.round;
+
+    if (model.round.phase === 'resolved') {
+      settleHouseIfResolved();
+    } else {
+      say('idle');
+    }
+  } catch (error) {
+    model.house = beforeHouse;
     throw error;
   }
 }
@@ -514,6 +699,55 @@ function takePlayerAction(action: PlayerAction): void {
   }
 }
 
+function takeHouseAction(action: PlayerAction): void {
+  if (!model.round || model.round.phase !== 'player-turn') throw new Error('Deal a House hand first.');
+
+  const hand = getActiveHand(model.round);
+  const startingTotal = evaluateHand(hand.cards).total;
+  const activeHandId = hand.id;
+  if (action === 'hit' && startingTotal === 20) model.roundProgress.hitOn20 = true;
+  const before = model.profile;
+  const additionalStake = action === 'double' || action === 'split' ? hand.wager : 0;
+
+  if (!allowedActions(hand, before.chips).includes(action)) {
+    throw new Error(`Action "${action}" is not currently allowed.`);
+  }
+
+  if (additionalStake > 0) persistProfile(reserveStake(before, additionalStake));
+
+  try {
+    performAction(model.round, action, before.chips);
+
+    if (action === 'hit') {
+      const updatedHand = model.round.hands.find((candidate) => candidate.id === activeHandId);
+      if (updatedHand && !evaluateHand(updatedHand.cards).isBust && startingTotal >= 16) {
+        model.roundProgress.riskyHitSurvived = true;
+      }
+    }
+
+    if (model.round.phase === 'resolved') {
+      settleHouseIfResolved();
+    } else if (action === 'split') {
+      say('split_started');
+    } else if (action === 'hit') {
+      const updatedHand = model.round.hands.find((candidate) => candidate.id === activeHandId);
+      if (updatedHand) {
+        const updated = evaluateHand(updatedHand.cards);
+        if (updated.isBust) {
+          say('player_bust');
+        } else if (startingTotal >= 17 && startingTotal <= 20) {
+          say(`hit_${startingTotal}` as DialogueEvent);
+        } else if (startingTotal >= 16) {
+          say('survived_risky_hit');
+        }
+      }
+    }
+  } catch (error) {
+    if (additionalStake > 0) persistProfile(before);
+    throw error;
+  }
+}
+
 function render(): void {
   switch (model.screen) {
     case 'menu':
@@ -523,7 +757,7 @@ function render(): void {
       app().innerHTML = classicMarkup();
       break;
     case 'house':
-      app().innerHTML = placeholderMarkup("Jak's House", 'Arcade modifiers stay isolated from Classic BlackJak and arrive in a later phase.');
+      app().innerHTML = houseMarkup();
       break;
     case 'stats':
       app().innerHTML = statsMarkup();
@@ -541,7 +775,13 @@ function bindEvents(): void {
     element.addEventListener('click', () => {
       const screen = element.dataset.screen as AppScreen | undefined;
       if (!screen) return;
-      if (screen === 'classic' && model.screen !== 'classic') {
+      if ((screen === 'classic' || screen === 'house') && screen !== model.screen) {
+        model.round = null;
+        model.roundProgress = emptyRoundProgressionContext();
+        model.achievementToasts = [];
+        model.lastRepEarned = 0;
+        model.houseLastBonusRep = 0;
+        model.houseTokenAwarded = false;
         say(model.profile.stats.totalHands > 0 ? 'return_player' : 'game_start');
       }
       model.screen = screen;
@@ -568,7 +808,10 @@ function bindEvents(): void {
       model.error = null;
       try {
         if (action === 'deal') {
-          dealRound();
+          if (model.screen === 'house') dealHouseRound();
+          else dealRound();
+        } else if (action === 'run-it-back') {
+          runHouseReplay();
         } else if (action === 'refill') {
           persistProfile(refillPracticeChips(model.profile));
           model.selectedStake = 25;
@@ -576,9 +819,12 @@ function bindEvents(): void {
           model.roundProgress = emptyRoundProgressionContext();
           model.achievementToasts = [];
           model.lastRepEarned = 0;
+          model.houseLastBonusRep = 0;
+          model.houseTokenAwarded = false;
           say('refill_chips');
         } else if (action) {
-          takePlayerAction(action as PlayerAction);
+          if (model.screen === 'house') takeHouseAction(action as PlayerAction);
+          else takePlayerAction(action as PlayerAction);
         }
       } catch (error) {
         model.error = error instanceof Error ? error.message : 'Unexpected game error.';

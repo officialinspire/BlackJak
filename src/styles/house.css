@@ -1,0 +1,346 @@
+/* Prompt 6 — Jak's House arcade mode */
+
+.house-screen {
+  --house-hot: #f2c14e;
+  --house-deep: #3f2b0a;
+}
+
+.house-lamp {
+  opacity: .9;
+  background:
+    radial-gradient(ellipse at center, rgba(242,193,78,.22), rgba(113,72,12,.08) 42%, transparent 72%);
+}
+
+.house-mode-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .9rem;
+  padding: .7rem .9rem;
+  border: 1px solid rgba(240,215,122,.34);
+  border-radius: 14px;
+  background:
+    linear-gradient(110deg, rgba(214,182,80,.07), transparent 42%),
+    rgba(9,8,6,.8);
+  box-shadow: inset 0 1px rgba(255,255,255,.025), 0 12px 30px rgba(0,0,0,.22);
+}
+
+.house-mode-banner > div {
+  min-width: 0;
+}
+
+.house-kicker {
+  display: block;
+  color: var(--bj-gold-bright);
+  font-size: .48rem;
+  font-weight: 900;
+  letter-spacing: .14em;
+}
+
+.house-mode-banner h1 {
+  margin: .12rem 0 .1rem;
+  color: var(--bj-cream);
+  font-family: Georgia, serif;
+  font-size: clamp(1.15rem, 4.8vw, 1.7rem);
+  letter-spacing: -.025em;
+}
+
+.house-mode-banner p {
+  margin: 0;
+  max-width: 680px;
+  color: var(--bj-muted);
+  font-size: .62rem;
+  line-height: 1.35;
+}
+
+.house-mode-banner > b {
+  flex: 0 0 auto;
+  padding: .32rem .5rem;
+  border: 1px solid rgba(240,215,122,.28);
+  border-radius: 999px;
+  color: var(--bj-gold-bright);
+  background: rgba(214,182,80,.05);
+  font-size: .5rem;
+  letter-spacing: .09em;
+}
+
+.house-modifier-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: .42rem;
+}
+
+.house-modifier {
+  min-width: 0;
+  display: grid;
+  gap: .12rem;
+  padding: .48rem .55rem;
+  border: 1px solid rgba(214,182,80,.13);
+  border-radius: 10px;
+  background: rgba(0,0,0,.2);
+  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+
+.house-modifier > span {
+  color: var(--bj-muted);
+  font-size: .46rem;
+  font-weight: 900;
+  letter-spacing: .12em;
+}
+
+.house-modifier > strong {
+  overflow: hidden;
+  color: var(--bj-cream);
+  font-size: .58rem;
+  letter-spacing: .035em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.house-modifier > p {
+  margin: .05rem 0 0;
+  color: #8f8778;
+  font-size: .49rem;
+  line-height: 1.22;
+}
+
+.house-modifier.is-active {
+  border-color: rgba(240,215,122,.62);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(242,193,78,.12), transparent 50%),
+    rgba(30,22,8,.42);
+  box-shadow: 0 0 24px rgba(214,182,80,.08);
+}
+
+.house-modifier.is-active > span,
+.house-modifier.is-active > strong {
+  color: var(--bj-gold-bright);
+}
+
+.house-table {
+  border-color: rgba(240,215,122,.48);
+  background:
+    radial-gradient(ellipse at 50% 12%, rgba(214,182,80,.09), transparent 34%),
+    radial-gradient(ellipse at center, #1b1912 0%, #100f0b 58%, #090907 100%);
+}
+
+.house-table::before {
+  border-color: rgba(240,215,122,.15);
+}
+
+.house-avatar {
+  border-color: rgba(240,215,122,.85);
+  box-shadow:
+    inset 0 0 0 2px rgba(214,182,80,.12),
+    0 0 18px rgba(214,182,80,.12);
+}
+
+.house-table-mark {
+  color: rgba(242,234,217,.1);
+}
+
+.house-table-mark span {
+  display: inline;
+  margin-left: .12em;
+  color: rgba(240,215,122,.2);
+}
+
+.house-table-mark::after {
+  content: "ARCADE RULES";
+}
+
+.gold-card {
+  color: #241806 !important;
+  border-color: #fff0a6 !important;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(255,255,255,.55), transparent 25%),
+    linear-gradient(145deg, #fff0a8 0%, #e1b847 46%, #9b6f17 100%) !important;
+  box-shadow:
+    0 12px 30px rgba(0,0,0,.5),
+    0 0 22px rgba(242,193,78,.22),
+    inset 0 0 0 1px rgba(255,255,255,.25) !important;
+}
+
+.gold-card::after {
+  border-color: rgba(70,45,5,.2);
+}
+
+.gold-card-label {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: .24rem;
+  transform: translateX(-50%);
+  padding: .08rem .24rem;
+  border: 1px solid rgba(68,43,3,.28);
+  border-radius: 999px;
+  color: #2f1d03;
+  background: rgba(255,247,203,.45);
+  font-size: .32rem;
+  font-weight: 1000;
+  letter-spacing: .12em;
+}
+
+.gold-card .card-center-suit {
+  text-shadow: 0 1px rgba(255,255,255,.35), 0 0 18px rgba(255,248,200,.35);
+}
+
+.run-it-back-panel {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: .6rem;
+  align-items: center;
+  padding: .58rem .68rem;
+  border: 1px solid rgba(240,215,122,.4);
+  border-radius: 11px;
+  background:
+    linear-gradient(100deg, rgba(214,182,80,.075), transparent 55%),
+    rgba(7,7,7,.5);
+  box-shadow: 0 8px 22px rgba(0,0,0,.2);
+}
+
+.run-it-back-panel > div {
+  min-width: 0;
+  display: grid;
+  gap: .12rem;
+}
+
+.run-it-back-panel span {
+  color: var(--bj-gold-bright);
+  font-size: .52rem;
+  font-weight: 900;
+  letter-spacing: .13em;
+}
+
+.run-it-back-panel strong {
+  color: var(--bj-cream);
+  font-size: .55rem;
+  line-height: 1.25;
+}
+
+.house-special-action {
+  min-height: 44px;
+  padding: .55rem .72rem;
+  border: 1px solid #f1d36c;
+  border-radius: 9px;
+  color: #100c04;
+  background: linear-gradient(180deg, #f0d46d, #b98b26);
+  box-shadow: inset 0 1px rgba(255,255,255,.35), 0 7px 18px rgba(0,0,0,.25);
+  font-size: .62rem;
+  font-weight: 900;
+  letter-spacing: .04em;
+}
+
+.house-bonus-line,
+.house-token-line {
+  margin: 0;
+  text-align: center;
+  font-size: .56rem;
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+
+.house-bonus-line {
+  color: var(--bj-gold-bright);
+}
+
+.house-token-line {
+  color: #e8d79a;
+}
+
+.house-controls .betting-panel {
+  border-color: rgba(240,215,122,.24);
+}
+
+@media (max-width: 700px) {
+  .house-modifier-grid {
+    grid-template-columns: 1fr;
+    gap: .3rem;
+  }
+
+  .house-modifier {
+    grid-template-columns: auto 1fr;
+    gap: .08rem .5rem;
+    align-items: baseline;
+    padding: .4rem .5rem;
+  }
+
+  .house-modifier > span {
+    grid-column: 1;
+  }
+
+  .house-modifier > strong {
+    grid-column: 2;
+    text-align: right;
+  }
+
+  .house-modifier > p {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 520px) {
+  .house-mode-banner {
+    padding: .52rem .58rem;
+    gap: .45rem;
+  }
+
+  .house-mode-banner h1 {
+    font-size: 1.05rem;
+  }
+
+  .house-mode-banner p {
+    font-size: .54rem;
+    line-height: 1.25;
+  }
+
+  .house-mode-banner > b {
+    font-size: .42rem;
+    padding-inline: .38rem;
+  }
+
+  .house-kicker {
+    font-size: .4rem;
+  }
+
+  .house-modifier {
+    padding: .34rem .42rem;
+  }
+
+  .house-modifier > p {
+    display: none;
+  }
+
+  .house-table {
+    min-height: 50vh;
+  }
+
+  .gold-card-label {
+    font-size: .26rem;
+  }
+
+  .run-it-back-panel {
+    grid-template-columns: 1fr;
+    gap: .4rem;
+  }
+
+  .house-special-action {
+    width: 100%;
+  }
+}
+
+@media (max-width: 350px) {
+  .house-mode-banner p {
+    display: none;
+  }
+
+  .house-modifier > strong {
+    font-size: .5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .house-modifier {
+    transition: none !important;
+  }
+}

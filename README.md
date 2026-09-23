@@ -6,7 +6,7 @@ BlackJak is a mobile-first blackjack game from OFFICIAL INSPIRE, inspired in per
 
 ## Current status
 
-**Prompts 0–5 implemented. Classic BlackJak is playable, polished, reactive, and now includes persistent REP, titles, and achievements.**
+**Prompts 0–6 implemented. Classic BlackJak remains standard, while Jak's House now provides a separate arcade rules mode with three isolated modifiers.**
 
 Current demo features:
 
@@ -50,6 +50,15 @@ Current demo features:
 - compact title/REP meter on the table plus full progression display on Stats
 - non-blocking achievement unlock toasts
 - backward-compatible profile hydration for saves created before Prompt 5
+- separate **Jak's House** arcade mode with explicit "not standard blackjack" labeling
+- generic House modifier framework isolated from Classic `startRound`
+- **Gold Card:** every third paid House hand turns the player's first opening card into a visibly gold Ace that counts as 1 or 11
+- **Run It Back:** House sessions start with one token; after a net-losing House round, spend it to redeal the same base stake from a fresh deck with no additional initial chip charge
+- while the Run It Back token is empty, completing five House rounds earns another token
+- Run It Back replays do not increment the paid House-hand counter, so Gold Card scheduling stays deterministic
+- **Hot Hand:** consecutive all-winning House rounds add +25% REP per win after the first, capped at a 2× REP multiplier; losses, pushes, and mixed split results reset it
+- live House modifier status cards, Gold Card presentation, Hot Hand bonus readout, and replay-token controls
+- House outcomes reuse the same chips, stats, achievements, and dealer personality while modifier logic stays separate
 - accessible focus states, semantic controls, live result feedback, and 44px+ touch targets
 - Vitest coverage for deck, hands, rules, round state, storage fallback, and session economy
 
@@ -57,7 +66,7 @@ Current demo features:
 
 See **[BlackJak-Development-Prompts.md](./BlackJak-Development-Prompts.md)**.
 
-Prompt 5 is complete. Prompt 6 adds the separate Jak's House arcade mode and modifier framework.
+Prompt 6 is complete. Prompt 7 adds audio, haptics, and the next game-feel pass.
 
 ## Local development
 
@@ -104,6 +113,31 @@ public/        Static assets
 - no insurance
 - no surrender
 - no side bets
+
+
+## Jak's House rules
+
+**Jak's House is an arcade mode, not standard blackjack.** Classic BlackJak remains available separately and does not use these modifiers.
+
+### Gold Card
+
+Every third **paid** House hand changes the player's first opening card into a Gold Card. The card is rendered in gold and counts exactly like an Ace: **1 or 11**, whichever standard Ace value best fits the hand. A Run It Back replay keeps the same House hand number, so if the original hand was a Gold Card hand, its replay is too.
+
+### Run It Back
+
+A House session begins with **one token**. After a House round with negative net chip result, the token can be spent to redeal the **same base stake** using a fresh shuffled deck. No new initial stake is charged, but optional Double/Split actions still require their normal additional fictional-chip stake. The original result remains in local stats/history; the replay is another resolved hand. While no token is held, completing five House rounds awards one replacement token.
+
+### Hot Hand
+
+Hot Hand changes **REP rewards only**, never deck order, card values, payouts, or dealer behavior.
+
+- first consecutive all-winning House round: 1× REP
+- second: 1.25×
+- third: 1.5×
+- fourth: 1.75×
+- fifth and beyond: 2× cap
+
+A loss, push, or mixed split result resets the House Hot Hand streak.
 
 ## Practice-chip economy
 
