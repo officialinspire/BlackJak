@@ -4,6 +4,8 @@ Repository: https://github.com/officialinspire/BlackJak
 
 BlackJak is a mobile-first, browser-based blackjack game inspired in personality by Jak Gold and built for the OFFICIAL INSPIRE game library. The design goal is simple: keep blackjack recognizable and satisfying, then layer on a distinctive black-and-gold visual identity, humorous dealer commentary, fictional REP progression, unlockables, and an optional arcade-like "Jak's House" mode.
 
+> **Implementation status:** Prompts 0–11 are complete for the **BlackJak Demo v0.1.0 release candidate**. The Post-Demo Expansion Backlog remains intentionally deferred until the release candidate is stable.
+
 ## Product guardrails
 
 - This is an entertainment game using fictional chips and REP only.
