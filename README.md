@@ -6,30 +6,39 @@ BlackJak is a mobile-first blackjack game from OFFICIAL INSPIRE, inspired in per
 
 ## Current status
 
-**Prompts 0–1 implemented:**
+**Prompts 0–2 implemented. Classic BlackJak is now playable.**
+
+Current demo features:
 
 - Vite + TypeScript foundation
-- responsive black/gold menu and game-table shell
-- accessible focus/reduced-motion/touch foundations
-- versioned local-storage helper
-- isolated blackjack rules engine
-- standard 52-card deck and injectable Fisher-Yates RNG
-- ace-aware hand evaluation
-- hard/soft totals, blackjack and bust detection
-- dealer stands on all 17s (including soft 17)
-- Hit / Stand / Double / Split action rules
-- v1 split policy: any two equal-value cards may split (for example K + 10)
-- 3:2 natural-blackjack payout model
-- split 21 is treated as a normal win, not a natural blackjack
-- round state machine with split-hand support
-- developer gameplay harness wired to Classic BlackJak
-- Vitest unit coverage for deck, hand, dealer, payout, actions, and round transitions
-
-The developer harness is intentionally **not** the final player economy. Prompt 2 will add fictional betting controls, bankroll persistence, repeated-round UX, and production gameplay flow.
+- responsive mobile-first black/gold table UI
+- standard 52-card blackjack rules engine
+- injectable Fisher-Yates RNG for deterministic tests
+- ace-aware hard/soft hand evaluation
+- dealer stands on all 17s, including soft 17
+- Hit / Stand / Double / Split
+- v1 split policy: equal blackjack point values may split (for example K + 10)
+- natural blackjack pays 3:2
+- split 21 pays as a normal win
+- fictional practice-chip bankroll starting at 1,000
+- stake presets: 10 / 25 / 50 / 100 / MAX (MAX capped at 250)
+- initial, Double, and Split stakes are validated against available chips
+- zero-chip **Refill Practice Chips** recovery with no purchase or real-world value
+- multiple split hands render independently with active-hand highlighting
+- dealer hole card remains hidden until resolution
+- repeat-hand flow without page refresh
+- persistent chip balance and Classic stats in versioned local storage
+- persistent hands / wins / losses / pushes / blackjacks
+- original HTML/CSS card faces and backs
+- basic deal animation with reduced-motion fallback
+- accessible focus states, semantic controls, live result feedback, and 44px+ touch targets
+- Vitest coverage for deck, hands, rules, round state, storage fallback, and session economy
 
 ## Development Roadmap
 
 See **[BlackJak-Development-Prompts.md](./BlackJak-Development-Prompts.md)**.
+
+Prompt 3 is the dedicated visual/presentation polish pass. Prompt 4 adds Jak's reactive dealer personality.
 
 ## Local development
 
@@ -52,13 +61,13 @@ npm run build
 
 ```text
 src/
-  config/      App constants
-  game/        Pure blackjack rules/state engine
-  storage/     Versioned browser persistence helpers
+  config/      App constants and stake configuration
+  game/        Pure blackjack rules, round state, and session economy
+  storage/     Versioned browser persistence and profile loading
   styles/      Responsive visual system
-  types/       App-level types
+  types/       App/profile types
   ui/          DOM rendering helpers/components
-tests/         Vitest rules/unit tests
+tests/         Vitest rules and state/economy tests
 public/        Static assets
 ```
 
@@ -77,9 +86,9 @@ public/        Static assets
 - no surrender
 - no side bets
 
-## Gameplay economy
+## Practice-chip economy
 
-BlackJak is designed as an entertainment game using **fictional chips and REP only**. The development plan does not include real-money wagering, cash-out, purchasable gambling currency, or gambling-operator integrations.
+BlackJak is an entertainment game using **fictional practice chips and REP only**. Practice chips cannot be purchased or exchanged for money or prizes. If the local practice-chip balance reaches zero, the game provides a free refill to the baseline stack.
 
 ## Design principle
 

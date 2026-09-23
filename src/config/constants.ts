@@ -4,3 +4,5 @@ export const STORAGE_NAMESPACE = 'blackjak';
 export const STORAGE_VERSION = 1;
 export const DEFAULT_CHIPS = 1000;
 export const DEFAULT_REP = 0;
+export const STAKE_OPTIONS = [10, 25, 50, 100] as const;
+export const MAX_STAKE = 250;

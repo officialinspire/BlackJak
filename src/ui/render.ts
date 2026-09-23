@@ -1,21 +1,37 @@
-import { APP_NAME, APP_TAGLINE, DEFAULT_CHIPS, DEFAULT_REP } from '../config/constants';
-import { allowedActions, evaluateHand, performAction, startRound, type PlayerAction, type RoundState } from '../game';
+import { APP_NAME, APP_TAGLINE, MAX_STAKE, STAKE_OPTIONS } from '../config/constants';
+import {
+  allowedActions,
+  evaluateHand,
+  getActiveHand,
+  performAction,
+  refillPracticeChips,
+  reserveStake,
+  settleResults,
+  startRound,
+  type PlayerAction,
+  type PlayerHand,
+  type RoundState,
+} from '../game';
+import { loadProfile, saveProfile } from '../storage/profile';
 import type { AppScreen } from '../types/app';
+import type { PlayerProfile } from '../types/profile';
 import { cardMarkup } from './card';
 
 interface AppModel {
   screen: AppScreen;
   round: RoundState | null;
-  chips: number;
-  rep: number;
+  profile: PlayerProfile;
+  selectedStake: number;
   error: string | null;
 }
+
+const initialProfile = loadProfile();
 
 const model: AppModel = {
   screen: 'menu',
   round: null,
-  chips: DEFAULT_CHIPS,
-  rep: DEFAULT_REP,
+  profile: initialProfile,
+  selectedStake: initialProfile.chips > 0 ? Math.min(25, initialProfile.chips) : 0,
   error: null,
 };
 
@@ -25,8 +41,25 @@ const app = (): HTMLElement => {
   return root;
 };
 
-const button = (label: string, screen: AppScreen, disabled = false): string =>
-  `<button class="menu-button" data-screen="${screen}" ${disabled ? 'disabled aria-disabled="true"' : ''}>${label}</button>`;
+const button = (label: string, screen: AppScreen): string =>
+  `<button class="menu-button" data-screen="${screen}">${label}</button>`;
+
+const formatChips = (value: number): string =>
+  new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(value);
+
+function persistProfile(profile: PlayerProfile): void {
+  model.profile = profile;
+  saveProfile(profile);
+}
+
+function normalizedStake(): number {
+  if (model.profile.chips <= 0) return 0;
+  if (model.selectedStake > 0 && model.selectedStake <= model.profile.chips) return model.selectedStake;
+
+  const affordablePreset = [...STAKE_OPTIONS].reverse().find((stake) => stake <= model.profile.chips);
+  model.selectedStake = affordablePreset ?? Math.min(model.profile.chips, MAX_STAKE);
+  return model.selectedStake;
+}
 
 function menuMarkup(): string {
   return `
@@ -42,7 +75,8 @@ function menuMarkup(): string {
         ${button('Stats', 'stats')}
         ${button('Settings', 'settings')}
       </nav>
-      <p class="fine-print">Fictional chips only. No real-money wagering.</p>
+      <div class="menu-bankroll" aria-label="Saved Classic BlackJak bankroll">Practice chips <strong>${formatChips(model.profile.chips)}</strong></div>
+      <p class="fine-print">Fictional practice chips only. No purchases, cash-out, or real-money wagering.</p>
     </main>`;
 }
 
@@ -58,57 +92,195 @@ function placeholderMarkup(title: string, copy: string): string {
     </main>`;
 }
 
+function statsMarkup(): string {
+  const stats = model.profile.stats;
+  return `
+    <main id="app-main" class="screen panel-screen">
+      <button class="back-button" data-screen="menu">← Menu</button>
+      <section class="glass-panel stats-panel">
+        <p class="eyebrow">CLASSIC BLACKJAK</p>
+        <h1>Stats</h1>
+        <div class="stats-grid">
+          ${statCard('Practice chips', formatChips(model.profile.chips))}
+          ${statCard('Hands', stats.totalHands)}
+          ${statCard('Wins', stats.wins)}
+          ${statCard('Losses', stats.losses)}
+          ${statCard('Pushes', stats.pushes)}
+          ${statCard('Blackjacks', stats.blackjacks)}
+        </div>
+        <p class="stats-note">Split hands are counted individually in win/loss statistics.</p>
+      </section>
+    </main>`;
+}
+
+function statCard(label: string, value: string | number): string {
+  return `<div class="stat-card"><span>${label}</span><strong>${value}</strong></div>`;
+}
+
+function handResultLabel(round: RoundState, hand: PlayerHand): string {
+  if (round.phase !== 'resolved') return hand.status === 'active' ? 'PLAYING' : hand.status.toUpperCase();
+  const result = round.results.find((entry) => entry.handId === hand.id);
+  return result ? result.outcome.toUpperCase() : hand.status.toUpperCase();
+}
+
+function playerHandsMarkup(round: RoundState | null): string {
+  if (!round?.hands.length) {
+    return `<div class="empty-hand" aria-hidden="true"><span>PLACE YOUR STAKE</span></div>`;
+  }
+
+  return `<div class="player-hands ${round.hands.length > 1 ? 'is-split' : ''}">
+    ${round.hands.map((hand, index) => {
+      const evaluation = evaluateHand(hand.cards);
+      const active = round.phase === 'player-turn' && index === round.activeHandIndex;
+      return `
+        <section class="player-hand ${active ? 'is-active' : ''}" aria-label="Player hand ${index + 1}${active ? ', active' : ''}">
+          <div class="hand-meta">
+            <span>HAND ${index + 1}${round.hands.length > 1 ? ` / ${round.hands.length}` : ''}</span>
+            <strong>${evaluation.total}</strong>
+            <span class="hand-wager">${formatChips(hand.wager)} chips</span>
+          </div>
+          <div class="cards">${hand.cards.map((card) => cardMarkup(card)).join('')}</div>
+          <span class="hand-state">${handResultLabel(round, hand)}</span>
+        </section>`;
+    }).join('')}
+  </div>`;
+}
+
+function bettingControlsMarkup(): string {
+  if (model.profile.chips <= 0) {
+    return `
+      <div class="betting-panel broke-panel">
+        <p>You're out of practice chips.</p>
+        <button class="primary-action" data-action="refill">Refill Practice Chips</button>
+        <span>No purchase required. This simply restores the practice stack.</span>
+      </div>`;
+  }
+
+  const selected = normalizedStake();
+  const maxValue = Math.min(model.profile.chips, MAX_STAKE);
+  return `
+    <div class="betting-panel" aria-label="Choose a fictional chip stake">
+      <div class="betting-heading"><span>STAKE</span><strong>${formatChips(selected)} CHIPS</strong></div>
+      <div class="stake-row">
+        ${STAKE_OPTIONS.map((stake) => `
+          <button class="stake-button ${selected === stake ? 'is-selected' : ''}" data-stake="${stake}" aria-pressed="${selected === stake}" ${stake > model.profile.chips ? 'disabled' : ''}>${stake}</button>`).join('')}
+        <button class="stake-button ${selected === maxValue ? 'is-selected' : ''}" data-stake="max" aria-pressed="${selected === maxValue}">MAX</button>
+      </div>
+      <button class="primary-action deal-button" data-action="deal">${model.round?.phase === 'resolved' ? 'Deal Again' : 'Deal Hand'}</button>
+    </div>`;
+}
+
+function actionControlsMarkup(round: RoundState): string {
+  const activeHand = getActiveHand(round);
+  const valid = allowedActions(activeHand, model.profile.chips);
+  return `
+    <div class="action-bar" aria-label="Blackjack actions">
+      ${(['hit', 'stand', 'double', 'split'] as PlayerAction[])
+        .map((action) => `<button data-action="${action}" ${valid.includes(action) ? '' : 'disabled'}>${action.toUpperCase()}</button>`)
+        .join('')}
+    </div>`;
+}
+
 function classicMarkup(): string {
   const round = model.round;
   const dealerCards = round?.dealer ?? [];
-  const activeHand = round?.hands[round.activeHandIndex];
-  const playerCards = activeHand?.cards ?? [];
-  const playerTotal = playerCards.length ? evaluateHand(playerCards).total : '—';
   const revealDealer = round?.phase === 'resolved';
   const dealerTotal = dealerCards.length ? (revealDealer ? evaluateHand(dealerCards).total : '?') : '—';
-  const valid = round?.phase === 'player-turn' && activeHand ? allowedActions(activeHand, model.chips) : [];
+  const showActions = round?.phase === 'player-turn';
 
   return `
     <main id="app-main" class="screen table-screen">
       <header class="table-header">
         <button class="back-button" data-screen="menu">← Menu</button>
-        <div class="hud" aria-label="Player resources"><span>CHIPS <strong>${model.chips}</strong></span><span>REP <strong>${model.rep}</strong></span></div>
+        <div class="hud" aria-label="Player resources">
+          <span>CHIPS <strong>${formatChips(model.profile.chips)}</strong></span>
+          <span>REP <strong>${model.profile.rep}</strong></span>
+        </div>
       </header>
 
-      <section class="table" aria-live="polite">
+      <section class="table" aria-label="Classic BlackJak table">
         <div class="hand-zone dealer-zone">
           <div class="zone-label"><span>DEALER</span><strong>${dealerTotal}</strong></div>
-          <div class="cards">${dealerCards.map((card, index) => cardMarkup(card, index === 1 && !revealDealer)).join('')}</div>
+          <div class="cards dealer-cards">${dealerCards.length ? dealerCards.map((card, index) => cardMarkup(card, index === 1 && !revealDealer)).join('') : '<div class="empty-cards" aria-hidden="true"></div>'}</div>
         </div>
 
-        <div class="table-mark">BLACK<span>JAK</span></div>
+        <div class="table-mark" aria-hidden="true">BLACK<span>JAK</span></div>
 
         <div class="hand-zone player-zone">
-          <div class="zone-label"><span>YOUR HAND</span><strong>${playerTotal}</strong></div>
-          <div class="cards">${playerCards.map((card) => cardMarkup(card)).join('')}</div>
+          ${playerHandsMarkup(round)}
         </div>
       </section>
 
-      <section class="developer-harness" aria-label="Blackjack developer harness">
-        <p class="status-line">${statusText(round)}</p>
+      <section class="game-controls" aria-label="Classic BlackJak controls">
+        <p class="status-line" aria-live="polite">${statusText(round)}</p>
         ${model.error ? `<p class="error-line" role="alert">${model.error}</p>` : ''}
-        <div class="action-bar">
-          <button data-action="deal">${round ? 'New Test Hand' : 'Deal Test Hand'}</button>
-          ${(['hit', 'stand', 'double', 'split'] as PlayerAction[])
-            .map((action) => `<button data-action="${action}" ${valid.includes(action) ? '' : 'disabled'}>${action.toUpperCase()}</button>`)
-            .join('')}
-        </div>
-        <p class="dev-note">Developer harness: rules engine only. Betting/persistence/gameplay economy arrive in Prompt 2.</p>
+        ${showActions && round ? actionControlsMarkup(round) : bettingControlsMarkup()}
+        <p class="practice-note">Practice chips have no monetary value.</p>
       </section>
     </main>`;
 }
 
 function statusText(round: RoundState | null): string {
-  if (!round) return 'Rules engine ready. Deal a deterministic testable round.';
+  if (!round) return 'Choose a stake and deal your first hand.';
   if (round.phase === 'resolved') {
-    return round.results.map((result) => `${result.handId}: ${result.outcome.toUpperCase()} (${result.net >= 0 ? '+' : ''}${result.net})`).join(' · ');
+    return round.results.map((result, index) => {
+      const delta = result.net === 0 ? '±0' : `${result.net > 0 ? '+' : ''}${formatChips(result.net)}`;
+      return `${round.results.length > 1 ? `Hand ${index + 1}: ` : ''}${result.outcome.toUpperCase()} ${delta}`;
+    }).join(' · ');
   }
-  return `Phase: ${round.phase.replace('-', ' ')} · Deck: ${round.deck.length} cards`;
+
+  if (round.phase === 'player-turn') {
+    const hand = getActiveHand(round);
+    return round.hands.length > 1
+      ? `Hand ${round.activeHandIndex + 1} of ${round.hands.length} · ${evaluateHand(hand.cards).total}`
+      : `Your move · ${evaluateHand(hand.cards).total}`;
+  }
+
+  return 'Dealer is playing…';
+}
+
+function settleIfResolved(): void {
+  if (!model.round || model.round.phase !== 'resolved') return;
+  persistProfile(settleResults(model.profile, model.round.results));
+}
+
+function dealRound(): void {
+  const stake = normalizedStake();
+  if (stake <= 0) throw new Error('Refill practice chips before dealing.');
+
+  const before = model.profile;
+  const reserved = reserveStake(before, stake);
+  persistProfile(reserved);
+
+  try {
+    model.round = startRound(stake);
+    settleIfResolved();
+  } catch (error) {
+    persistProfile(before);
+    throw error;
+  }
+}
+
+function takePlayerAction(action: PlayerAction): void {
+  if (!model.round || model.round.phase !== 'player-turn') throw new Error('Deal a hand first.');
+
+  const hand = getActiveHand(model.round);
+  const before = model.profile;
+  const additionalStake = action === 'double' || action === 'split' ? hand.wager : 0;
+
+  if (!allowedActions(hand, before.chips).includes(action)) {
+    throw new Error(`Action "${action}" is not currently allowed.`);
+  }
+
+  if (additionalStake > 0) persistProfile(reserveStake(before, additionalStake));
+
+  try {
+    performAction(model.round, action, before.chips);
+    settleIfResolved();
+  } catch (error) {
+    if (additionalStake > 0) persistProfile(before);
+    throw error;
+  }
 }
 
 function render(): void {
@@ -123,7 +295,7 @@ function render(): void {
       app().innerHTML = placeholderMarkup("Jak's House", 'Arcade modifiers stay isolated from Classic BlackJak and arrive in a later phase.');
       break;
     case 'stats':
-      app().innerHTML = placeholderMarkup('Stats', 'Persistent wins, losses, blackjacks, streaks, REP, and achievements will live here.');
+      app().innerHTML = statsMarkup();
       break;
     case 'settings':
       app().innerHTML = placeholderMarkup('Settings', 'Audio, haptics, motion, accessibility, and gameplay preferences will live here.');
@@ -144,15 +316,31 @@ function bindEvents(): void {
     });
   });
 
+  document.querySelectorAll<HTMLButtonElement>('[data-stake]').forEach((element) => {
+    element.addEventListener('click', () => {
+      const stake = element.dataset.stake;
+      const next = stake === 'max' ? Math.min(model.profile.chips, MAX_STAKE) : Number(stake);
+      if (Number.isFinite(next) && next > 0 && next <= model.profile.chips) {
+        model.selectedStake = next;
+        model.error = null;
+        render();
+      }
+    });
+  });
+
   document.querySelectorAll<HTMLButtonElement>('[data-action]').forEach((element) => {
     element.addEventListener('click', () => {
       const action = element.dataset.action;
       model.error = null;
       try {
         if (action === 'deal') {
-          model.round = startRound(25);
-        } else if (model.round && action) {
-          performAction(model.round, action as PlayerAction, model.chips);
+          dealRound();
+        } else if (action === 'refill') {
+          persistProfile(refillPracticeChips(model.profile));
+          model.selectedStake = 25;
+          model.round = null;
+        } else if (action) {
+          takePlayerAction(action as PlayerAction);
         }
       } catch (error) {
         model.error = error instanceof Error ? error.message : 'Unexpected game error.';
