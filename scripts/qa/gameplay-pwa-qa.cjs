@@ -150,11 +150,11 @@ async function enterGame(p) {
         const serial = await page.$eval('.scene-cards [data-visual-id]', (card) => Number(card.getAttribute('data-visual-id').split(':')[0]));
         await page.locator('[data-action="deal"]').click({ clickCount: 2, delay: 0 });
         await page.waitForTimeout(30);
-        const guarded = await page.$eval('.scene-cards [data-visual-id]', (cards) => [...new Set(cards.map((card) => Number(card.getAttribute('data-visual-id').split(':')[0])))]);
+        const guarded = await page.$$eval('.scene-cards [data-visual-id]', (cards) => [...new Set(cards.map((card) => Number(card.getAttribute('data-visual-id').split(':')[0])))]);
         await page.waitForTimeout(300);
         await page.click('[data-action="deal"]');
         await page.waitForTimeout(30);
-        const started = await page.$eval('.scene-cards [data-visual-id]', (cards) => [...new Set(cards.map((card) => Number(card.getAttribute('data-visual-id').split(':')[0])))]);
+        const started = await page.$$eval('.scene-cards [data-visual-id]', (cards) => [...new Set(cards.map((card) => Number(card.getAttribute('data-visual-id').split(':')[0])))]);
         rapidChecked ||= guarded.length === 1 && guarded[0] === serial && started.length === 1 && started[0] === serial + 1;
       }
       while (await phase(page) === 'playing') { await page.keyboard.press('s'); await page.waitForTimeout(10); }
