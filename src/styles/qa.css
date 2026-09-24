@@ -281,3 +281,208 @@ input:focus-visible,
     color: CanvasText;
   }
 }
+
+
+/* Prompt 5 — device matrix hardening (phone / tablet / desktop / landscape). */
+
+.pause-button,
+.hud-deck,
+.setting-toggle,
+.house-rules summary {
+  min-height: 44px;
+}
+
+.pause-overlay {
+  padding-bottom: max(.75rem, env(safe-area-inset-bottom));
+}
+
+.pause-sign,
+.main-menu-board,
+.glass-panel,
+.daily-panel,
+.game-footer,
+.table-dock {
+  min-width: 0;
+}
+
+/* Settings controls should wrap instead of squeezing labels off narrow screens. */
+@media (max-width: 520px) {
+  .settings-panel .setting-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .settings-panel .setting-row > button,
+  .settings-panel .setting-row > b,
+  .settings-panel .setting-row > label {
+    margin-left: auto;
+  }
+
+  .settings-panel .deck-theme-setting {
+    display: grid;
+  }
+
+  .settings-panel .deck-theme-options {
+    width: 100%;
+  }
+
+  .game-footer-link {
+    max-width: 100%;
+  }
+
+  .game-footer-copy {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .pause-sign {
+    width: min(100%, 620px);
+    margin-top: clamp(32px, 8vh, 72px);
+  }
+}
+
+/* Tiny phones: keep game chrome readable without stealing table width. */
+@media (max-width: 360px) {
+  .table-hud {
+    gap: .2rem;
+  }
+
+  .pause-button,
+  .hud-deck {
+    padding-inline: .38rem;
+  }
+
+  .game-footer-compact .game-footer-link {
+    gap: .3rem;
+    padding-inline: .25rem;
+  }
+
+  .game-footer-compact .game-footer-copy {
+    font-size: .55rem;
+    letter-spacing: .04em;
+  }
+}
+
+/* Tablets get a deliberate middle layout rather than an enlarged phone shell. */
+@media (min-width: 700px) and (max-width: 1100px) {
+  .screen {
+    padding-inline:
+      max(1.25rem, env(safe-area-inset-left))
+      max(1.25rem, env(safe-area-inset-right));
+  }
+
+  .menu-screen {
+    align-content: start;
+    padding-top: max(2rem, env(safe-area-inset-top));
+  }
+
+  .main-menu-board {
+    width: min(100%, 760px);
+  }
+
+  .panel-screen .glass-panel {
+    width: min(100%, 840px);
+  }
+
+  .table-screen .game-scene {
+    --scene-chrome: 17rem;
+    width: min(100%, 960px);
+  }
+
+  .house-screen .game-scene {
+    --scene-chrome: 18.5rem;
+  }
+
+  .table-screen > .table-dock,
+  .table-screen > .house-strip {
+    width: min(100%, 960px);
+  }
+
+  .table-dock .dock-row {
+    min-height: 60px;
+  }
+
+  .daily-panel {
+    width: min(100%, 880px);
+  }
+
+  .game-footer:not(.game-footer-compact) {
+    width: min(100%, 40rem);
+  }
+}
+
+/* Wide desktop: cap the scene instead of stretching art/UI into empty space. */
+@media (min-width: 1200px) {
+  .table-screen .game-scene,
+  .table-screen > .table-dock,
+  .table-screen > .house-strip {
+    width: min(100%, 1040px);
+  }
+
+  .menu-screen {
+    row-gap: 1.2rem;
+  }
+}
+
+/* Short landscape: preserve the two-column game-first shell and keep every
+   secondary element in the controls column instead of auto-flowing under art. */
+@media (orientation: landscape) and (max-height: 540px) {
+  .startup-awaiting {
+    padding:
+      max(.45rem, env(safe-area-inset-top))
+      max(.75rem, env(safe-area-inset-right))
+      max(.45rem, env(safe-area-inset-bottom))
+      max(.75rem, env(safe-area-inset-left));
+  }
+
+  .startup-lockup {
+    gap: .3rem;
+  }
+
+  .startup-logo {
+    width: clamp(2.75rem, 12vh, 4rem);
+  }
+
+  .startup-presents {
+    font-size: .58rem;
+  }
+
+  .startup-lockup h1 {
+    font-size: clamp(3rem, 20vh, 5rem);
+  }
+
+  .startup-action {
+    width: min(100%, 26rem);
+    min-height: 44px;
+    padding-block: .55rem;
+  }
+
+  .startup-skip {
+    right: max(.5rem, env(safe-area-inset-right));
+    bottom: max(.5rem, env(safe-area-inset-bottom));
+  }
+
+  .pause-sign {
+    width: min(100%, 590px);
+    margin-top: max(.5rem, env(safe-area-inset-top));
+  }
+
+  .pause-rope {
+    display: none;
+  }
+
+  .table-screen > .game-footer-compact {
+    grid-column: 2;
+    width: 100%;
+    justify-self: stretch;
+    padding-inline: .15rem;
+  }
+
+  .table-screen > .game-footer-compact .game-footer-link {
+    width: 100%;
+  }
+
+  .panel-screen {
+    padding-top: max(.5rem, env(safe-area-inset-top));
+  }
+}
