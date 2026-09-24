@@ -30,6 +30,7 @@ import {
   type DialogueEvent,
   type DialogueMemory,
   type DialogueSelection,
+  type Card,
   type HouseState,
   type PlayerAction,
   type PlayerHand,
@@ -42,6 +43,7 @@ import type { AppScreen } from '../types/app';
 import type { DailyOutcome, PlayerProfile } from '../types/profile';
 import type { FeedbackPreferences, VisualPreferences } from '../types/preferences';
 import { cardMarkup, setActiveCardTheme } from './card';
+import { CardMotionPlanner, cardVisualId, type CardMotionPlan } from './card-motion';
 import { CARD_THEMES } from '../data/card-atlas';
 import { CARD_THEME_IDS, type CardThemeId } from '../data/visual-atlas';
 import { loadVisualPreferences, saveVisualPreferences } from '../storage/visual-preferences';
@@ -144,9 +146,7 @@ const model: AppModel = {
   roundSerial: 0,
 };
 
-/** Cards already on screen in the previous render: only new cards play the deal-in. */
-let renderedCardKeys = new Set<string>();
-let pendingCardKeys = new Set<string>();
+const cardMotion = new CardMotionPlanner();
 
 const fxQueue = new FxQueue();
 /** Cues for the render in progress (one-shot; empty for plain re-renders). */
@@ -159,15 +159,22 @@ function cueFx(...cues: FxCue[]): void {
   fxQueue.cue(...cues);
 }
 
-/** Card key already shown face-down in the previous render (so a reveal flips). */
-function wasRenderedHidden(key: string): boolean {
-  return renderedCardKeys.has(`${model.roundSerial}:${key}`);
-}
-
-function cardIsNew(key: string): boolean {
-  const scoped = `${model.roundSerial}:${key}`;
-  pendingCardKeys.add(scoped);
-  return !renderedCardKeys.has(scoped);
+function planCard(
+  owner: 'dealer' | 'player',
+  handId: string,
+  slot: number,
+  card: Card,
+  hidden: boolean,
+  dealOrder: number,
+  splitSourceId?: string,
+): CardMotionPlan {
+  return cardMotion.plan({
+    id: cardVisualId(model.roundSerial, owner, handId, slot),
+    hidden,
+    fingerprint: `${card.rank}-${card.suit}`,
+    dealOrder,
+    splitSourceId,
+  });
 }
 
 const app = (): HTMLElement => {
@@ -559,8 +566,12 @@ function playerHandsMarkup(round: RoundState | null, house: HouseState | null = 
             <span class="hand-wager">${formatChips(hand.wager)} chips</span>
           </div>
           <div class="cards">${hand.cards.map((card, cardIndex) => {
-            const fresh = cardIsNew(`p:${index}:${cardIndex}:${card.rank}${card.suit}`);
-            return cardMarkup(card, false, fresh ? cardIndex + index * 2 : 0, house && isGoldCard(house, hand.id, cardIndex) ? 'gold' : 'standard', undefined, fresh);
+            const splitSourceId = index > 0 && cardIndex === 0
+              ? cardVisualId(model.roundSerial, 'player', round.hands[index - 1].id, 1)
+              : undefined;
+            const dealOrder = round.hands.length === 1 && cardIndex === 1 ? 2 : 0;
+            const plan = planCard('player', hand.id, cardIndex, card, false, dealOrder, splitSourceId);
+            return cardMarkup(card, false, 0, house && isGoldCard(house, hand.id, cardIndex) ? 'gold' : 'standard', undefined, plan);
           }).join('')}</div>
           <span class="hand-state">${handResultLabel(round, hand)}</span>
         </section>`;
@@ -695,13 +706,31 @@ function dealerHandMarkup(view: TableView): string {
     <div class="dealer-hand-row">
       <div class="cards dealer-cards" aria-label="Dealer cards">${dealerCards.map((card, index) => {
         const hidden = index === 1 && !view.revealDealer;
-        const fresh = cardIsNew(`d:${index}:${hidden ? 'hidden' : `${card.rank}${card.suit}`}`);
-        // The hole card that was face-down last render flips over instead of re-dealing.
-        const reveal = fresh && !hidden && wasRenderedHidden(`d:${index}:hidden`);
-        return cardMarkup(card, hidden, fresh ? index : 0, 'standard', undefined, reveal ? 'flip' : fresh);
+        const plan = planCard('dealer', 'dealer', index, card, hidden, index === 0 ? 1 : index === 1 ? 3 : 0);
+        return cardMarkup(card, hidden, 0, 'standard', undefined, plan);
       }).join('')}</div>
       ${dealerCards.length ? `<strong class="dealer-total" aria-label="${view.revealDealer ? `Dealer total ${view.dealerTotal}` : 'Dealer total hidden'}">${view.dealerTotal}</strong>` : ''}
     </div>`;
+}
+
+function dailyDealerCardsMarkup(round: RoundState, revealDealer: boolean): string {
+  return round.dealer.map((card, index) => {
+    const hidden = index === 1 && !revealDealer;
+    return cardMarkup(card, hidden, 0, 'standard', undefined,
+      planCard('dealer', 'dealer', index, card, hidden, index === 0 ? 1 : index === 1 ? 3 : 0));
+  }).join('');
+}
+
+function dailyPreviewPlayerCardsMarkup(round: RoundState): string {
+  const hand = round.hands[0];
+  return hand.cards.map((card, index) => cardMarkup(
+    card,
+    false,
+    0,
+    'standard',
+    undefined,
+    planCard('player', hand.id, index, card, false, index === 0 ? 0 : 2),
+  )).join('');
 }
 
 function sceneDialogueMarkup(view: TableView, house: boolean): string {
@@ -1127,7 +1156,6 @@ function dailyMarkup(): string {
   const round = model.dailyRound;
   const displayRound = round ?? challenge.round;
   const revealDealer = Boolean(round?.phase === 'resolved');
-  const dealerCards = displayRound.dealer;
   const playerHand = displayRound.hands[0];
   const completed = state.completed;
   const result = completed && state.outcome ? state.outcome.toUpperCase() : null;
@@ -1146,12 +1174,12 @@ function dailyMarkup(): string {
         <div class="daily-table">
           <section>
             <span>DEALER UP-CARD</span>
-            <div class="cards">${cardMarkup(dealerCards[0], false, 0)}${round ? cardMarkup(dealerCards[1], !revealDealer, 1) : ''}</div>
+            <div class="cards">${dailyDealerCardsMarkup(displayRound, revealDealer)}</div>
           </section>
           <div class="daily-vs">VS</div>
           <section class="daily-player-zone">
             <span>YOUR HAND</span>
-            ${round ? playerHandsMarkup(round) : `<div class="daily-starting-hand"><strong>${evaluateHand(playerHand.cards).total}</strong><div class="cards">${playerHand.cards.map((card,index)=>cardMarkup(card,false,index)).join('')}</div></div>`}
+            ${round ? playerHandsMarkup(round) : `<div class="daily-starting-hand"><strong>${evaluateHand(playerHand.cards).total}</strong><div class="cards">${dailyPreviewPlayerCardsMarkup(displayRound)}</div></div>`}
           </section>
         </div>
         ${completed && !round ? `
@@ -1325,6 +1353,7 @@ function isStaleTap(event: MouseEvent): boolean {
 
 function render(options: RenderOptions = {}): void {
   currentFx = fxQueue.consume();
+  cardMotion.beginFrame();
   const previousScreen = lastRenderedScreen;
   const activeBeforeRender = document.activeElement;
   const hadInteractiveFocus = activeBeforeRender instanceof HTMLElement && activeBeforeRender !== document.body;
@@ -1354,8 +1383,7 @@ function render(options: RenderOptions = {}): void {
   // Dealer gestures are one-shot: later re-renders show the dialogue pose only.
   model.dealerCue = null;
   app().querySelector('#app-main')?.classList.toggle('is-static-render', Boolean(options.staticTable));
-  renderedCardKeys = pendingCardKeys;
-  pendingCardKeys = new Set<string>();
+  cardMotion.commitFrame();
   const dockPhase = (app().querySelector('.table-dock')?.className.match(/phase-(\w+)/)?.[1] ?? null) as DockPhase | null;
   const controlsState = controlsStateKey({
     screen: model.screen,

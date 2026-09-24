@@ -7,11 +7,19 @@
  * the table screen, so ordinary re-renders (e.g. choosing a stake) don't replay them.
  */
 
-/* ---- Card slide / deal (only new cards; see is-settled) ---- */
+/* ---- Card lifecycle: the planner is the sole animation trigger ---- */
 
-.game-scene .playing-card:not(.is-settled):not(.is-flip) {
+.playing-card {
+  animation: none;
+}
+
+.playing-card.is-new {
   animation: fx-card-deal var(--fx-card-deal, 200ms) cubic-bezier(.2,.8,.3,1.1) both;
   animation-delay: var(--deal-delay, 0ms);
+}
+
+.playing-card.is-moving-split {
+  animation: fx-card-split var(--fx-card-deal, 200ms) cubic-bezier(.2,.8,.3,1.1) both;
 }
 
 @keyframes fx-card-deal {
@@ -20,17 +28,48 @@
   to { opacity: 1; transform: none; }
 }
 
+@keyframes fx-card-split {
+  from { opacity: .7; transform: translate3d(-42%, 0, 0) rotate(-3deg); }
+  to { opacity: 1; transform: none; }
+}
+
 /* ---- Hole card flip on reveal ---- */
 
-.game-scene .playing-card.is-flip {
+.playing-card.card-flip-shell {
+  overflow: visible;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  perspective: 700px;
+}
+
+.card-flipper {
+  position: absolute;
+  inset: 0;
+  display: block;
+  transform-style: preserve-3d;
+}
+
+.playing-card.is-flip .card-flipper {
   animation: fx-card-flip var(--fx-card-flip, 320ms) cubic-bezier(.3,.9,.35,1) both;
-  transform-origin: 50% 50%;
+}
+
+.card-side {
+  position: absolute;
+  inset: 0;
+  display: block;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform-style: preserve-3d;
+}
+
+.card-flip-back {
+  transform: rotateY(180deg);
 }
 
 @keyframes fx-card-flip {
-  0% { transform: perspective(700px) rotateY(88deg) scale(1.04); filter: brightness(.7); }
-  60% { transform: perspective(700px) rotateY(-8deg) scale(1.02); filter: none; }
-  100% { transform: none; }
+  from { transform: rotateY(180deg); }
+  to { transform: rotateY(0deg); }
 }
 
 /* ---- Bust impact: once, on the bust itself (was replaying every render) ---- */
@@ -183,6 +222,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .game-scene .playing-card,
+  .playing-card,
+  .card-flipper,
   .fx-bust .player-hand.is-bust,
   .fx-result .player-hand.is-bust,
   .fx-result .player-hand .playing-card,

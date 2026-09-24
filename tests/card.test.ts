@@ -38,6 +38,19 @@ describe('accessible card markup', () => {
   it('keeps the deal animation delay', () => {
     expect(cardMarkup({ rank: '9', suit: 'clubs' }, false, 3)).toContain('--deal-delay:114ms');
   });
+
+  it('renders a hole reveal with simultaneous back and face planes', () => {
+    const markup = cardMarkup({ rank: 'A', suit: 'spades' }, false, 0, 'standard', 'standard', {
+      id: '4:dealer:dealer:1', state: 'FLIPPING', dealOrder: 3,
+    });
+    expect(markup).toContain('data-visual-id="4:dealer:dealer:1"');
+    expect(markup).toContain('data-motion="FLIPPING"');
+    expect(markup).toContain('card-front');
+    expect(markup).toContain('card-flip-back');
+    expect(markup).toContain(viewBoxOf(CARD_THEMES.standard.faces['A-spades']));
+    expect(markup).toContain(viewBoxOf(CARD_THEMES.standard.back));
+    expect(markup).toContain('aria-label="A of spades"');
+  });
 });
 
 describe('themed sprite faces', () => {
