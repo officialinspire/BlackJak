@@ -2,12 +2,17 @@ import { canSplitCards, evaluateHand } from './hand';
 import type { Card, HandResult, Outcome, PlayerAction, PlayerHand } from './types';
 
 export const BLACKJACK_PAYOUT = 1.5;
+export const MAX_PLAYER_HANDS = 4;
 
 export function dealerShouldHit(cards: readonly Card[]): boolean {
   return evaluateHand(cards).total < 17;
 }
 
-export function allowedActions(hand: PlayerHand, availableBankroll = Number.POSITIVE_INFINITY): PlayerAction[] {
+export function allowedActions(
+  hand: PlayerHand,
+  availableBankroll = Number.POSITIVE_INFINITY,
+  playerHandCount = 1,
+): PlayerAction[] {
   if (hand.status !== 'active') return [];
 
   const actions: PlayerAction[] = ['hit', 'stand'];
@@ -15,7 +20,7 @@ export function allowedActions(hand: PlayerHand, availableBankroll = Number.POSI
 
   if (isInitialTwoCards && availableBankroll >= hand.wager) {
     actions.push('double');
-    if (canSplitCards(hand.cards)) actions.push('split');
+    if (playerHandCount < MAX_PLAYER_HANDS && canSplitCards(hand.cards)) actions.push('split');
   }
 
   return actions;
