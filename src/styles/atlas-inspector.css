@@ -115,3 +115,7 @@
 #visual-atlas-inspector .vai-crop.is-active { border-color: #ff3df2; }
 #visual-atlas-inspector .vai-crop code { font-size: 10px; opacity: 0.75; }
 #visual-atlas-inspector .vai-crop-label { font-size: 11px; text-align: center; }
+
+#visual-atlas-inspector .vai-rect.is-flagged { stroke: #ff4d4d; stroke-width: 3; stroke-dasharray: 4 3; }
+#visual-atlas-inspector .vai-crop.is-flagged { border-color: #ff4d4d; }
+#visual-atlas-inspector .vai-crop.is-flagged .vai-crop-label { color: #ff9c9c; }

@@ -40,8 +40,11 @@ import { loadFeedbackPreferences, saveFeedbackPreferences } from '../storage/pre
 import { loadProfile, saveProfile } from '../storage/profile';
 import type { AppScreen } from '../types/app';
 import type { DailyOutcome, PlayerProfile } from '../types/profile';
-import type { FeedbackPreferences } from '../types/preferences';
-import { cardMarkup } from './card';
+import type { FeedbackPreferences, VisualPreferences } from '../types/preferences';
+import { cardMarkup, setActiveCardTheme } from './card';
+import { CARD_THEMES } from '../data/card-atlas';
+import { CARD_THEME_IDS, type CardThemeId } from '../data/visual-atlas';
+import { loadVisualPreferences, saveVisualPreferences } from '../storage/visual-preferences';
 import { gameSceneMarkup } from './scene';
 import { dealerMarkup } from './dealer';
 import type { DealerAction } from '../data/dealer-visuals';
@@ -62,6 +65,7 @@ interface AppModel {
   houseLastBonusRep: number;
   houseTokenAwarded: boolean;
   preferences: FeedbackPreferences;
+  visual: VisualPreferences;
   dailyDateKey: string;
   dailyRound: RoundState | null;
   dailyShareStatus: string | null;
@@ -84,6 +88,7 @@ const FOCUS_ATTRIBUTES = [
   'data-stake',
   'data-setting-toggle',
   'data-setting-volume',
+  'data-card-theme',
   'data-screen',
 ] as const;
 
@@ -99,6 +104,8 @@ let globalKeyboardBound = false;
 
 const initialProfile = loadProfile();
 const initialPreferences = loadFeedbackPreferences();
+const initialVisual = loadVisualPreferences();
+setActiveCardTheme(initialVisual.cardTheme);
 const initialDateKey = localDateKey();
 const initialDialogue = selectDialogue(initialProfile.stats.totalHands > 0 ? 'return_player' : 'game_start');
 
@@ -118,6 +125,7 @@ const model: AppModel = {
   houseLastBonusRep: 0,
   houseTokenAwarded: false,
   preferences: initialPreferences,
+  visual: initialVisual,
   dailyDateKey: initialDateKey,
   dailyRound: null,
   dailyShareStatus: null,
@@ -227,6 +235,28 @@ const formatChips = (value: number): string =>
 function persistProfile(profile: PlayerProfile): void {
   model.profile = profile;
   saveProfile(profile);
+}
+
+function setCardTheme(theme: CardThemeId): void {
+  model.visual = { ...model.visual, cardTheme: theme };
+  saveVisualPreferences(model.visual);
+  setActiveCardTheme(theme);
+}
+
+function deckThemeSettingMarkup(): string {
+  const preview = (theme: CardThemeId): string =>
+    `<span class="deck-theme-preview" aria-hidden="true">${cardMarkup({ rank: 'A', suit: 'spades' }, false, 0, 'standard', theme)}${cardMarkup({ rank: 'K', suit: 'hearts' }, true, 0, 'standard', theme)}</span>`;
+  return `
+    <div class="setting-row deck-theme-setting">
+      <span><strong>Card deck</strong><small>Visual only. Every deck plays exactly the same.</small></span>
+      <div class="deck-theme-options" role="group" aria-label="Card deck theme">
+        ${CARD_THEME_IDS.map((theme) => `
+          <button type="button" class="deck-theme-option" data-card-theme="${theme}" aria-pressed="${model.visual.cardTheme === theme}">
+            ${preview(theme)}
+            <span>${CARD_THEMES[theme].label}</span>
+          </button>`).join('')}
+      </div>
+    </div>`;
 }
 
 function persistPreferences(preferences: FeedbackPreferences): void {
@@ -356,6 +386,7 @@ function settingsMarkup(): string {
         <p class="eyebrow">TABLE SETUP</p>
         <h1>Settings</h1>
         <div class="settings-list">
+          ${deckThemeSettingMarkup()}
           <div class="setting-row"><span><strong>Motion</strong><small>Animations follow your device's reduced-motion preference.</small></span><b>System</b></div>
           ${toggle('master', 'Master feedback', 'Master switch for synthesized sound and haptic feedback.')}
           ${toggle('sfx', 'Sound effects', 'Cards, chips, buttons, results, and achievement stings.')}
@@ -1222,6 +1253,18 @@ function bindEvents(): void {
       if (!key) return;
       const next = { ...model.preferences, [key]: !model.preferences[key] };
       persistPreferences(next);
+      feedback('button', 'tap');
+      render();
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-card-theme]').forEach((element) => {
+    element.addEventListener('click', () => {
+      if (!element.isConnected) return;
+      feedbackEngine.activate();
+      const theme = element.dataset.cardTheme;
+      if (!theme || !(CARD_THEME_IDS as readonly string[]).includes(theme)) return;
+      setCardTheme(theme as CardThemeId);
       feedback('button', 'tap');
       render();
     });

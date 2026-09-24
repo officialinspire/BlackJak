@@ -1,0 +1,136 @@
+/*
+ * Prompt 15 — sprite-sheet card faces (standard / jak / inspire).
+ *
+ * The card box keeps the existing size, overlap and deal-animation rules. The
+ * themed sprite is fitted inside it without distortion (pip cards are narrower
+ * than court cards on the sheets); --sprite-inset-x/y mark where the art sits.
+ */
+
+.playing-card.sprite-card {
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.playing-card.sprite-card::after {
+  content: none;
+}
+
+.sprite-card .card-sprite {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  filter: drop-shadow(0 8px 12px rgba(0,0,0,.42));
+}
+
+/* Hidden dealer card: themed back only. */
+.playing-card.sprite-card.card-back {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+/* ---- Gold Card (Jak's House): decorates the themed card, never replaces it ---- */
+
+.playing-card.sprite-card.gold-card {
+  border: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+
+.gold-card-overlay {
+  position: absolute;
+  z-index: 3;
+  inset: var(--sprite-inset-y, 0) var(--sprite-inset-x, 0);
+  border-radius: 9% / 6%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255,250,215,.28), transparent 45%),
+    linear-gradient(145deg, rgba(255,236,150,.36) 0%, rgba(225,184,71,.2) 48%, rgba(155,111,23,.32) 100%);
+  box-shadow:
+    0 0 0 2px #f2c14e,
+    0 0 0 3px rgba(68,43,3,.35),
+    0 0 20px rgba(242,193,78,.5);
+  animation: gold-card-glow 2.4s ease-in-out infinite;
+}
+
+.sprite-card.gold-card .gold-card-label {
+  top: calc(var(--sprite-inset-y, 0%) + .2rem);
+  background: rgba(255,240,170,.92);
+}
+
+@keyframes gold-card-glow {
+  0%, 100% { box-shadow: 0 0 0 2px #f2c14e, 0 0 0 3px rgba(68,43,3,.35), 0 0 14px rgba(242,193,78,.4); }
+  50% { box-shadow: 0 0 0 2px #ffe08a, 0 0 0 3px rgba(68,43,3,.35), 0 0 24px rgba(242,193,78,.65); }
+}
+
+/* ---- Settings: deck theme selector ---- */
+
+.deck-theme-setting {
+  display: grid;
+  gap: .6rem;
+}
+
+.deck-theme-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .5rem;
+}
+
+.deck-theme-option {
+  display: grid;
+  justify-items: center;
+  gap: .35rem;
+  min-width: 0;
+  padding: .55rem .35rem .45rem;
+  border: 1px solid rgba(212,175,55,.28);
+  border-radius: 12px;
+  color: var(--cream);
+  background: rgba(0,0,0,.28);
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+}
+
+.deck-theme-option[aria-pressed='true'] {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, rgba(212,175,55,.16), rgba(0,0,0,.3));
+  box-shadow: 0 0 0 1px rgba(240,215,122,.4) inset;
+}
+
+.deck-theme-preview {
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.deck-theme-preview .playing-card {
+  width: clamp(34px, 9vw, 52px);
+  margin-left: -12px;
+  animation: none;
+}
+
+.deck-theme-preview .playing-card:first-child {
+  margin-left: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gold-card-overlay { animation: none; }
+}
+
+@media (forced-colors: active) {
+  .gold-card-overlay { border: 2px solid Highlight; background: none; box-shadow: none; }
+  .deck-theme-option[aria-pressed='true'] { border: 2px solid Highlight; }
+}
+
+/* Drawn fallback for flagged sheet cells (CARD_ART_ISSUES), matched to the Inspire mono deck. */
+.playing-card.art-fallback.card-theme-inspire {
+  color: #111 !important;
+  border-color: #1a1a1a;
+  background: #fbfaf7;
+}

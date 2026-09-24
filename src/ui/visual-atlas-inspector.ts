@@ -9,6 +9,7 @@ import {
   type AtlasSheetId,
 } from '../data/visual-atlas';
 import { atlasSpriteMarkup } from './atlas';
+import { CARD_ART_ISSUES } from '../data/card-atlas';
 
 /*
  * Developer-only visual atlas inspector, opened with ?debugVisuals=1.
@@ -18,6 +19,12 @@ import { atlasSpriteMarkup } from './atlas';
 
 const ROOT_ID = 'visual-atlas-inspector';
 
+/** Atlas keys (card:theme:suit:rank) of sheet cells flagged as unusable art. */
+const FLAGGED = new Map<string, string>(CARD_ART_ISSUES.map((issue) => {
+  const [rank, suit] = issue.key.split('-');
+  return [`card:${issue.theme}:${suit}:${rank}`, issue.issue] as const;
+}));
+
 const escapeHtml = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -25,7 +32,8 @@ function sheetOverlayMarkup(sheetId: AtlasSheetId, entries: readonly AtlasEntry[
   const sheet = ATLAS_SHEETS[sheetId];
   const outlines = entries.map((entry) => {
     const { x, y, width, height } = entry.rect;
-    return `<rect class="vai-rect vai-kind-${entry.kind}" data-key="${escapeHtml(entry.key)}" x="${x}" y="${y}" width="${width}" height="${height}"><title>${escapeHtml(`${entry.key} — ${x},${y} ${width}×${height}`)}</title></rect>`;
+    const flag = FLAGGED.get(entry.key);
+    return `<rect class="vai-rect vai-kind-${entry.kind}${flag ? ' is-flagged' : ''}" data-key="${escapeHtml(entry.key)}" x="${x}" y="${y}" width="${width}" height="${height}"><title>${escapeHtml(`${entry.key} — ${x},${y} ${width}×${height}${flag ? ` — FLAGGED: ${flag}` : ''}`)}</title></rect>`;
   }).join('');
 
   return `<svg class="vai-sheet" viewBox="0 0 ${sheet.width} ${sheet.height}" role="img" aria-label="${escapeHtml(sheet.file)} with atlas rects">
@@ -37,9 +45,10 @@ function sheetOverlayMarkup(sheetId: AtlasSheetId, entries: readonly AtlasEntry[
 function cropGridMarkup(entries: readonly AtlasEntry[]): string {
   return entries.map((entry) => {
     const { x, y, width, height } = entry.rect;
-    return `<button type="button" class="vai-crop" data-key="${escapeHtml(entry.key)}">
+    const flag = FLAGGED.get(entry.key);
+    return `<button type="button" class="vai-crop${flag ? ' is-flagged' : ''}" data-key="${escapeHtml(entry.key)}"${flag ? ` title="${escapeHtml(flag)}"` : ''}>
         ${atlasSpriteMarkup(entry.sheet, entry.rect)}
-        <span class="vai-crop-label">${escapeHtml(entry.label)}</span>
+        <span class="vai-crop-label">${flag ? '⚠ ' : ''}${escapeHtml(entry.label)}</span>
         <code>${x},${y} ${width}×${height}</code>
       </button>`;
   }).join('');

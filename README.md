@@ -341,6 +341,16 @@ The table keeps its native aspect ratio. The frame height follows the viewport: 
 
 Jak comes from `blackjak-sprite-sheet.png` and stands behind the dealer's cards; the lower part of his viewport fades out behind them. `src/data/dealer-visuals.ts` maps every `DialogueEvent` to a `DealerMood` and each mood to one or more sprite poses. Examples: `player_blackjack` → surprised, `dealer_blackjack` → smug, `player_bust` → shrug, `double_loss` → teasing. Short one-shot gestures (deal → card flick, hit → card toss, double → chips) play before he settles into the dialogue pose. The mapping reads only dialogue events and UI action cues, never rules or round state. Each pose is framed on its measured sunglasses position, so his head stays the same size whether a bust, half-body or full-body sprite is showing. The sprite is `aria-hidden`; his lines stay as text in the dialogue layer. With reduced motion, gestures and idle breathing are turned off.
 
+### Card decks
+
+Cards are drawn from the three deck sheets through a strict `Card {rank, suit}` → sprite mapping in `src/data/card-atlas.ts` (52 faces plus a back per deck). Every face was checked by eye: the corner index (rank and suit) matches its key in all three sheets, and pip counts were counted on every number card. The Inspire deck orders its rows ♠ ♥ ♣ ♦ and prints all suits in black.
+
+**Flagged art:** the Inspire 7♠, 7♥ and 7♣ show six pips (their index correctly reads 7). They are listed in `CARD_ART_ISSUES` and render as the drawn CSS face instead of the misleading sprite. The `?debugVisuals=1` inspector marks them in red. All other cells map directly.
+
+Sprites sit undistorted inside the existing card box, so sizing, overlap, split hands and the deal animation are unchanged. The hidden dealer card shows the deck's own back. Jak's House Gold Card adds a gold tint, ring and "GOLD" tag on top of the themed card; the rule itself is untouched. Accessible names ("K of hearts", "Hidden dealer card", "Gold Card, counts as Ace, …") are unchanged.
+
+Settings → **Card deck** chooses Standard (default), Jak's Cosmic or Inspire Mono. The choice is stored separately under `visual-preferences`, so existing saves load unchanged, and a missing or unknown value falls back to Standard.
+
 ## Visual atlas (art sheets)
 
 The PNG sheets at the repository root (`blackjak-sprite-sheet.png`, `blackjak-table.png`, `dialogue-status-bar.png`, `menu-bar.png`, and the three `blackjak-cards-*.png` decks) are mapped in `src/data/visual-atlas.ts`. Every `SpriteRect` was measured from the actual pixels rather than an assumed grid — ace/court cards are wider, rows sit at different offsets, the Inspire deck orders its rows ♠ ♥ ♣ ♦, and neighbouring dealer poses overlap (their shared borders sit on min-cost cut lines so rects never intersect). `scripts/measure-visual-atlas.py` reproduces the measurements.

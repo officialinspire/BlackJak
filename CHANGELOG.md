@@ -12,11 +12,18 @@ All notable changes to BlackJak are documented here.
 
 - Shared responsive `.game-scene` for Classic and Jak's House. The `blackjak-table.png` art replaces the CSS-generated table, with layers for the NPC placeholder, cards, dialogue/status, and HUD. Anchors come from `src/config/scene-layout.ts`, and styling lives in `src/styles/scene.css`.
 - Jak replaces the JG monogram as the gameplay dealer. His poses come from `blackjak-sprite-sheet.png` and are driven by dialogue events through `src/data/dealer-visuals.ts`, with one-shot deal/draw/chips gestures (`src/ui/dealer.ts`, `src/styles/dealer.css`).
+- Sprite-sheet card faces and backs for three decks (Standard, Jak's Cosmic, Inspire Mono) via a strict 52-card mapping in `src/data/card-atlas.ts`. Every cell was verified by eye.
+- Persistent Card deck preference in Settings (defaults to Standard; missing or corrupted values fall back safely).
+- The Gold Card now decorates the themed card with a gold tint, ring and tag.
+
+### Known art issues
+- In the Inspire deck, 7♠, 7♥ and 7♣ show six pips. They're flagged in `CARD_ART_ISSUES` and render as the drawn face until the art is fixed.
 
 ### Changed
 - The dealer total now sits beside the dealer's cards. Dealer cards are slightly smaller on tall frames so Jak's face stays visible, and the empty dealer placeholder is gone.
 
 ### Fixed
+- Atlas sprites fitted into a box of a different shape no longer show slivers of neighbouring sheet cells (nested SVG viewport clips exactly to the rect).
 - The CHIPS pill was hidden on phones in Jak's House, because the mobile rule hid the second HUD pill by position rather than by class.
 - Table screens are game-first: the compact HUD is above, the table fills the available height without distortion, and the controls sit directly below. The Jak's House banner and modifier strip moved below the controls.
 - The dealer commentary and the status live region now sit in the scene's dialogue/status layer.

@@ -212,6 +212,9 @@ describe('atlas renderer', () => {
     const markup = dealerSpriteMarkup('bust-smug', { label: 'Jak "smug"' });
     expect(markup).toContain(`viewBox="${rect.x} ${rect.y} ${rect.width} ${rect.height}"`);
     expect(markup).toContain(`width="${ATLAS_SHEETS.dealer.width}" height="${ATLAS_SHEETS.dealer.height}"`);
+    // Inner viewport clips exactly to the rect so letterboxing never shows neighbouring cells.
+    expect(markup).toContain(`<svg x="${rect.x}" y="${rect.y}" width="${rect.width}" height="${rect.height}"`);
+    expect(markup).toContain('overflow="hidden"');
     expect(markup).toContain('aria-label="Jak &quot;smug&quot;"');
     expect(markup).toContain(BLACKJAK_ASSET_URLS.dealer);
   });
