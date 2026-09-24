@@ -9,7 +9,11 @@ export const defaultFeedbackPreferences = (): FeedbackPreferences => ({
   sfx: true,
   haptics: true,
   volume: 0.65,
+  musicVolume: 0.65,
 });
+
+const unitLevel = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : null;
 
 export function loadFeedbackPreferences(): FeedbackPreferences {
   const fallback = defaultFeedbackPreferences();
@@ -21,9 +25,9 @@ export function loadFeedbackPreferences(): FeedbackPreferences {
     music: stored.music !== false,
     sfx: stored.sfx !== false,
     haptics: stored.haptics !== false,
-    volume: typeof stored.volume === 'number' && Number.isFinite(stored.volume)
-      ? Math.max(0, Math.min(1, stored.volume))
-      : fallback.volume,
+    volume: unitLevel(stored.volume) ?? fallback.volume,
+    // Saves from before the separate music slider used one shared volume.
+    musicVolume: unitLevel(stored.musicVolume) ?? unitLevel(stored.volume) ?? fallback.musicVolume,
   };
 }
 

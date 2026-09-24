@@ -307,6 +307,42 @@ async function layoutMetrics(p) {
     await ctx.close();
   }
 
+  // ---- Music volume: routed through Web Audio gain (iOS ignores element.volume) ----
+  {
+    const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
+    await ctx.addInitScript(() => {
+      window.__gains = []; window.__routed = 0;
+      const createGain = AudioContext.prototype.createGain;
+      AudioContext.prototype.createGain = function patchedGain() { const gain = createGain.call(this); window.__gains.push(gain); return gain; };
+      const source = AudioContext.prototype.createMediaElementSource;
+      AudioContext.prototype.createMediaElementSource = function patchedSource(element) { window.__routed++; return source.call(this, element); };
+    });
+    const p = await ctx.newPage(); await p.goto(URL); await p.evaluate(() => localStorage.clear()); await p.reload(); await enterGame(p);
+    await p.click('[data-screen="settings"]'); await p.waitForTimeout(900);
+    const menuGain = () => p.evaluate(() => Number(window.__gains[0]?.gain.value.toFixed(2)));
+    const start = await menuGain();
+    await (await p.$('[data-setting-volume="music"]')).fill('20'); await p.waitForTimeout(200);
+    const lowered = await menuGain();
+    await (await p.$('[data-setting-volume="sfx"]')).fill('90'); await p.waitForTimeout(200);
+    const afterSfx = await menuGain();
+    await p.reload(); await enterGame(p); await p.click('[data-screen="settings"]');
+    const persisted = [await p.$eval('[data-setting-volume="music"]', (e) => e.value), await p.$eval('[data-setting-volume="sfx"]', (e) => e.value)];
+    const routed = await p.evaluate(() => window.__routed);
+    check('music volume slider drives the music gain; effects slider is separate; both persist', routed === 2 && start === 0.65 && lowered === 0.2 && afterSfx === 0.2 && persisted.join() === '20,90', JSON.stringify({ routed, start, lowered, afterSfx, persisted }));
+    await ctx.close();
+  }
+
+  // ---- Deck switching from every control, including Daily Hand ----
+  {
+    const { ctx, p } = await fresh(b);
+    const themes = (scope) => p.evaluate((s) => [...new Set([...document.querySelectorAll(`${s} .playing-card`)].map((e) => [...e.classList].find((c) => c.startsWith('card-theme-'))))].join(), scope);
+    await p.click('[data-screen="daily"]'); await p.waitForTimeout(200);
+    const dailyBefore = await themes('.daily-screen'); await p.click('[data-deck-cycle]'); await p.waitForTimeout(150);
+    const dailyAfter = await themes('.daily-screen');
+    check('deck switch works on Daily Hand', dailyBefore === 'card-theme-standard' && dailyAfter === 'card-theme-jak', `${dailyBefore} → ${dailyAfter}`);
+    await ctx.close();
+  }
+
   // ---- Refresh mid-hand: stake not charged, no stuck round ----
   {
     const { ctx, p } = await fresh(b);

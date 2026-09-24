@@ -2,6 +2,22 @@
 
 All notable changes to BlackJak are documented here.
 
+## [0.3.1] — 2026-09-24 — Volume, decks, and button polish
+
+### Fixed
+- **Music volume now works on iPhone/iPad.** iOS ignores `HTMLMediaElement.volume`, so the slider and crossfades did nothing there. Music now runs through a Web Audio gain node (shared with SFX, unlocked by the start tap) on every browser, and falls back to `element.volume` only if routing fails.
+- **Deck switching:** Daily Hand had no deck control. It now has the same deck button as the tables. On phones the HUD deck button was just a card-back icon, so it now also says "DECK". Every deck control is covered by browser QA.
+
+### Changed
+- Settings has separate **Music volume** and **Effects volume** sliders. Saves from before this change start both sliders at the old shared volume.
+- Button polish (`src/styles/buttons.css`):
+  - Table and Daily actions have a bevelled face with a press "lip" and colour accents (Hit green, Stand red, Double gold, Split blue).
+  - The Deal button is minted gold.
+  - The focus ring is a crisp gold one.
+  - Settings uses sliding switch toggles and gold volume sliders with a readout.
+  - The selected deck shows a checkmark badge.
+  - All of it respects reduced motion and forced colors.
+
 ## [0.3.0] — 2026-09-24 — Startup, music, SFX, and integration hardening
 
 Blackjack rules, odds and payouts are unchanged, and existing saves load as-is.

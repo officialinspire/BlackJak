@@ -65,13 +65,13 @@ describe('music engine', () => {
     engine.unlock();
     engine.sync('MENU', preferences);
     advance(700);
-    expect(engine.snapshot()).toMatchObject({ target: 'menu', menuVolume: preferences.volume, gameplayVolume: 0 });
+    expect(engine.snapshot()).toMatchObject({ target: 'menu', menuVolume: preferences.musicVolume, gameplayVolume: 0 });
     engine.sync('GAMEPLAY', preferences);
     advance(350);
-    expect(audios[0].volume).toBeCloseTo(preferences.volume / 2);
-    expect(audios[1].volume).toBeCloseTo(preferences.volume / 2);
+    expect(audios[0].volume).toBeCloseTo(preferences.musicVolume / 2);
+    expect(audios[1].volume).toBeCloseTo(preferences.musicVolume / 2);
     advance(350);
-    expect(engine.snapshot()).toMatchObject({ target: 'gameplay', menuVolume: 0, gameplayVolume: preferences.volume });
+    expect(engine.snapshot()).toMatchObject({ target: 'gameplay', menuVolume: 0, gameplayVolume: preferences.musicVolume });
   });
 
   it('respects master/music mute and applies volume changes to the active track', () => {
@@ -79,8 +79,14 @@ describe('music engine', () => {
     engine.unlock();
     engine.sync('MENU', defaultFeedbackPreferences());
     advance(700);
-    engine.sync('MENU', { ...defaultFeedbackPreferences(), volume: 0.25 });
+    engine.sync('MENU', { ...defaultFeedbackPreferences(), musicVolume: 0.25 });
     expect(engine.snapshot().menuVolume).toBe(0.25);
+    // The effects slider is independent of music.
+    engine.sync('MENU', { ...defaultFeedbackPreferences(), musicVolume: 0.25, volume: 0.9 });
+    expect(engine.snapshot().menuVolume).toBe(0.25);
+    engine.sync('MENU', { ...defaultFeedbackPreferences(), musicVolume: 0 });
+    advance(700);
+    expect(engine.snapshot()).toMatchObject({ target: null, menuVolume: 0 });
     engine.sync('MENU', { ...defaultFeedbackPreferences(), music: false });
     advance(700);
     expect(engine.snapshot()).toMatchObject({ target: null, menuVolume: 0, gameplayVolume: 0 });
@@ -101,7 +107,7 @@ describe('music engine', () => {
     expect(audios[0].playCount).toBe(playsBefore);
     expect(callbacks.size).toBe(pendingBefore);
     advance(520);
-    expect(engine.snapshot()).toMatchObject({ target: 'menu', menuVolume: preferences.volume, gameplayVolume: 0 });
+    expect(engine.snapshot()).toMatchObject({ target: 'menu', menuVolume: preferences.musicVolume, gameplayVolume: 0 });
   });
 
   it('cancels stale fades during rapid switching without orphan playback', () => {
@@ -115,7 +121,7 @@ describe('music engine', () => {
     engine.sync('GAMEPLAY', preferences);
     expect(callbacks.size).toBe(1);
     advance(700);
-    expect(engine.snapshot()).toMatchObject({ target: 'gameplay', menuVolume: 0, gameplayVolume: preferences.volume });
+    expect(engine.snapshot()).toMatchObject({ target: 'gameplay', menuVolume: 0, gameplayVolume: preferences.musicVolume });
     expect(audios[0].pauseCount).toBeGreaterThan(0);
   });
 

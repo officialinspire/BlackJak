@@ -442,6 +442,15 @@ function menuMarkup(): string {
     </main>`;
 }
 
+function volumeSlider(channel: 'music' | 'sfx', label: string, copy: string, level: number): string {
+  const percent = Math.round(level * 100);
+  return `
+    <div class="setting-row volume-setting">
+      <span><strong>${label}</strong><small>${copy}</small></span>
+      <label><span data-volume-readout="${channel}">${percent}%</span><input type="range" min="0" max="100" step="5" value="${percent}" data-setting-volume="${channel}" aria-label="${label}" aria-valuetext="${percent}%" style="--fill:${percent}%"></label>
+    </div>`;
+}
+
 function settingsMarkup(): string {
   const prefs = model.preferences;
   const toggle = (key: 'master' | 'music' | 'sfx' | 'haptics', label: string, copy: string): string => `
@@ -464,10 +473,8 @@ function settingsMarkup(): string {
           ${toggle('music', 'Music', 'Looping menu and gameplay background music.')}
           ${toggle('sfx', 'Sound effects', 'Cards, chips, buttons, results, and achievement stings.')}
           ${toggle('haptics', 'Haptics', 'Defensive mobile vibration feedback where supported.')}
-          <div class="setting-row volume-setting">
-            <span><strong>Volume</strong><small>Music and sound-effect level. The game remains fully usable muted.</small></span>
-            <label><span>${Math.round(prefs.volume * 100)}%</span><input type="range" min="0" max="100" step="5" value="${Math.round(prefs.volume * 100)}" data-setting-volume aria-label="Sound volume"></label>
-          </div>
+          ${volumeSlider('music', 'Music volume', 'Menu and table background music.', prefs.musicVolume)}
+          ${volumeSlider('sfx', 'Effects volume', 'Cards, chips, buttons and result stings.', prefs.volume)}
           <div class="setting-row"><span><strong>Dealer commentary</strong><small>Reactive Jak lines are enabled and never block play.</small></span><b>On</b></div>
           <div class="setting-row"><span><strong>Classic rules</strong><small>3:2 blackjack · dealer stands on soft 17.</small></span><b>Locked</b></div>
         </div>
@@ -701,7 +708,6 @@ function tableView(): TableView {
 
 function sceneHudMarkup(modePill = ''): string {
   const progression = titleProgressForRep(model.profile.rep);
-  const theme = model.visual.cardTheme;
   return `
     <header class="table-header table-hud">
       <button type="button" class="back-button pause-button" data-pause="open" aria-haspopup="dialog" aria-expanded="${model.pauseMenuOpen}" aria-keyshortcuts="Escape"><span aria-hidden="true">☰</span> <span class="hud-label">Menu</span></button>
@@ -710,11 +716,19 @@ function sceneHudMarkup(modePill = ''): string {
         <span class="hud-chips">CHIPS <strong>${formatChips(model.profile.chips)}</strong></span>
         <span class="rep-pill"><span class="title-pill">${progression.current.name}</span> <strong>${model.profile.rep}</strong> REP<i class="rep-mini-track" aria-hidden="true"><i style="width:${progression.percent}%"></i></i></span>
       </div>
+      ${deckCycleButtonMarkup()}
+    </header>`;
+}
+
+/** Deck switcher shared by the table HUD and the Daily Hand header. */
+function deckCycleButtonMarkup(): string {
+  const theme = model.visual.cardTheme;
+  return `
       <button type="button" class="hud-deck" data-deck-cycle aria-label="Card deck: ${CARD_THEMES[theme].label}. Change deck">
         <span class="hud-deck-back" aria-hidden="true">${cardMarkup({ rank: 'A', suit: 'spades' }, true, 0, 'standard', theme, false)}</span>
         <span class="hud-label">${CARD_THEMES[theme].label}</span>
-      </button>
-    </header>`;
+        <span class="hud-deck-hint" aria-hidden="true">DECK</span>
+      </button>`;
 }
 
 function dealerNpcMarkup(house: boolean): string {
@@ -1174,7 +1188,7 @@ function dailyControlsMarkup(round: RoundState): string {
   return `
     <div class="action-bar daily-action-bar" aria-label="Daily Hand actions">
       ${(['hit', 'stand', 'double', 'split'] as PlayerAction[])
-        .map((action) => `<button data-daily-action="${action}" aria-label="${action.toUpperCase()}" aria-keyshortcuts="${ACTION_SHORTCUTS[action]}" ${valid.includes(action) ? '' : 'disabled'}>${action.toUpperCase()}</button>`)
+        .map((action) => `<button type="button" class="daily-action daily-action-${action}${valid.includes(action) ? ' is-ready' : ''}" data-daily-action="${action}" aria-label="${action.toUpperCase()}" aria-keyshortcuts="${ACTION_SHORTCUTS[action]}" ${valid.includes(action) ? '' : 'disabled'}><strong>${action.toUpperCase()}</strong></button>`)
         .join('')}
     </div>`;
 }
@@ -1199,7 +1213,10 @@ function dailyMarkup(): string {
   return `
     <main id="app-main" tabindex="-1" class="screen panel-screen daily-screen ${fxClassNames(currentFx)}" style="${fxStyleVars()}">
       <div class="ambient-lamp" aria-hidden="true"></div>
-      <button class="back-button" data-screen="menu" aria-keyshortcuts="Escape">← Menu</button>
+      <div class="daily-topbar">
+        <button class="back-button" data-screen="menu" aria-keyshortcuts="Escape">← Menu</button>
+        ${deckCycleButtonMarkup()}
+      </div>
       <section class="glass-panel daily-panel">
         <div class="daily-heading">
           <div><p class="eyebrow">DAILY HAND · ${today}</p><h1>Same Table. Same Problem.</h1></div>
@@ -1518,9 +1535,17 @@ function bindEvents(): void {
   document.querySelectorAll<HTMLInputElement>('[data-setting-volume]').forEach((element) => {
     element.addEventListener('input', () => {
       const value = Math.max(0, Math.min(100, Number(element.value))) / 100;
-      persistPreferences({ ...model.preferences, volume: value });
+      const channel = element.dataset.settingVolume === 'music' ? 'musicVolume' : 'volume';
+      persistPreferences({ ...model.preferences, [channel]: value });
+      const percent = `${Math.round(value * 100)}%`;
       const label = element.previousElementSibling;
-      if (label) label.textContent = `${Math.round(value * 100)}%`;
+      if (label) label.textContent = percent;
+      element.setAttribute('aria-valuetext', percent);
+      element.style.setProperty('--fill', percent);
+    });
+    // Let the player hear the new effects level once they let go.
+    element.addEventListener('change', () => {
+      if (element.dataset.settingVolume === 'sfx') feedback('chip-select', null);
     });
   });
 

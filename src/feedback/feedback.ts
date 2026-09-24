@@ -173,6 +173,11 @@ export class FeedbackEngine {
     return this.context;
   }
 
+  /** Shared context so music and SFX use one output (and one iOS unlock). */
+  audioContext(): AudioContext | null {
+    return this.ensureContext();
+  }
+
   activate(): void {
     const context = this.ensureContext();
     // iOS reports 'interrupted' after a call/background; both need a resume.
