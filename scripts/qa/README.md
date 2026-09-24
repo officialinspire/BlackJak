@@ -8,6 +8,6 @@ npm run build && npx vite preview --port 4173 &
 export PW="$(npm root -g)/playwright" S=/tmp/qa   # screenshots land in $S
 mkdir -p "$S"
 node scripts/qa/browser-qa.cjs       # widths 320–1440 + landscape, hitboxes, keyboard, reduced motion, mute, refresh, corrupt storage, offline
-node scripts/qa/gameplay-pwa-qa.cjs  # hidden card, layering, split, Gold Card, PWA update (edits dist/sw.js — rebuild afterwards)
+node scripts/qa/gameplay-pwa-qa.cjs  # card lifecycle/input stress, split, Gold Card, PWA update (dist/sw.js is restored in finally)
 node scripts/qa/refresh-qa.cjs       # 30 refresh-mid-hand trials across Classic and Jak's House
 ```

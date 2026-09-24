@@ -51,6 +51,8 @@ The illustrated art set replaces the CSS-drawn presentation. Blackjack rules, od
 - The dealer total now sits beside the dealer's cards. Dealer cards are slightly smaller on tall frames so Jak's face stays visible, and the empty dealer placeholder is gone.
 
 ### Fixed
+- Final gameplay stress coverage now checks repeatable seeded rounds, exact P/D/P/D opening choreography, single-card hits, one-time hole flips, settled-card rerenders, rapid Deal taps, deck switching, and uncaught browser errors.
+- The PWA update QA now restores `dist/sw.js` byte-for-byte in a `finally` block, including after browser or assertion failures, so running QA cannot contaminate the production build.
 - The empty scene overlay layer covered the whole felt and intercepted taps on the cards.
 - Dealer poses showed slivers of neighbouring poses (a red card corner, part of an arm) at the edges of their frame.
 - The bust shake, dialogue line fade and achievement toast no longer replay on every re-render.
