@@ -6,7 +6,7 @@ BlackJak is a mobile-first blackjack game from OFFICIAL INSPIRE, inspired in per
 
 ## Current status
 
-**BlackJak Visual Demo v0.2.0.** v0.1.0 delivered the full game: Classic play, Jak's House, local progression, Daily Hand, audio/haptics, accessibility, offline PWA and CI. v0.2.0 dresses it in the illustrated art set:
+**BlackJak Visual Demo v0.2.x** (v0.2.1 adds security hardening: a production CSP, escaped runtime text, patched tooling and lockfile-based CI). v0.1.0 delivered the full game: Classic play, Jak's House, local progression, Daily Hand, audio/haptics, accessibility, offline PWA and CI. v0.2.0 dresses it in the illustrated art set:
 
 - the **illustrated table** (`blackjak-table.png`) as a shared, responsive game scene for Classic and Jak's House
 - **Jak as a reactive dealer NPC**, with 19 sprite poses driven by dialogue events plus deal, draw and chip gestures
@@ -407,6 +407,8 @@ The seven original PNG sheets at the repository root stay the untouched source a
 Weight falls from 13.8MB to 2.9MB. A manifest records each source PNG's SHA-256, and `tests/runtime-assets.test.ts` fails if a PNG changes without the WebP being regenerated.
 
 `npm run build` ends with `scripts/verify-dist.mjs`, which fails the build if:
+
+- the Content-Security-Policy meta tag is missing, or an inline script appears
 
 - any file in dist is missing from the service-worker precache, or any referenced asset is missing
 - any of the seven sheets isn't present as WebP

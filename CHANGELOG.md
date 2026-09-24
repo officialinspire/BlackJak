@@ -2,6 +2,19 @@
 
 All notable changes to BlackJak are documented here.
 
+## [0.2.1] — 2026-09-24 — Hardening
+
+### Security
+- Content-Security-Policy `<meta>` in the production build: same-origin scripts only, no plugins, and `base-uri`/`form-action` locked. `verify-dist` fails the build if it's missing or an inline script appears. The whole app was verified to run with zero CSP violations.
+- Error and Daily share-status text is HTML-escaped before rendering (`src/util/html.ts`). A test guards against unescaped interpolation.
+- Dev toolchain patched: Vite 7.1.7 → 7.3.6 and Vitest 3.2.4 → 3.2.7, clearing the high and critical dev-server advisories. One moderate Vitest mock-redirect advisory remains; it's test-runner only, unused here, and fixed only in Vitest 5.
+
+### Changed
+- CI installs with `npm ci` from a committed `package-lock.json`, for reproducible builds.
+
+### Fixed
+- The Daily Hand's cards now deal in even when a previous table hand showed the same cards.
+
 ## [0.2.0] — 2026-09-24 — Visual Demo
 
 The illustrated art set replaces the CSS-drawn presentation. Blackjack rules, odds, payouts and saved progress are unchanged; existing v0.1.0 saves load as-is.
