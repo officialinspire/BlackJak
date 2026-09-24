@@ -19,6 +19,7 @@ import { registerPWA } from './pwa/register';
 import { initializeUI } from './ui/render';
 import { feedbackEngine } from './feedback/feedback';
 import { StartupController } from './startup/startup';
+import { musicEngine } from './audio/music';
 
 function boot(): void {
   try {
@@ -27,6 +28,7 @@ function boot(): void {
     new StartupController({
       root,
       unlockAudio: () => feedbackEngine.activate(),
+      unlockMedia: () => musicEngine.unlock(),
       onGameReady: initializeUI,
     }).mount();
   } catch (error) {

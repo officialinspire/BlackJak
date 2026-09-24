@@ -105,7 +105,7 @@ describe('BlackJak release smoke (rules unchanged since v0.1.0)', () => {
     const preferences = {
       ...defaultFeedbackPreferences(),
       master: false,
-      ambience: true,
+      music: false,
       volume: 0.4,
     };
     saveFeedbackPreferences(preferences);
@@ -117,7 +117,7 @@ describe('BlackJak release smoke (rules unchanged since v0.1.0)', () => {
     });
     expect(loadFeedbackPreferences()).toMatchObject({
       master: false,
-      ambience: true,
+      music: false,
       volume: 0.4,
     });
   });
