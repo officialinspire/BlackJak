@@ -1,17 +1,22 @@
 // Dev-only browser QA. See scripts/qa/README.md.
 const { chromium } = require(process.env.PW);
 const { execSync } = require('node:child_process');
+const { readFileSync, writeFileSync } = require('node:fs');
+const { resolve } = require('node:path');
 const S = process.env.S; const URL = 'http://localhost:4173/BlackJak/';
+const swPath = resolve(__dirname, '../../dist/sw.js');
 const phase = (p) => p.$eval('.table-dock', (e) => e.className.match(/phase-(\w+)/)[1]).catch(() => null);
 const fails = []; const check = (n, ok, d = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); if (!ok) fails.push(n); };
 (async () => {
+  const originalServiceWorker = readFileSync(swPath);
   const b = await chromium.launch();
+  try {
   // ---- Hidden dealer card, layering, split, Gold Card (House) ----
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 } }); const p = await ctx.newPage();
   const errs = []; p.on('pageerror', (e) => errs.push(String(e)));
   await p.goto(URL); await p.evaluate(() => localStorage.clear()); await p.reload();
   await p.click('[data-screen="house"]');
-  let sawHidden = false, sawSplit = false, sawGold = false, layering = null, splitShot = false;
+  let sawHidden = false, sawSplit = false, splitMotion = false, sawGold = false, layering = null, splitShot = false;
   for (let i = 0; i < 160 && !(sawSplit && sawGold && sawHidden); i++) {
     if (await p.$('[data-action="refill"]')) await p.click('[data-action="refill"]');
     await p.keyboard.press('n'); await p.waitForTimeout(50);
@@ -30,6 +35,12 @@ const fails = []; const check = (n, ok, d = '') => { console.log(`${ok ? 'PASS' 
     if (await p.$('[data-action="split"]:not([disabled])')) {
       await p.keyboard.press('p'); await p.waitForTimeout(150);
       sawSplit = (await p.$$('.player-hand')).length >= 2;
+      const motion = await p.evaluate(() => ({
+        moved: document.querySelectorAll('.player-hands [data-motion="MOVING/SPLIT"]').length,
+        dealt: document.querySelectorAll('.player-hands [data-motion="NEW"]').length,
+        settled: document.querySelectorAll('.player-hands [data-motion="SETTLED"]').length,
+      }));
+      splitMotion ||= motion.moved === 1 && motion.dealt === 2 && motion.settled === 1;
       if (sawSplit && !splitShot) { await p.screenshot({ path: `${S}/qa-split.png` }); splitShot = true; }
     }
     while (await phase(p) === 'playing') { await p.keyboard.press('s'); await p.waitForTimeout(40); }
@@ -39,9 +50,100 @@ const fails = []; const check = (n, ok, d = '') => { console.log(`${ok ? 'PASS' 
   check('dealer hidden card (back sprite, face not exposed)', sawHidden && layering?.backHidesFace, JSON.stringify(layering));
   check('table layering: table < Jak < cards, cards on top', layering && layering.table < layering.npc && layering.npc < layering.cards && layering.cardOnTop);
   check('split hands render side by side', sawSplit);
+  check('Split moves one card and deals only two cards', splitMotion);
   check('Gold Card appears in House', sawGold);
   check('no page errors during 160 House rounds', errs.length === 0, errs.join(';'));
   await ctx.close();
+
+  // ---- Daily uses the same card identity/order lifecycle as table rounds ----
+  {
+    const dailyContext = await b.newContext({ viewport: { width: 390, height: 844 } });
+    const daily = await dailyContext.newPage();
+    await daily.goto(URL); await daily.evaluate(() => localStorage.clear()); await daily.reload();
+    await daily.click('[data-screen="daily"]');
+    const initial = await daily.evaluate(() => [...document.querySelectorAll('.daily-table [data-motion="NEW"]')]
+      .map((card) => ({ owner: card.getAttribute('data-visual-id').includes(':player:') ? 'P' : 'D', delay: Number.parseInt(getComputedStyle(card).getPropertyValue('--deal-delay')) }))
+      .sort((a, b) => a.delay - b.delay));
+    await daily.click('[data-action="start-daily"]');
+    const replayed = await daily.$$eval('.daily-table [data-motion]:not([data-motion="SETTLED"])', (cards) => cards.length);
+    check('Daily opening uses one P/D/P/D deal and does not redeal on start', initial.length === 4
+      && initial.map((card) => card.owner).join('') === 'PDPD'
+      && initial.map((card) => card.delay).join(',') === '0,38,76,114' && replayed === 0);
+    await dailyContext.close();
+  }
+
+  // ---- Card lifecycle and input stress (repeatable shuffled decks) ----
+  for (const seed of [7, 41, 97]) {
+    const c = await b.newContext({ viewport: { width: 390, height: 844 } });
+    await c.addInitScript((initialSeed) => {
+      let state = initialSeed >>> 0;
+      Math.random = () => ((state = (state * 1664525 + 1013904223) >>> 0) / 4294967296);
+    }, seed);
+    const page = await c.newPage(); const stressErrors = [];
+    page.on('pageerror', (error) => stressErrors.push(String(error)));
+    page.on('console', (message) => { if (message.type() === 'error') stressErrors.push(message.text()); });
+    await page.goto(URL); await page.evaluate(() => localStorage.clear()); await page.reload();
+    await page.click('[data-screen="classic"]');
+
+    let openingChecked = false; let hitChecked = false; let flipChecked = false; let rapidChecked = false;
+    for (let round = 0; round < 45 && !(openingChecked && hitChecked && flipChecked && rapidChecked); round++) {
+      await page.keyboard.press('n'); await page.waitForTimeout(20);
+      if (await phase(page) !== 'playing') continue;
+      const opening = await page.evaluate(() => [...document.querySelectorAll('.scene-cards [data-motion="NEW"]')].map((card) => ({
+        id: card.getAttribute('data-visual-id'), delay: getComputedStyle(card).getPropertyValue('--deal-delay').trim(), card: card.getAttribute('data-card'),
+      })));
+      const ordered = [...opening].sort((a, z) => Number.parseInt(a.delay) - Number.parseInt(z.delay));
+      openingChecked ||= opening.length === 4 && ordered.map((entry) => entry.id.includes(':player:') ? 'P' : 'D').join('') === 'PDPD'
+        && ordered.map((entry) => entry.delay).join(',') === '0ms,38ms,76ms,114ms';
+
+      // A visual-only deck change must neither mutate the cards nor replay motion.
+      const beforeTheme = await page.$$eval('.scene-cards [data-visual-id]', (cards) => cards.map((card) => `${card.getAttribute('data-visual-id')}:${card.getAttribute('data-card') ?? 'hidden'}`));
+      const themes = [];
+      for (let theme = 0; theme < 3; theme++) {
+        themes.push(await page.$eval('[data-deck-cycle]', (button) => button.getAttribute('aria-label')));
+        await page.click('[data-deck-cycle]');
+      }
+      const afterTheme = await page.$$eval('.scene-cards [data-visual-id]', (cards) => cards.map((card) => `${card.getAttribute('data-visual-id')}:${card.getAttribute('data-card') ?? 'hidden'}`));
+      check(`seed ${seed}: deck switch preserves hand and settles cards`, JSON.stringify(beforeTheme) === JSON.stringify(afterTheme)
+        && await page.$$eval('.scene-cards [data-motion]:not([data-motion="SETTLED"])', (cards) => cards.length) === 0
+        && ['Standard', "Jak's Cosmic", 'Inspire Mono'].every((theme) => themes.some((label) => label.includes(theme))));
+
+      const total = await page.$eval('.player-hand.is-active .hand-meta strong', (node) => Number(node.textContent));
+      if (!hitChecked && total <= 11 && await page.$('[data-action="hit"]:not([disabled])')) {
+        const count = await page.$$eval('.scene-cards [data-visual-id]', (cards) => cards.length);
+        await page.click('[data-action="hit"]');
+        const result = await page.evaluate((oldCount) => ({
+          count: document.querySelectorAll('.scene-cards [data-visual-id]').length,
+          moving: document.querySelectorAll('.scene-cards [data-motion="NEW"]').length,
+          priorMoving: [...document.querySelectorAll('.scene-cards [data-motion="NEW"]')].filter((card) => Number(card.getAttribute('data-visual-id').split(':').at(-1)) < 2).length,
+        }), count);
+        hitChecked = result.count === count + 1 && result.moving === 1 && result.priorMoving === 0;
+      }
+
+      if (await phase(page) === 'playing') {
+        await page.keyboard.press('s'); await page.waitForTimeout(10);
+        const flips = await page.$$eval('.scene-cards [data-motion="FLIPPING"]', (cards) => cards.length);
+        await page.click('[data-deck-cycle]');
+        const replayed = await page.$$eval('.scene-cards [data-motion="FLIPPING"]', (cards) => cards.length);
+        flipChecked ||= flips === 1 && replayed === 0;
+      }
+
+      if (await phase(page) === 'resolved') {
+        const serial = await page.$eval('.scene-cards [data-visual-id]', (card) => card.getAttribute('data-visual-id').split(':')[0]);
+        await page.locator('[data-action="deal"]').click({ clickCount: 2, delay: 0 });
+        await page.waitForTimeout(20);
+        const serials = await page.$$eval('.scene-cards [data-visual-id]', (cards) => [...new Set(cards.map((card) => card.getAttribute('data-visual-id').split(':')[0]))]);
+        rapidChecked ||= serials.length === 1 && Number(serials[0]) === Number(serial) + 1;
+      }
+      while (await phase(page) === 'playing') { await page.keyboard.press('s'); await page.waitForTimeout(10); }
+    }
+    check(`seed ${seed}: opening deal animates once in P/D/P/D order`, openingChecked);
+    check(`seed ${seed}: Hit moves exactly one new card`, hitChecked);
+    check(`seed ${seed}: hole card true-flips once`, flipChecked);
+    check(`seed ${seed}: rapid Deal taps start one round`, rapidChecked);
+    check(`seed ${seed}: no uncaught errors in stress rounds`, stressErrors.length === 0, stressErrors.join(';'));
+    await c.close();
+  }
 
   // ---- PWA update: install v1, build v2, update notice → reload onto v2 ----
   const c2 = await b.newContext({ viewport: { width: 390, height: 844 } }); const q = await c2.newPage();
@@ -62,5 +164,11 @@ const fails = []; const check = (n, ok, d = '') => { console.log(`${ok ? 'PASS' 
   check('PWA update notice does not cover the dock', true);
   await c2.close();
   console.log(fails.length ? `\n${fails.length} FAILURE(S): ${fails.join(' | ')}` : '\nALL CHECKS PASSED');
-  await b.close();
-})();
+  } finally {
+    // This QA deliberately publishes a synthetic worker revision. Always put the
+    // production artifact back, even when Playwright or an assertion throws.
+    writeFileSync(swPath, originalServiceWorker);
+    await b.close();
+  }
+  if (fails.length) process.exitCode = 1;
+})().catch((error) => { console.error(error); process.exitCode = 1; });
