@@ -6,6 +6,7 @@ import {
   FX_TIMING,
   FxQueue,
   INPUT_GUARD_MS,
+  controlsStateKey,
   fxClassNames,
   fxStyleVars,
   shouldIgnoreActivation,
@@ -79,7 +80,7 @@ describe('one-shot cues', () => {
   });
 
   it('map to screen classes', () => {
-    expect(fxClassNames(new Set(['stake:25', 'stake', 'action:hit', 'bust']))).toBe('fx-action fx-bust fx-stake');
+    expect(fxClassNames(new Set(['stake:25', 'stake', 'action:hit', 'bust']))).toBe('fx-action fx-action-hit fx-bust fx-stake fx-stake-25');
     expect(fxClassNames(new Set())).toBe('');
   });
 
@@ -102,6 +103,13 @@ describe('one-shot cues', () => {
 });
 
 describe('stale-input guard', () => {
+  it('detects Daily phase and active-hand control transitions', () => {
+    expect(controlsStateKey({ screen: 'daily', dockPhase: null, dailyPhase: 'player-turn', dailyHandIndex: 0 }))
+      .not.toBe(controlsStateKey({ screen: 'daily', dockPhase: null, dailyPhase: 'resolved', dailyHandIndex: 0 }));
+    expect(controlsStateKey({ screen: 'daily', dockPhase: null, dailyPhase: 'player-turn', dailyHandIndex: 0 }))
+      .not.toBe(controlsStateKey({ screen: 'daily', dockPhase: null, dailyPhase: 'player-turn', dailyHandIndex: 1 }));
+  });
+
   it('ignores a pointer tap that lands just after the controls changed', () => {
     expect(shouldIgnoreActivation({ now: 1000 + INPUT_GUARD_MS - 1, controlsChangedAt: 1000, pointer: true })).toBe(true);
     expect(shouldIgnoreActivation({ now: 1000 + 10, controlsChangedAt: 1000, pointer: true })).toBe(true);

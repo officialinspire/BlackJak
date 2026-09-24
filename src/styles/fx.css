@@ -7,30 +7,91 @@
  * the table screen, so ordinary re-renders (e.g. choosing a stake) don't replay them.
  */
 
-/* ---- Card slide / deal (only new cards; see is-settled) ---- */
+/* ---- Card lifecycle: the planner is the sole animation trigger ---- */
 
-.game-scene .playing-card:not(.is-settled):not(.is-flip) {
+.playing-card {
+  animation: none;
+}
+
+.playing-card.is-new {
+  --deal-from-x: clamp(26px, 9vw, 110px);
+  --deal-from-y: clamp(-150px, -16vw, -50px);
   animation: fx-card-deal var(--fx-card-deal, 200ms) cubic-bezier(.2,.8,.3,1.1) both;
   animation-delay: var(--deal-delay, 0ms);
 }
 
+.playing-card.is-moving-split {
+  animation: fx-card-split var(--fx-split-move, 240ms) cubic-bezier(.2,.8,.3,1.1) both;
+}
+
 @keyframes fx-card-deal {
-  from { opacity: 0; transform: translate3d(18px, -26px, 0) rotate(4deg) scale(.94); }
+  from { opacity: 0; transform: translate3d(var(--deal-from-x), var(--deal-from-y), 0) rotate(4deg) scale(.94); }
   70% { opacity: 1; }
+  to { opacity: 1; transform: none; }
+}
+
+[data-visual-id*=':dealer:'].playing-card.is-new {
+  --deal-from-x: clamp(20px, 6vw, 72px);
+  --deal-from-y: clamp(-70px, -8vw, -28px);
+}
+
+.fx-shuffle .deck-shoe > span:first-child { animation: fx-shuffle-left var(--fx-shuffle, 360ms) ease-in-out both; }
+.fx-shuffle .deck-shoe > span:last-child { animation: fx-shuffle-right var(--fx-shuffle, 360ms) ease-in-out both; }
+.fx-shuffle .playing-card.is-new { animation-delay: calc(var(--deal-delay, 0ms) + 180ms); }
+.fx-action-split .playing-card.is-new { animation-delay: calc(var(--deal-delay, 0ms) + 220ms); }
+
+@keyframes fx-shuffle-left {
+  0%, 100% { transform: translate(-4px, 2px) rotate(-3deg); }
+  45% { transform: translate(-14px, -3px) rotate(-9deg); }
+}
+
+@keyframes fx-shuffle-right {
+  0%, 100% { transform: translate(3px, -2px) rotate(2deg); }
+  55% { transform: translate(14px, 2px) rotate(8deg); }
+}
+
+@keyframes fx-card-split {
+  from { opacity: .7; transform: translate3d(-42%, 0, 0) rotate(-3deg); }
   to { opacity: 1; transform: none; }
 }
 
 /* ---- Hole card flip on reveal ---- */
 
-.game-scene .playing-card.is-flip {
+.playing-card.card-flip-shell {
+  overflow: visible;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  perspective: 700px;
+}
+
+.card-flipper {
+  position: absolute;
+  inset: 0;
+  display: block;
+  transform-style: preserve-3d;
+}
+
+.playing-card.is-flip .card-flipper {
   animation: fx-card-flip var(--fx-card-flip, 320ms) cubic-bezier(.3,.9,.35,1) both;
-  transform-origin: 50% 50%;
+}
+
+.card-side {
+  position: absolute;
+  inset: 0;
+  display: block;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform-style: preserve-3d;
+}
+
+.card-flip-back {
+  transform: rotateY(180deg);
 }
 
 @keyframes fx-card-flip {
-  0% { transform: perspective(700px) rotateY(88deg) scale(1.04); filter: brightness(.7); }
-  60% { transform: perspective(700px) rotateY(-8deg) scale(1.02); filter: none; }
-  100% { transform: none; }
+  from { transform: rotateY(180deg); }
+  to { transform: rotateY(0deg); }
 }
 
 /* ---- Bust impact: once, on the bust itself (was replaying every render) ---- */
@@ -74,6 +135,12 @@
 
 .fx-result .player-hand.is-win .playing-card {
   animation: fx-win-lift var(--fx-result-pop, 450ms) ease-out both;
+}
+
+.fx-result .player-hand.is-win .playing-card,
+.fx-result .player-hand.is-blackjack .playing-card,
+.fx-result .dialogue-panel-status {
+  animation-delay: 340ms;
 }
 
 @keyframes fx-blackjack-pop {
@@ -183,6 +250,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .game-scene .playing-card,
+  .playing-card,
+  .card-flipper,
+  .deck-shoe > span,
   .fx-bust .player-hand.is-bust,
   .fx-result .player-hand.is-bust,
   .fx-result .player-hand .playing-card,

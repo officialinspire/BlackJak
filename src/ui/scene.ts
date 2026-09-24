@@ -24,6 +24,7 @@ export interface GameSceneSlots {
   readonly className?: string;
   readonly hud: string;
   readonly npc: string;
+  readonly shoe: string;
   readonly dealerHand: string;
   readonly playerHands: string;
   /** Dialogue/status panel rendered in the bar under the table frame. */
@@ -41,6 +42,7 @@ export function gameSceneMarkup(slots: GameSceneSlots): string {
           <img class="scene-layer scene-table" src="${assetUrl('table')}" alt="" aria-hidden="true" draggable="false" decoding="async" fetchpriority="high">
           <div class="scene-layer scene-npc"><div class="scene-anchor anchor-npc">${slots.npc}</div></div>
           <div class="scene-layer scene-cards">
+            <div class="scene-anchor anchor-shoe">${slots.shoe}</div>
             <div class="scene-anchor anchor-dealer-hand">${slots.dealerHand}</div>
             <div class="scene-anchor scene-span anchor-player-hands">${slots.playerHands}</div>
           </div>

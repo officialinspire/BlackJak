@@ -5,6 +5,7 @@ import {
   hotHandMultiplier,
   isGoldCard,
   replayHouseRound,
+  performAction,
   startHouseRound,
   startRound,
   type Card,
@@ -60,6 +61,20 @@ describe("Jak's House modifiers", () => {
     expect(createHouseState().runItBackTokens).toBe(1);
   });
 
+  it('keeps the Gold Card attached to its original card when that hand splits', () => {
+    let house = createHouseState();
+    const ordinaryDeck = deckFor(c('9'), c('6'), c('7'), c('10'));
+    house = startHouseRound(25, house, undefined, ordinaryDeck).house;
+    house = startHouseRound(25, house, undefined, ordinaryDeck).house;
+    const third = startHouseRound(25, house, undefined, deckFor(c('9'), c('6'), c('A'), c('10'), c('2'), c('3')));
+
+    performAction(third.round, 'split', 100);
+    expect(third.round.hands).toHaveLength(2);
+    expect(third.round.hands[0].cards[0].rank).toBe('A');
+    expect(isGoldCard(third.house, third.round.hands[0].id, 0)).toBe(true);
+    expect(isGoldCard(third.house, third.round.hands[1].id, 0)).toBe(false);
+  });
+
   it('offers Run It Back after a net loss and consumes the token without incrementing round number', () => {
     let house = createHouseState();
     const started = startHouseRound(25, house, undefined, deckFor(c('10'), c('9'), c('7'), c('8')));
@@ -69,6 +84,28 @@ describe("Jak's House modifiers", () => {
     const replay = replayHouseRound(house, undefined, deckFor(c('10'), c('6'), c('8'), c('9')));
     expect(replay.house.runItBackTokens).toBe(0);
     expect(replay.house.roundNumber).toBe(started.house.roundNumber);
+    expect(replay.house.currentStake).toBe(25);
+  });
+
+  it('bases Run It Back on the original stake after a losing split round', () => {
+    const started = startHouseRound(25, createHouseState(), undefined, deckFor(c('8'), c('9'), c('8'), c('8')));
+    const splitLoss: RoundState = {
+      ...started.round,
+      phase: 'resolved',
+      hands: [
+        { id: 'hand-1', cards: [c('8'), c('10')], wager: 25, status: 'resolved', doubled: false, fromSplit: true },
+        { id: 'hand-2', cards: [c('8'), c('9')], wager: 25, status: 'resolved', doubled: false, fromSplit: true },
+      ],
+      results: [
+        { handId: 'hand-1', outcome: 'loss', wager: 25, returned: 0, net: -25 },
+        { handId: 'hand-2', outcome: 'push', wager: 25, returned: 25, net: 0 },
+      ],
+    };
+    const completed = completeHouseRound(started.house, splitLoss, 0).house;
+    const replay = replayHouseRound(completed, undefined, deckFor(c('10'), c('6'), c('8'), c('9')));
+
+    expect(completed.replayAvailable).toBe(true);
+    expect(replay.round.hands[0].wager).toBe(25);
     expect(replay.house.currentStake).toBe(25);
   });
 

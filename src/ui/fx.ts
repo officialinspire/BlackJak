@@ -10,6 +10,7 @@ import type { PlayerAction } from '../game';
 
 export type FxCue =
   | 'deal'
+  | 'shuffle'
   | 'line'
   | 'panel'
   | 'result'
@@ -23,6 +24,8 @@ export type FxCue =
 export const FX_TIMING = {
   cardDeal: 200,
   cardFlip: 320,
+  shuffle: 360,
+  splitMove: 240,
   chipBounce: 260,
   actionFlash: 180,
   resultPop: 450,
@@ -62,7 +65,11 @@ export class FxQueue {
 /** Screen-level classes for plain cues: `fx-result`, `fx-bust`, … (`stake:25` → `fx-stake`). */
 export function fxClassNames(cues: ReadonlySet<string>): string {
   const names = new Set<string>();
-  for (const cue of cues) names.add(`fx-${cue.split(':')[0]}`);
+  for (const cue of cues) {
+    const [kind, detail] = cue.split(':');
+    names.add(`fx-${kind}`);
+    if (detail) names.add(`fx-${kind}-${detail}`);
+  }
   return [...names].sort().join(' ');
 }
 
@@ -74,6 +81,19 @@ export function fxClassNames(cues: ReadonlySet<string>): string {
  * Hit) are never delayed.
  */
 export const INPUT_GUARD_MS = 260;
+
+/** Stable identity for the controls currently occupying the action area. */
+export function controlsStateKey(input: {
+  readonly screen: string;
+  readonly dockPhase: string | null;
+  readonly dailyPhase?: string;
+  readonly dailyHandIndex?: number;
+}): string | null {
+  if (input.screen === 'daily') {
+    return `daily:${input.dailyPhase ?? 'preview'}:${input.dailyHandIndex ?? -1}`;
+  }
+  return input.dockPhase ? `dock:${input.dockPhase}` : null;
+}
 
 export function shouldIgnoreActivation(input: {
   readonly now: number;

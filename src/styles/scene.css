@@ -134,6 +134,26 @@
 
 .anchor-dealer-hand { --ax: var(--anchor-dealer-hand-x); --ay: var(--anchor-dealer-hand-y); }
 
+.anchor-shoe {
+  left: 64%;
+  top: 22%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+
+.deck-shoe {
+  position: relative;
+  width: calc(var(--card-w) * .48);
+  aspect-ratio: .69;
+  filter: drop-shadow(0 5px 7px rgba(0,0,0,.45));
+  pointer-events: none;
+}
+
+.deck-shoe > span { position: absolute; inset: 0; display: block; }
+.deck-shoe > span:first-child { transform: translate(-4px, 2px) rotate(-3deg); }
+.deck-shoe > span:last-child { transform: translate(3px, -2px) rotate(2deg); }
+.deck-shoe .playing-card { width: 100%; margin: 0; }
+
 .anchor-player-hands {
   left: var(--anchor-player-hands-x);
   top: auto;
@@ -227,6 +247,12 @@
 
 .game-scene .scene-cards .player-hand.is-active {
   background: radial-gradient(ellipse at center, rgba(0,0,0,.28), transparent 72%);
+  transform: translateY(-3px);
+  box-shadow: 0 7px 18px rgba(212,175,55,.12), inset 0 0 0 1px rgba(212,175,55,.3);
+}
+
+.game-scene .scene-cards .player-hand {
+  transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
 }
 
 .game-scene .scene-cards .hand-meta,

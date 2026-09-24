@@ -92,6 +92,14 @@
   box-shadow: inset 0 0 50px rgba(0,0,0,.4);
 }
 
+.daily-table > section:first-child { position: relative; }
+.daily-table .deck-shoe {
+  position: absolute;
+  top: 1.35rem;
+  right: .35rem;
+  width: 30px;
+}
+
 .daily-table > section {
   min-width: 0;
   display: grid;
