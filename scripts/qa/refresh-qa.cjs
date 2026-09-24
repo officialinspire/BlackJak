@@ -28,4 +28,5 @@ async function enterGame(p) {
   }
   console.log(bad ? `${bad} mismatches` : 'refresh mid-hand: 30/30 restored to pre-hand chips');
   await b.close();
-})();
+  if (bad) process.exitCode = 1;
+})().catch((error) => { console.error(error); process.exitCode = 1; });

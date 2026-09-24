@@ -312,4 +312,5 @@ async function layoutMetrics(p) {
 
   log(fails.length ? `\n${fails.length} FAILURE(S): ${fails.join(' | ')}` : '\nALL CHECKS PASSED');
   await b.close();
-})();
+  if (fails.length) process.exitCode = 1;
+})().catch((error) => { console.error(error); process.exitCode = 1; });
