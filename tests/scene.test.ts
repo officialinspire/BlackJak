@@ -3,6 +3,7 @@ import sceneCss from '../src/styles/scene.css?raw';
 import { BLACKJAK_ASSET_URLS } from '../src/assets/blackjak-assets';
 import {
   SCENE_ANCHORS,
+  SCENE_NPC_HEIGHT,
   SCENE_TABLE_ASPECT,
   SCENE_TALLEST_FRAME_ASPECT,
   sceneStyleVars,
@@ -54,9 +55,15 @@ describe('scene layout constants', () => {
     expect(SCENE_ANCHORS.dealerHand.y).toBeGreaterThan((chipTray.rect.y + chipTray.rect.height) / h);
     expect(SCENE_ANCHORS.dealerHand.y).toBeLessThan((title.rect.y + title.rect.height) / h);
 
-    const order: SceneAnchorId[] = ['npc', 'dealerHand', 'dialogue', 'playerHands'];
+    const order: SceneAnchorId[] = ['dealerHand', 'dialogue', 'playerHands'];
     const ys = order.map((id) => SCENE_ANCHORS[id].y);
     expect([...ys].sort((a, b) => a - b)).toEqual(ys);
+
+    // Jak's viewport starts at the table's top edge and ends behind the dealer's cards.
+    expect(SCENE_ANCHORS.npc.align).toBe('bottom');
+    expect(SCENE_ANCHORS.npc.y).toBeGreaterThan(SCENE_ANCHORS.dealerHand.y);
+    expect(SCENE_ANCHORS.npc.y).toBeLessThan(SCENE_ANCHORS.dialogue.y);
+    expect(SCENE_ANCHORS.npc.y - SCENE_NPC_HEIGHT).toBeGreaterThanOrEqual(-0.01);
   });
 
   it('emits a custom property for every anchor and scene.css consumes only emitted vars', () => {
@@ -69,7 +76,7 @@ describe('scene layout constants', () => {
     }
 
     const locallyDefined = new Set([...sceneCss.matchAll(/(--[a-z-]+)\s*:/g)].map((match) => match[1]));
-    const layoutVar = /^--(anchor|table|frame|scene)-/;
+    const layoutVar = /^--(anchor|table|frame|scene|npc)-/;
     const consumed = [...sceneCss.matchAll(/var\((--[a-z-]+)/g)].map((match) => match[1]).filter((name) => layoutVar.test(name));
     expect(consumed.length).toBeGreaterThan(5);
     for (const name of consumed) {

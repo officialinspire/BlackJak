@@ -125,7 +125,6 @@
   padding-inline: clamp(4px, 1.5cqi, 16px);
 }
 
-.anchor-npc { --ax: var(--anchor-npc-x); --ay: var(--anchor-npc-y); }
 .anchor-dealer-hand { --ax: var(--anchor-dealer-hand-x); --ay: var(--anchor-dealer-hand-y); }
 .anchor-dialogue { --ax: var(--anchor-dialogue-x); --ay: var(--anchor-dialogue-y); }
 
@@ -136,15 +135,14 @@
   transform: translateX(-50%);
 }
 
-/* ---- NPC placeholder ---- */
+/* ---- NPC (Jak) — see dealer.css for the sprite itself ---- */
 
-.scene-npc .dealer-identity-row {
-  padding: .2rem .55rem .2rem .25rem;
-  border: 1px solid rgba(214,182,80,.28);
-  border-radius: 999px;
-  background: rgba(8,8,7,.78);
-  box-shadow: 0 6px 18px rgba(0,0,0,.4);
-  min-height: 0;
+.anchor-npc {
+  left: var(--anchor-npc-x);
+  top: auto;
+  bottom: calc(100% - var(--anchor-npc-y));
+  height: var(--npc-height);
+  transform: translateX(-50%);
 }
 
 /* ---- Cards (gameplay layer) ---- */
@@ -359,6 +357,9 @@
 
 @media (max-width: 520px) {
   .scene-hud .hud span { padding: .3rem .42rem; }
+  /* premium.css hides the 2nd pill (the title); the House pill shifts order, so hide by class. */
+  .scene-hud .hud span:nth-child(2) { display: inline; }
+  .scene-hud .hud span.title-pill { display: none; }
   .scene-hud .back-button { padding: .4rem .55rem; font-size: .8rem; }
   .scene-dialogue .dealer-commentary p { -webkit-line-clamp: 2; line-clamp: 2; }
 }
@@ -409,5 +410,5 @@
 @media (forced-colors: active) {
   .scene-frame { border: 1px solid CanvasText; }
   .scene-dialogue .dealer-commentary,
-  .scene-npc .dealer-identity-row { forced-color-adjust: auto; border: 1px solid CanvasText; }
+  .dealer-nameplate { forced-color-adjust: auto; border: 1px solid CanvasText; }
 }

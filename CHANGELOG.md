@@ -11,8 +11,13 @@ All notable changes to BlackJak are documented here.
 - Atlas tests covering real PNG dimensions, bounds, duplicate keys/rects, and overlaps.
 
 - Shared responsive `.game-scene` for Classic and Jak's House. The `blackjak-table.png` art replaces the CSS-generated table, with layers for the NPC placeholder, cards, dialogue/status, and HUD. Anchors come from `src/config/scene-layout.ts`, and styling lives in `src/styles/scene.css`.
+- Jak replaces the JG monogram as the gameplay dealer. His poses come from `blackjak-sprite-sheet.png` and are driven by dialogue events through `src/data/dealer-visuals.ts`, with one-shot deal/draw/chips gestures (`src/ui/dealer.ts`, `src/styles/dealer.css`).
 
 ### Changed
+- The dealer total now sits beside the dealer's cards. Dealer cards are slightly smaller on tall frames so Jak's face stays visible, and the empty dealer placeholder is gone.
+
+### Fixed
+- The CHIPS pill was hidden on phones in Jak's House, because the mobile rule hid the second HUD pill by position rather than by class.
 - Table screens are game-first: the compact HUD is above, the table fills the available height without distortion, and the controls sit directly below. The Jak's House banner and modifier strip moved below the controls.
 - The dealer commentary and the status live region now sit in the scene's dialogue/status layer.
 

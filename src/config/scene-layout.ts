@@ -34,7 +34,10 @@ export const SCENE_TALLEST_FRAME_ASPECT = {
 } as const;
 
 /** Frame height floor so cards and dialogue never crowd on short phones. */
-export const SCENE_MIN_FRAME_HEIGHT_PX = 330;
+export const SCENE_MIN_FRAME_HEIGHT_PX = 345;
+
+/** Height of Jak's viewport as a share of the table height (it starts at the top edge). */
+export const SCENE_NPC_HEIGHT = 0.37;
 
 /** Upper bound for the scene width on desktop/tablet (CSS px). */
 export const SCENE_MAX_WIDTH_PX = 1120;
@@ -52,17 +55,16 @@ export interface SceneAnchor {
 
 const spots = TABLE_LAYOUT.playerSpots;
 const centerSpot = spots[2].rect;
-const trayBottom = bottomOf(TABLE_LAYOUT.chipTray.rect);
 const titleCenter = centerY(TABLE_LAYOUT.title.rect);
 const outerSpotTop = spots[0].rect.y;
 
 export const SCENE_ANCHORS = {
-  /** Jak NPC placeholder: centered on the chip tray, behind the dealer's cards. */
-  npc: { x: nx(centerX(TABLE_LAYOUT.chipTray.rect)), y: ny(trayBottom * 0.5), align: 'center' },
-  /** Dealer hand: on the felt between the chip tray lip and the BLACKJAK title. */
-  dealerHand: { x: 0.5, y: ny((trayBottom + titleCenter) / 2), align: 'center' },
+  /** Jak NPC: centered behind the chip tray; the viewport's bottom edge sits behind the dealer's cards. */
+  npc: { x: nx(centerX(TABLE_LAYOUT.chipTray.rect)), y: ny(titleCenter + 70), align: 'bottom' },
+  /** Dealer hand: on the BLACKJAK title, low enough that Jak's face stays clear above it. */
+  dealerHand: { x: 0.5, y: ny(titleCenter), align: 'center' },
   /** Dialogue/status: over the rules arc, between the title and the outer spots. */
-  dialogue: { x: 0.5, y: ny((bottomOf(TABLE_LAYOUT.title.rect) + outerSpotTop) / 2), align: 'center' },
+  dialogue: { x: 0.5, y: ny((bottomOf(TABLE_LAYOUT.title.rect) + outerSpotTop) / 2 + 50), align: 'center' },
   /** Player hands: bottom edge just below the center betting spot. */
   playerHands: { x: nx(centerX(centerSpot)), y: ny(bottomOf(centerSpot) + 40), align: 'bottom' },
 } as const satisfies Record<string, SceneAnchor>;
@@ -80,6 +82,7 @@ export function sceneStyleVars(): string {
     `--frame-tallest-tablet:${SCENE_TALLEST_FRAME_ASPECT.tablet}`,
     `--frame-min-height:${SCENE_MIN_FRAME_HEIGHT_PX}px`,
     `--scene-max-width:${SCENE_MAX_WIDTH_PX}px`,
+    `--npc-height:${(SCENE_NPC_HEIGHT * 100).toFixed(2)}%`,
   ];
   for (const [id, anchor] of Object.entries(SCENE_ANCHORS) as [SceneAnchorId, SceneAnchor][]) {
     vars.push(`--anchor-${kebab(id)}-x:${pct(anchor.x)}`, `--anchor-${kebab(id)}-y:${pct(anchor.y)}`);

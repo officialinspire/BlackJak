@@ -43,6 +43,8 @@ import type { DailyOutcome, PlayerProfile } from '../types/profile';
 import type { FeedbackPreferences } from '../types/preferences';
 import { cardMarkup } from './card';
 import { gameSceneMarkup } from './scene';
+import { dealerMarkup } from './dealer';
+import type { DealerAction } from '../data/dealer-visuals';
 
 interface AppModel {
   screen: AppScreen;
@@ -63,6 +65,8 @@ interface AppModel {
   dailyDateKey: string;
   dailyRound: RoundState | null;
   dailyShareStatus: string | null;
+  /** One-shot Jak gesture for the next render (visual only). */
+  dealerCue: DealerAction | null;
 }
 
 type RoundTone = 'idle' | 'playing' | 'blackjack' | 'win' | 'loss' | 'push' | 'mixed';
@@ -117,6 +121,7 @@ const model: AppModel = {
   dailyDateKey: initialDateKey,
   dailyRound: null,
   dailyShareStatus: null,
+  dealerCue: null,
 };
 
 const app = (): HTMLElement => {
@@ -612,20 +617,17 @@ function sceneHudMarkup(modePill = ''): string {
     </header>`;
 }
 
-function dealerNpcMarkup(view: TableView, house: boolean): string {
-  return `
-    <div class="dealer-identity-row">
-      <span class="dealer-avatar${house ? ' house-avatar' : ''}" aria-hidden="true">JG</span>
-      <span class="dealer-name"><b>JAK</b><small>${house ? 'HOUSE RULES ACTIVE' : 'HOUSE DEALER'}</small></span>
-      <strong class="dealer-total" aria-label="${view.revealDealer ? `Dealer total ${view.dealerTotal}` : 'Dealer total hidden'}">${view.dealerTotal}</strong>
-    </div>`;
+function dealerNpcMarkup(house: boolean): string {
+  return dealerMarkup({ event: model.commentary.event, seed: model.commentary.text, action: model.dealerCue, house });
 }
 
 function dealerHandMarkup(view: TableView): string {
   const dealerCards = view.round?.dealer ?? [];
-  return `<div class="cards dealer-cards" aria-label="Dealer cards">${dealerCards.length
-    ? dealerCards.map((card, index) => cardMarkup(card, index === 1 && !view.revealDealer, index)).join('')
-    : '<div class="empty-cards" aria-hidden="true"><span>DEALER</span></div>'}</div>`;
+  return `
+    <div class="dealer-hand-row">
+      <div class="cards dealer-cards" aria-label="Dealer cards">${dealerCards.map((card, index) => cardMarkup(card, index === 1 && !view.revealDealer, index)).join('')}</div>
+      ${dealerCards.length ? `<strong class="dealer-total" aria-label="${view.revealDealer ? `Dealer total ${view.dealerTotal}` : 'Dealer total hidden'}">${view.dealerTotal}</strong>` : ''}
+    </div>`;
 }
 
 function sceneDialogueMarkup(view: TableView): string {
@@ -650,7 +652,7 @@ function classicMarkup(): string {
         mode: 'classic',
         label: 'Classic BlackJak table',
         hud: sceneHudMarkup(),
-        npc: dealerNpcMarkup(view, false),
+        npc: dealerNpcMarkup(false),
         dealerHand: dealerHandMarkup(view),
         playerHands: playerHandsMarkup(round),
         dialogue: sceneDialogueMarkup(view),
@@ -677,7 +679,7 @@ function houseMarkup(): string {
         mode: 'house',
         label: "Jak's House arcade blackjack table",
         hud: sceneHudMarkup(`<span class="house-hud-pill">JAK'S HOUSE <strong>HAND ${model.house.roundNumber || '—'}</strong></span>`),
-        npc: dealerNpcMarkup(view, true),
+        npc: dealerNpcMarkup(true),
         dealerHand: dealerHandMarkup(view),
         playerHands: playerHandsMarkup(round, model.house),
         dialogue: sceneDialogueMarkup(view),
@@ -779,6 +781,7 @@ function dealRound(): void {
 
   try {
     model.round = startRound(stake);
+    model.dealerCue = 'deal';
     feedback('deal', 'deal');
     if (model.round.phase === 'resolved') {
       settleIfResolved();
@@ -819,6 +822,7 @@ function dealHouseRound(): void {
     const started = startHouseRound(stake, model.house);
     model.house = started.house;
     model.round = started.round;
+    model.dealerCue = 'deal';
     feedback('deal', 'deal');
 
     if (model.round.phase === 'resolved') {
@@ -847,6 +851,7 @@ function runHouseReplay(): void {
     const replay = replayHouseRound(model.house);
     model.house = replay.house;
     model.round = replay.round;
+    model.dealerCue = 'deal';
     feedback('deal', 'deal');
 
     if (model.round.phase === 'resolved') {
@@ -859,6 +864,14 @@ function runHouseReplay(): void {
     model.houseCheckpoint = null;
     throw error;
   }
+}
+
+/** Visual gesture for a player action; stand has no gesture. */
+function dealerCueForAction(action: PlayerAction): DealerAction | null {
+  if (action === 'hit') return 'draw';
+  if (action === 'double') return 'chips';
+  if (action === 'split') return 'deal';
+  return null;
 }
 
 function takePlayerAction(action: PlayerAction): void {
@@ -888,6 +901,7 @@ function takePlayerAction(action: PlayerAction): void {
   try {
     const updatedRound = performAction(model.round, action, before.chips);
     model.round = updatedRound;
+    model.dealerCue = dealerCueForAction(action);
 
     if (action === 'hit') {
       const updatedHand = updatedRound.hands.find((candidate) => candidate.id === activeHandId);
@@ -946,6 +960,7 @@ function takeHouseAction(action: PlayerAction): void {
   try {
     const updatedRound = performAction(model.round, action, before.chips);
     model.round = updatedRound;
+    model.dealerCue = dealerCueForAction(action);
 
     if (action === 'hit') {
       const updatedHand = updatedRound.hands.find((candidate) => candidate.id === activeHandId);
@@ -1140,6 +1155,8 @@ function render(): void {
       break;
   }
 
+  // Dealer gestures are one-shot: later re-renders show the dialogue pose only.
+  model.dealerCue = null;
   bindEvents();
   const screenChanged = previousScreen !== null && previousScreen !== model.screen;
   lastRenderedScreen = model.screen;
