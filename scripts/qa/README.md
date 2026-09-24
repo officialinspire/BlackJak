@@ -1,7 +1,8 @@
 # Browser QA scripts
 
-Dev-only Playwright checks used for the sprite-build QA pass. They run against a
-production preview and are not part of `npm test` (they need a browser).
+Playwright/Chromium integration checks used for release hardening. They run against a
+production preview. They are separate from `npm test`, and GitHub Actions now runs all
+three scripts as a required browser QA gate.
 
 ```sh
 npm run build && npx vite preview --port 4173 &

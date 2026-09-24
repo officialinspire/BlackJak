@@ -2,6 +2,29 @@
 
 All notable changes to BlackJak are documented here.
 
+## [0.2.2] — 2026-09-24 — Playtest hardening
+
+### Added
+- Chromium browser QA is now a required GitHub Actions gate. It exercises the startup/intro path, responsive device matrix, menu/pause flow, Classic, Jak's House, Daily Hand, keyboard/touch behavior, reduced motion, mute persistence, refresh recovery, PWA update behavior, and offline core play.
+- Production artifact validation now requires the INSPIRE intro video plus both background-music tracks and verifies they are referenced by the built app.
+- A versioned runtime media cache serves MP3/MP4 assets, including cached byte-range responses for browser seeking/playback.
+
+### Changed
+- Large MP3/MP4 files are no longer part of the core service-worker precache. The install/update path now precaches the game shell and art while music/video are cached on demand.
+- Music sync ignores ordinary same-target rerenders, preventing an active 700ms crossfade from restarting repeatedly during gameplay UI updates.
+- All browser QA scripts now pass through the tap/Enter startup gate before interacting with the game.
+- Browser CI timeout increased to 15 minutes to accommodate pinned Chromium installation and the full integration suite.
+
+### Fixed
+- PWA update QA now edits the generated `APP_CACHE_NAME` used by the current service worker and still restores `dist/sw.js` in `finally`.
+- Refresh/gameplay QA no longer attempts to click table/menu controls behind the startup overlay.
+
+### Validation
+- `npm run release:check`
+- Chromium browser/device/integration QA in GitHub Actions
+- Production artifact/media/service-worker verification
+- GitHub Pages deployment from the merged `main` commit
+
 ## [0.2.1] — 2026-09-24 — Hardening
 
 ### Security

@@ -439,8 +439,8 @@ The PNG sheets at the repository root (`blackjak-sprite-sheet.png`, `blackjak-ta
 - **Browser-local persistence:** clearing site data removes chips, REP, stats, achievements, Daily completion, and settings.
 - **Classic v1 scope:** no insurance, surrender, side bets, or real-money functionality.
 - **Art notes:** the Inspire deck's 7♠, 7♥ and 7♣ are misdrawn in the source sheet (six pips); they render as a drawn fallback face until the art is corrected. Jak's shuffling pose isn't used by any mood yet.
-- **PWA deployment dependency:** GitHub Pages must be enabled once in repository settings before the production URL can deploy.
-- **Automated browser E2E:** CI runs the unit/integration suite and the production build gate; the Playwright checks in `scripts/qa/` are run manually (Chromium only).
+- **Media caching:** the core PWA is precached; the intro video and two music tracks are runtime-cached after use so installs/updates do not block on ~5.7 MB of audio. Cached media supports byte-range playback; if media is unavailable, gameplay still starts and remains usable.
+- **Automated browser E2E:** CI now runs Chromium device/integration QA across startup, menu, Classic, Jak's House, Daily, responsive layouts, input stress, refresh recovery, PWA update, reduced motion, mute, and offline core play.
 
 ## Roadmap after v0.2.0
 
@@ -460,7 +460,7 @@ A dedicated release-smoke suite covers:
 - Jak's House isolation and Gold Card scheduling
 - deterministic Daily Hand and one-award-per-date behavior
 
-GitHub Actions remains the source of truth for the final build gate.
+GitHub Actions remains the source of truth for the final build gate and now includes the Chromium browser QA suites in addition to Vitest, TypeScript, production build, artifact validation, and Pages deployment.
 
 ## Practice-chip economy
 
