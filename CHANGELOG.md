@@ -2,6 +2,27 @@
 
 All notable changes to BlackJak are documented here.
 
+## [0.4.0] — 2026-09-24 — Jak's voice, cardistry, haptics
+
+Blackjack rules, odds and payouts are unchanged.
+
+### Added
+- **Jak's personality.** The dialogue bank was rewritten around cardistry (fans, springs, Sybil cuts, one-handed Charliers), First Amendment-auditor humor ("public forum", "I am filming", "I do not answer questions", "Am I being detained?", "get me a supervisor") and "Hallelujah" payouts. There are two new moments:
+  - `deal_start`: Jak talks as he deals, in the deck-fan pose.
+  - `player_stand`: Jak reacts when you Stand.
+- **Cardistry animations**, each one-shot, under 500ms and off with reduced motion:
+  - Deck fan: the deck thumb-fans open and squares up on the shuffle.
+  - Pitched deal: dealt cards pitch in with a spin.
+  - Twirl: a Hit card twirls in while the top card springs off the deck.
+  - Sideways double: a Double card lands sideways first, then squares up.
+  - Blackjack fan: a natural fans open with a glow.
+- **Per-action haptics.** Hit, Stand, Double, Split, deal, flip, win, loss, bust, blackjack, stake chips and toggles each have their own pattern.
+- **iPhone haptics.** iOS Safari has no `navigator.vibrate`, so a hidden `<input switch>` plays the system haptic on iOS 18+ without taking keyboard focus.
+
+### Changed
+- The shoe beside Jak is a five-card stack, so the fan reads as a real spread.
+- Browser QA covers the new haptics: Hit's own pattern, and iOS switch ticks that keep focus where it was.
+
 ## [0.3.1] — 2026-09-24 — Volume, decks, and button polish
 
 ### Fixed

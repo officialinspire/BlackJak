@@ -6,7 +6,7 @@ BlackJak is a mobile-first blackjack game from OFFICIAL INSPIRE, inspired in per
 
 ## Current status
 
-**BlackJak v0.3.x** (v0.3.1: working music volume on iOS, separate music/effects sliders, a deck switch on every screen, polished buttons) adds the INSPIRE startup intro, menu/gameplay music with crossfades, event-driven table SFX, phone-to-desktop layout hardening, and a PWA that precaches the game but runtime-caches its large media. v0.2.1 added security hardening: a production CSP, escaped runtime text, patched tooling and lockfile-based CI. v0.1.0 delivered the full game: Classic play, Jak's House, local progression, Daily Hand, audio/haptics, accessibility, offline PWA and CI. v0.2.0 dresses it in the illustrated art set:
+**BlackJak v0.4.0** gives Jak his full voice (cardistry, First Amendment-auditor bits, "Hallelujah"), cardistry card motion, and per-action haptics including iPhone. **v0.3.x** (v0.3.1: working music volume on iOS, separate music/effects sliders, a deck switch on every screen, polished buttons) adds the INSPIRE startup intro, menu/gameplay music with crossfades, event-driven table SFX, phone-to-desktop layout hardening, and a PWA that precaches the game but runtime-caches its large media. v0.2.1 added security hardening: a production CSP, escaped runtime text, patched tooling and lockfile-based CI. v0.1.0 delivered the full game: Classic play, Jak's House, local progression, Daily Hand, audio/haptics, accessibility, offline PWA and CI. v0.2.0 dresses it in the illustrated art set:
 
 - the **illustrated table** (`blackjak-table.png`) as a shared, responsive game scene for Classic and Jak's House
 - **Jak as a reactive dealer NPC**, with 19 sprite poses driven by dialogue events plus deal, draw and chip gestures
@@ -242,7 +242,18 @@ Settings persist locally, and missing or corrupt values fall back to defaults:
 
 Music is routed through a Web Audio gain node, so the music slider and crossfades work on iOS Safari too (it ignores `audio.volume`). Like the SFX, music follows the iPhone's silent switch.
 
-Haptics use `navigator.vibrate()` defensively and never block gameplay when unsupported. Reduced-motion behavior remains independent of audio/haptic settings.
+**Jak's voice** (`src/data/dialogue.ts`): Jak is a dealer who is also a cardist (fans, springs, Sybil cuts, one-handed Charliers). He talks like a First Amendment auditor filming the table ("This is a public forum", "I do not answer questions", "Am I being detained?", "get me a supervisor") and shouts "Hallelujah" when the chips come in. He speaks as he deals (fanning the deck) and when you Stand, as well as on every result.
+
+**Cardistry motion** (`src/styles/fx.css`), each move under half a second and one-shot:
+- Deck fan: the deck thumb-fans open and squares up on every shuffle.
+- Pitched deal: cards leave the deck spinning and land with a small overshoot.
+- Twirl and spring: a Hit card twirls in as the top card springs off the deck.
+- Sideways double: a Double card lands sideways first, the casino double-down mark.
+- Blackjack fan: a natural fans open and snaps shut with a glow.
+
+All of it is off with reduced motion.
+
+**Haptics** (`HAPTIC_PATTERNS` in `src/feedback/feedback.ts`): every button tap, stake chip and toggle gives a tick, and each action has its own feel. Hit is a crisp tick, Stand a settled double-tap, Double a heavier press, and Split a "da-dum". Deal, win, loss, bust and blackjack have their own patterns too. Android uses `navigator.vibrate()`. iPhone Safari has no vibration API, so BlackJak toggles a hidden `<input switch>`, which plays the iOS system haptic on iOS 18+. Haptics never block gameplay and follow the Haptics setting. Reduced-motion behavior stays independent of audio/haptic settings.
 
 ## Daily Hand
 

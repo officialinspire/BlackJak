@@ -737,7 +737,9 @@ function dealerNpcMarkup(house: boolean): string {
 
 function deckShoeMarkup(): string {
   const back = cardMarkup({ rank: 'A', suit: 'spades' }, true, 0, 'standard', model.visual.cardTheme, false);
-  return `<div class="deck-shoe" aria-hidden="true"><span>${back}</span><span>${back}</span></div>`;
+  // Five layered backs: enough for Jak's fan/spring cardistry on the shuffle cue.
+  const layers = [0, 1, 2, 3, 4].map((index) => `<span style="--i:${index}">${back}</span>`).join('');
+  return `<div class="deck-shoe" aria-hidden="true">${layers}</div>`;
 }
 
 function dealerHandMarkup(view: TableView): string {
@@ -918,7 +920,7 @@ function dealRound(): void {
     if (model.round.phase === 'resolved') {
       settleIfResolved();
     } else {
-      say('idle');
+      say('deal_start');
     }
   } catch (error) {
     persistProfile(before);
@@ -963,7 +965,7 @@ function dealHouseRound(): void {
     if (model.round.phase === 'resolved') {
       settleHouseIfResolved();
     } else {
-      say('idle');
+      say('deal_start');
     }
   } catch (error) {
     persistProfile(beforeProfile);
@@ -994,7 +996,7 @@ function runHouseReplay(): void {
     if (model.round.phase === 'resolved') {
       settleHouseIfResolved();
     } else {
-      say('idle');
+      say('deal_start');
     }
   } catch (error) {
     model.house = beforeHouse;
@@ -1053,6 +1055,8 @@ function takePlayerAction(action: PlayerAction): void {
       settleIfResolved();
     } else if (action === 'split') {
       say('split_started');
+    } else if (action === 'stand') {
+      say('player_stand');
     } else if (action === 'hit') {
       const updatedHand = model.round.hands.find((candidate) => candidate.id === activeHandId);
       if (updatedHand) {
@@ -1115,6 +1119,8 @@ function takeHouseAction(action: PlayerAction): void {
       settleHouseIfResolved();
     } else if (action === 'split') {
       say('split_started');
+    } else if (action === 'stand') {
+      say('player_stand');
     } else if (action === 'hit') {
       const updatedHand = model.round.hands.find((candidate) => candidate.id === activeHandId);
       if (updatedHand) {
@@ -1515,7 +1521,7 @@ function bindEvents(): void {
       if (!key) return;
       const next = { ...model.preferences, [key]: !model.preferences[key] };
       persistPreferences(next);
-      feedback('button', 'tap');
+      feedback('button', 'toggle');
       render();
     });
   });

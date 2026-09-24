@@ -24,9 +24,10 @@
   animation: fx-card-split var(--fx-split-move, 240ms) cubic-bezier(.2,.8,.3,1.1) both;
 }
 
+/* A pitched deal: the card leaves the deck spinning and lands with a small overshoot. */
 @keyframes fx-card-deal {
-  from { opacity: 0; transform: translate3d(var(--deal-from-x), var(--deal-from-y), 0) rotate(4deg) scale(.94); }
-  70% { opacity: 1; }
+  from { opacity: 0; transform: translate3d(var(--deal-from-x), var(--deal-from-y), 0) rotate(-26deg) scale(.88); }
+  55% { opacity: 1; transform: translate3d(0, -3px, 0) rotate(3deg) scale(1.02); }
   to { opacity: 1; transform: none; }
 }
 
@@ -35,20 +36,53 @@
   --deal-from-y: clamp(-70px, -8vw, -28px);
 }
 
-.fx-shuffle .deck-shoe > span:first-child { animation: fx-shuffle-left var(--fx-shuffle, 360ms) ease-in-out both; }
-.fx-shuffle .deck-shoe > span:last-child { animation: fx-shuffle-right var(--fx-shuffle, 360ms) ease-in-out both; }
-.fx-shuffle .playing-card.is-new { animation-delay: calc(var(--deal-delay, 0ms) + 180ms); }
+/* ---- Cardistry ---- */
+
+/* Shuffle cue: Jak thumb-fans the deck open and squares it back up before dealing. */
+.fx-shuffle .deck-shoe > span {
+  animation: fx-cardistry-fan var(--fx-cardistry-fan, 480ms) cubic-bezier(.3,.8,.3,1) both;
+}
+.fx-shuffle .playing-card.is-new { animation-delay: calc(var(--deal-delay, 0ms) + 300ms); }
+
+@keyframes fx-cardistry-fan {
+  0%, 100% { transform: translate(calc((var(--i) - 2) * 1.5px), calc((var(--i) - 2) * -1px)) rotate(calc((var(--i) - 2) * 1.4deg)); }
+  40%, 62% { transform: translate(calc((var(--i) - 2) * 3px), -5px) rotate(calc((var(--i) - 2) * 17deg)); }
+}
+
+/* A card leaving the deck: the top card springs up (Hit, Double, dealer draws). */
+.fx-action-hit .deck-shoe > span:last-child,
+.fx-action-double .deck-shoe > span:last-child,
+.fx-action-stand .deck-shoe > span:last-child {
+  animation: fx-deck-spring var(--fx-deck-spring, 240ms) ease-out both;
+}
+
+@keyframes fx-deck-spring {
+  0%, 100% { transform: translate(3px, -2px) rotate(2.8deg); }
+  45% { transform: translate(8px, -9px) rotate(-9deg); }
+}
+
+/* Hit: the new card twirls in off the deck (one clean spin, no wobble). */
+.fx-action-hit .player-hands .playing-card.is-new {
+  animation: fx-card-twirl var(--fx-card-twirl, 300ms) cubic-bezier(.2,.75,.25,1.05) both;
+}
+
+@keyframes fx-card-twirl {
+  from { opacity: 0; transform: translate3d(var(--deal-from-x), var(--deal-from-y), 0) rotate(-300deg) scale(.8); }
+  60% { opacity: 1; }
+  to { opacity: 1; transform: none; }
+}
+
+/* Double: the card lands sideways first, the way a casino marks a double, then squares up. */
+.fx-action-double .player-hands .playing-card.is-new {
+  animation: fx-card-double var(--fx-card-twirl, 300ms) cubic-bezier(.25,.8,.3,1.05) both;
+}
+
+@keyframes fx-card-double {
+  from { opacity: 0; transform: translate3d(var(--deal-from-x), var(--deal-from-y), 0) rotate(-90deg) scale(.86); }
+  55% { opacity: 1; transform: rotate(90deg); }
+  to { opacity: 1; transform: none; }
+}
 .fx-action-split .playing-card.is-new { animation-delay: calc(var(--deal-delay, 0ms) + 220ms); }
-
-@keyframes fx-shuffle-left {
-  0%, 100% { transform: translate(-4px, 2px) rotate(-3deg); }
-  45% { transform: translate(-14px, -3px) rotate(-9deg); }
-}
-
-@keyframes fx-shuffle-right {
-  0%, 100% { transform: translate(3px, -2px) rotate(2deg); }
-  55% { transform: translate(14px, 2px) rotate(8deg); }
-}
 
 @keyframes fx-card-split {
   from { opacity: .7; transform: translate3d(-42%, 0, 0) rotate(-3deg); }
@@ -126,11 +160,20 @@
 /* ---- Blackjack emphasis / win lift ---- */
 
 .fx-result .player-hand.is-blackjack .playing-card {
-  animation: fx-blackjack-pop var(--fx-result-pop, 450ms) cubic-bezier(.3,1.6,.5,1) both;
+  --fan-dir: -1;
+  transform-origin: 50% 100%;
+  animation: fx-blackjack-fan var(--fx-card-flourish, 460ms) cubic-bezier(.3,1.4,.5,1) both;
 }
 
 .fx-result .player-hand.is-blackjack .playing-card:nth-child(2) {
-  animation-delay: 60ms;
+  --fan-dir: 1;
+}
+
+/* Cardistry flourish: the natural fans open like a pressure fan, then snaps shut with a glow. */
+@keyframes fx-blackjack-fan {
+  0% { transform: none; filter: none; }
+  45% { transform: translate(calc(var(--fan-dir) * 7px), -9px) rotate(calc(var(--fan-dir) * 11deg)) scale(1.06); filter: drop-shadow(0 0 14px rgba(242,193,78,.9)); }
+  100% { transform: none; filter: drop-shadow(0 0 6px rgba(242,193,78,.35)); }
 }
 
 .fx-result .player-hand.is-win .playing-card {
@@ -141,12 +184,6 @@
 .fx-result .player-hand.is-blackjack .playing-card,
 .fx-result .dialogue-panel-status {
   animation-delay: 340ms;
-}
-
-@keyframes fx-blackjack-pop {
-  0% { transform: none; filter: none; }
-  45% { transform: translateY(-8px) scale(1.08); filter: drop-shadow(0 0 14px rgba(242,193,78,.9)); }
-  100% { transform: none; filter: drop-shadow(0 0 6px rgba(242,193,78,.35)); }
 }
 
 @keyframes fx-win-lift {

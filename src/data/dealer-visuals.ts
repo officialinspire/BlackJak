@@ -76,6 +76,9 @@ export const EVENT_MOODS: Readonly<Record<DialogueEvent, DealerMood>> = {
   losing_streak: 'celebrating',
   winning_streak: 'unimpressed',
   refill_chips: 'teasing',
+  // Jak fans the deck as he deals: the cardistry pose.
+  deal_start: 'intrigued',
+  player_stand: 'thinking',
 };
 
 /** Short one-shot gestures played before settling into the dialogue pose. */
