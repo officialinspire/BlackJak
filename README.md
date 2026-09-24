@@ -331,6 +331,12 @@ The responsive QA layer keeps controls at roughly 44px or larger, applies `touch
 An unfinished Classic or House wager is held in memory and committed only when the round resolves. Refreshing or abandoning an unresolved hand therefore restores the last committed bankroll rather than charging for a round that no longer exists. Malformed JSON, wrong-version storage envelopes, missing values, and blocked browser storage all fall back safely.
 
 
+## Game scene
+
+Classic and Jak's House render through one shared scene component (`src/ui/scene.ts`), stacked bottom to top: the `blackjak-table.png` table, the Jak NPC placeholder, the cards, dialogue/status plus the round result, and then the HUD. Controls stay as ordinary DOM buttons directly below. Anchors are normalized to the table art and come from `src/config/scene-layout.ts` (derived from the measured `TABLE_LAYOUT`). They're emitted as CSS custom properties and consumed by `src/styles/scene.css`, so `render.ts` contains no coordinates.
+
+The table keeps its native aspect ratio. The frame height follows the viewport: on portrait phones the frame is taller than the art, so the table is scaled to cover and its outer decor is cropped at the sides, never stretched. Card size tracks the frame through container query units, so cards stay at 48px or wider on 320px phones and top out at 96px on desktop. On short landscape screens the table sits on the left with the controls on the right. Jak's House only adds its existing modifier visuals (HUD pill, gold rim, gold cards, the Run It Back panel, and the modifier strip below the controls).
+
 ## Visual atlas (art sheets)
 
 The PNG sheets at the repository root (`blackjak-sprite-sheet.png`, `blackjak-table.png`, `dialogue-status-bar.png`, `menu-bar.png`, and the three `blackjak-cards-*.png` decks) are mapped in `src/data/visual-atlas.ts`. Every `SpriteRect` was measured from the actual pixels rather than an assumed grid — ace/court cards are wider, rows sit at different offsets, the Inspire deck orders its rows ♠ ♥ ♣ ♦, and neighbouring dealer poses overlap (their shared borders sit on min-cost cut lines so rects never intersect). `scripts/measure-visual-atlas.py` reproduces the measurements.

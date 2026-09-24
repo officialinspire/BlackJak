@@ -10,7 +10,13 @@ All notable changes to BlackJak are documented here.
 - SVG `viewBox` atlas renderer (`src/ui/atlas.ts`) and a lazy dev inspector behind `?debugVisuals=1`.
 - Atlas tests covering real PNG dimensions, bounds, duplicate keys/rects, and overlaps.
 
-No rules, round state, or gameplay UI changed.
+- Shared responsive `.game-scene` for Classic and Jak's House. The `blackjak-table.png` art replaces the CSS-generated table, with layers for the NPC placeholder, cards, dialogue/status, and HUD. Anchors come from `src/config/scene-layout.ts`, and styling lives in `src/styles/scene.css`.
+
+### Changed
+- Table screens are game-first: the compact HUD is above, the table fills the available height without distortion, and the controls sit directly below. The Jak's House banner and modifier strip moved below the controls.
+- The dealer commentary and the status live region now sit in the scene's dialogue/status layer.
+
+No blackjack rules or round state changed.
 
 ## [0.1.0] — 2026-09-23 — Demo release candidate
 

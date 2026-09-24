@@ -6,6 +6,7 @@ import './styles/house.css';
 import './styles/feedback-daily.css';
 import './styles/pwa.css';
 import './styles/qa.css';
+import './styles/scene.css';
 import { registerPWA } from './pwa/register';
 import { initializeUI } from './ui/render';
 

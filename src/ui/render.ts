@@ -42,6 +42,7 @@ import type { AppScreen } from '../types/app';
 import type { DailyOutcome, PlayerProfile } from '../types/profile';
 import type { FeedbackPreferences } from '../types/preferences';
 import { cardMarkup } from './card';
+import { gameSceneMarkup } from './scene';
 
 interface AppModel {
   screen: AppScreen;
@@ -576,53 +577,89 @@ function actionControlsMarkup(round: RoundState): string {
     </div>`;
 }
 
-function classicMarkup(): string {
+interface TableView {
+  readonly round: RoundState | null;
+  readonly revealDealer: boolean;
+  readonly dealerTotal: string | number;
+  readonly showActions: boolean;
+  readonly tone: RoundTone;
+}
+
+function tableView(): TableView {
   const round = model.round;
   const dealerCards = round?.dealer ?? [];
   const revealDealer = round?.phase === 'resolved';
-  const dealerTotal = dealerCards.length ? (revealDealer ? evaluateHand(dealerCards).total : '?') : '—';
-  const showActions = round?.phase === 'player-turn';
-  const tone = roundTone(round);
+  return {
+    round,
+    revealDealer,
+    dealerTotal: dealerCards.length ? (revealDealer ? evaluateHand(dealerCards).total : '?') : '—',
+    showActions: round?.phase === 'player-turn',
+    tone: roundTone(round),
+  };
+}
+
+function sceneHudMarkup(modePill = ''): string {
   const progression = titleProgressForRep(model.profile.rep);
+  return `
+    <header class="table-header">
+      <button class="back-button" data-screen="menu" aria-keyshortcuts="Escape">← Menu</button>
+      <div class="hud" aria-label="Player resources and progression">
+        ${modePill}
+        <span>CHIPS <strong>${formatChips(model.profile.chips)}</strong></span>
+        <span class="title-pill">${progression.current.name}</span>
+        <span class="rep-pill">REP <strong>${model.profile.rep}</strong><i class="rep-mini-track" aria-hidden="true"><i style="width:${progression.percent}%"></i></i></span>
+      </div>
+    </header>`;
+}
+
+function dealerNpcMarkup(view: TableView, house: boolean): string {
+  return `
+    <div class="dealer-identity-row">
+      <span class="dealer-avatar${house ? ' house-avatar' : ''}" aria-hidden="true">JG</span>
+      <span class="dealer-name"><b>JAK</b><small>${house ? 'HOUSE RULES ACTIVE' : 'HOUSE DEALER'}</small></span>
+      <strong class="dealer-total" aria-label="${view.revealDealer ? `Dealer total ${view.dealerTotal}` : 'Dealer total hidden'}">${view.dealerTotal}</strong>
+    </div>`;
+}
+
+function dealerHandMarkup(view: TableView): string {
+  const dealerCards = view.round?.dealer ?? [];
+  return `<div class="cards dealer-cards" aria-label="Dealer cards">${dealerCards.length
+    ? dealerCards.map((card, index) => cardMarkup(card, index === 1 && !view.revealDealer, index)).join('')
+    : '<div class="empty-cards" aria-hidden="true"><span>DEALER</span></div>'}</div>`;
+}
+
+function sceneDialogueMarkup(view: TableView): string {
+  return `
+    <div class="scene-dialogue">
+      <div class="dealer-commentary" aria-label="Dealer commentary" data-event="${model.commentary.event}">
+        <span class="dealer-quote-mark" aria-hidden="true">“</span>
+        <p>${model.commentary.text}</p>
+      </div>
+      <p class="status-line" role="status" aria-live="polite" aria-atomic="true">${statusText(view.round)}</p>
+    </div>`;
+}
+
+function classicMarkup(): string {
+  const view = tableView();
+  const { round } = view;
 
   return `
-    <main id="app-main" tabindex="-1" class="screen table-screen round-${tone}">
+    <main id="app-main" tabindex="-1" class="screen table-screen round-${view.tone}">
       <div class="ambient-lamp ambient-lamp-table" aria-hidden="true"></div>
-      <header class="table-header">
-        <button class="back-button" data-screen="menu" aria-keyshortcuts="Escape">← Menu</button>
-        <div class="hud" aria-label="Player resources and progression">
-          <span>CHIPS <strong>${formatChips(model.profile.chips)}</strong></span>
-          <span class="title-pill">${progression.current.name}</span>
-          <span class="rep-pill">REP <strong>${model.profile.rep}</strong><i class="rep-mini-track" aria-hidden="true"><i style="width:${progression.percent}%"></i></i></span>
-        </div>
-      </header>
-
-      <section class="table" aria-label="Classic BlackJak table">
-        <div class="hand-zone dealer-zone">
-          <div class="dealer-identity-row">
-            <span class="dealer-avatar" aria-hidden="true">JG</span>
-            <span class="dealer-name"><b>JAK</b><small>HOUSE DEALER</small></span>
-            <strong class="dealer-total" aria-label="${revealDealer ? `Dealer total ${dealerTotal}` : 'Dealer total hidden'}">${dealerTotal}</strong>
-          </div>
-          <div class="cards dealer-cards">${dealerCards.length ? dealerCards.map((card, index) => cardMarkup(card, index === 1 && !revealDealer, index)).join('') : '<div class="empty-cards" aria-hidden="true"><span>DEALER</span></div>'}</div>
-          <div class="dealer-commentary" aria-label="Dealer commentary" data-event="${model.commentary.event}">
-            <span class="dealer-quote-mark" aria-hidden="true">“</span>
-            <p>${model.commentary.text}</p>
-          </div>
-        </div>
-
-        <div class="table-mark" aria-hidden="true">BLACK<span>JAK</span></div>
-
-        <div class="hand-zone player-zone">
-          ${playerHandsMarkup(round)}
-        </div>
-        ${resultBannerMarkup(round)}
-      </section>
+      ${gameSceneMarkup({
+        mode: 'classic',
+        label: 'Classic BlackJak table',
+        hud: sceneHudMarkup(),
+        npc: dealerNpcMarkup(view, false),
+        dealerHand: dealerHandMarkup(view),
+        playerHands: playerHandsMarkup(round),
+        dialogue: sceneDialogueMarkup(view),
+        overlay: resultBannerMarkup(round),
+      })}
 
       <section class="game-controls" aria-label="Classic BlackJak controls">
-        <p class="status-line" role="status" aria-live="polite" aria-atomic="true">${statusText(round)}</p>
         ${model.error ? `<p class="error-line" role="alert">${model.error}</p>` : ''}
-        ${showActions && round ? actionControlsMarkup(round) : bettingControlsMarkup()}
+        ${view.showActions && round ? actionControlsMarkup(round) : bettingControlsMarkup()}
         <p class="practice-note">Practice chips have no monetary value.</p>
       </section>
       ${achievementToastMarkup()}
@@ -630,25 +667,30 @@ function classicMarkup(): string {
 }
 
 function houseMarkup(): string {
-  const round = model.round;
-  const dealerCards = round?.dealer ?? [];
-  const revealDealer = round?.phase === 'resolved';
-  const dealerTotal = dealerCards.length ? (revealDealer ? evaluateHand(dealerCards).total : '?') : '—';
-  const showActions = round?.phase === 'player-turn';
-  const tone = roundTone(round);
-  const progression = titleProgressForRep(model.profile.rep);
+  const view = tableView();
+  const { round } = view;
 
   return `
-    <main id="app-main" tabindex="-1" class="screen table-screen house-screen round-${tone}">
+    <main id="app-main" tabindex="-1" class="screen table-screen house-screen round-${view.tone}">
       <div class="ambient-lamp ambient-lamp-table house-lamp" aria-hidden="true"></div>
-      <header class="table-header">
-        <button class="back-button" data-screen="menu" aria-keyshortcuts="Escape">← Menu</button>
-        <div class="hud" aria-label="Player resources and progression">
-          <span>CHIPS <strong>${formatChips(model.profile.chips)}</strong></span>
-          <span class="title-pill">${progression.current.name}</span>
-          <span class="rep-pill">REP <strong>${model.profile.rep}</strong><i class="rep-mini-track" aria-hidden="true"><i style="width:${progression.percent}%"></i></i></span>
-        </div>
-      </header>
+      ${gameSceneMarkup({
+        mode: 'house',
+        label: "Jak's House arcade blackjack table",
+        hud: sceneHudMarkup(`<span class="house-hud-pill">JAK'S HOUSE <strong>HAND ${model.house.roundNumber || '—'}</strong></span>`),
+        npc: dealerNpcMarkup(view, true),
+        dealerHand: dealerHandMarkup(view),
+        playerHands: playerHandsMarkup(round, model.house),
+        dialogue: sceneDialogueMarkup(view),
+        overlay: resultBannerMarkup(round),
+      })}
+
+      <section class="game-controls house-controls" aria-label="Jak's House controls">
+        ${model.houseLastBonusRep > 0 ? `<p class="house-bonus-line">HOT HAND BONUS +${model.houseLastBonusRep} REP</p>` : ''}
+        ${model.houseTokenAwarded ? '<p class="house-token-line">RUN IT BACK TOKEN EARNED</p>' : ''}
+        ${model.error ? `<p class="error-line" role="alert">${model.error}</p>` : ''}
+        ${view.showActions && round ? actionControlsMarkup(round) : houseBettingControlsMarkup()}
+        <p class="practice-note">Jak's House uses fictional practice chips and arcade modifiers. No monetary value.</p>
+      </section>
 
       <section class="house-mode-banner" aria-labelledby="house-mode-title">
         <div>
@@ -660,37 +702,6 @@ function houseMarkup(): string {
       </section>
 
       ${houseModifierStripMarkup()}
-
-      <section class="table house-table" aria-label="Jak's House arcade blackjack table">
-        <div class="hand-zone dealer-zone">
-          <div class="dealer-identity-row">
-            <span class="dealer-avatar house-avatar" aria-hidden="true">JG</span>
-            <span class="dealer-name"><b>JAK</b><small>HOUSE RULES ACTIVE</small></span>
-            <strong class="dealer-total" aria-label="${revealDealer ? `Dealer total ${dealerTotal}` : 'Dealer total hidden'}">${dealerTotal}</strong>
-          </div>
-          <div class="cards dealer-cards">${dealerCards.length ? dealerCards.map((card, index) => cardMarkup(card, index === 1 && !revealDealer, index)).join('') : '<div class="empty-cards" aria-hidden="true"><span>DEALER</span></div>'}</div>
-          <div class="dealer-commentary" aria-label="Dealer commentary" data-event="${model.commentary.event}">
-            <span class="dealer-quote-mark" aria-hidden="true">“</span>
-            <p>${model.commentary.text}</p>
-          </div>
-        </div>
-
-        <div class="table-mark house-table-mark" aria-hidden="true">JAK'S<span>HOUSE</span></div>
-
-        <div class="hand-zone player-zone">
-          ${playerHandsMarkup(round, model.house)}
-        </div>
-        ${resultBannerMarkup(round)}
-      </section>
-
-      <section class="game-controls house-controls" aria-label="Jak's House controls">
-        <p class="status-line" role="status" aria-live="polite" aria-atomic="true">${statusText(round)}</p>
-        ${model.houseLastBonusRep > 0 ? `<p class="house-bonus-line">HOT HAND BONUS +${model.houseLastBonusRep} REP</p>` : ''}
-        ${model.houseTokenAwarded ? '<p class="house-token-line">RUN IT BACK TOKEN EARNED</p>' : ''}
-        ${model.error ? `<p class="error-line" role="alert">${model.error}</p>` : ''}
-        ${showActions && round ? actionControlsMarkup(round) : houseBettingControlsMarkup()}
-        <p class="practice-note">Jak's House uses fictional practice chips and arcade modifiers. No monetary value.</p>
-      </section>
       ${achievementToastMarkup()}
     </main>`;
 }
