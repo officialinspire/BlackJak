@@ -790,8 +790,8 @@ function classicMarkup(): string {
       })}
 
       <h1 class="visually-hidden">Classic BlackJak</h1>
-      ${gameFooterMarkup('compact')}
       ${tableDockFor(view, false)}
+      ${gameFooterMarkup('compact')}
       ${achievementToastMarkup()}
     </main>`;
 }
@@ -815,8 +815,8 @@ function houseMarkup(): string {
       })}
 
       ${houseModifierStripMarkup()}
-      ${gameFooterMarkup('compact')}
       ${tableDockFor(view, true)}
+      ${gameFooterMarkup('compact')}
       ${achievementToastMarkup()}
     </main>`;
 }
