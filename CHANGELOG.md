@@ -17,17 +17,22 @@ All notable changes to BlackJak are documented here.
 - The Gold Card now decorates the themed card with a gold tint, ring and tag.
 - `DialogueStatusPanel`: a nine-slice `dialogue-status-bar.png` frame for Jak's dialogue, status, round results and REP/House notes, in a bar under the table (`src/ui/dialogue-panel.ts`, `src/config/dialogue-panel-layout.ts`, `src/styles/dialogue-panel.css`).
 - `menu-bar.png` main menu with DOM buttons at normalized hit areas, and an in-game pause board (`model.pauseMenuOpen`) that hangs over the table without touching the round: Resume, Deck, Sound, and Main Menu with confirmation. Esc toggles it at a table. `?debugVisuals=1` outlines the hit areas.
+- Game-first table shell: compact HUD (menu, chips, REP/title, deck), fixed-height action dock (`src/ui/table-dock.ts`, `src/styles/dock.css`) that is sticky on phones, immediate Deal again, clear enabled/disabled states, a compact Jak's House modifier strip, and deal-in animation limited to new cards.
 
 ### Known art issues
 - In the Inspire deck, 7♠, 7♥ and 7♣ show six pips. They're flagged in `CARD_ART_ISSUES` and render as the drawn face until the art is fixed.
 
 ### Changed
+- The table controls are now a single dock. Jak's House's large banner and modifier cards became a one-line pill strip with a collapsible rules note; the page heading is kept for screen readers.
+- Achievement toasts on tables appear at the top so they never cover the dock.
 - At a table, the HUD's "← Menu" button (and Esc) now opens the pause board instead of leaving the table and discarding the hand.
 - Round results, REP, Hot Hand bonus and Run It Back token notes moved from the center-of-table banner and the controls into the panel's single live status line. The table's height floor dropped from 345px to 270px, because the felt no longer hosts dialogue.
 - Jak's name and dealer context moved from the NPC nameplate to the panel's speaker tab.
 - The dealer total now sits beside the dealer's cards. Dealer cards are slightly smaller on tall frames so Jak's face stays visible, and the empty dealer placeholder is gone.
 
 ### Fixed
+- The primary button no longer turns dark-on-dark while hovered (a sticky hover after a tap made Deal again look disabled).
+- Sticky positioning on table screens (`overflow-x: clip` instead of `hidden`).
 - Atlas sprites fitted into a box of a different shape no longer show slivers of neighbouring sheet cells (nested SVG viewport clips exactly to the rect).
 - The CHIPS pill was hidden on phones in Jak's House, because the mobile rule hid the second HUD pill by position rather than by class.
 - Table screens are game-first: the compact HUD is above, the table fills the available height without distortion, and the controls sit directly below. The Jak's House banner and modifier strip moved below the controls.

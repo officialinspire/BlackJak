@@ -57,14 +57,17 @@ export function cardMarkup(
   dealIndex = 0,
   variant: CardVariant = 'standard',
   theme: CardThemeId = activeTheme,
+  /** False for cards already on screen: they skip the deal-in animation. */
+  animate = true,
 ): string {
   const delay = Math.min(Math.max(dealIndex, 0), 8) * 38;
+  const settled = animate ? '' : ' is-settled';
   const sheet = cardThemeSheet(theme);
 
   if (hidden) {
     const back = cardBackSprite(theme);
     return `
-      <div class="playing-card card-back sprite-card card-theme-${theme}" role="img" aria-roledescription="playing card" style="${spriteStyle(back, delay)}" aria-label="Hidden dealer card">
+      <div class="playing-card card-back sprite-card card-theme-${theme}${settled}" role="img" aria-roledescription="playing card" style="${spriteStyle(back, delay)}" aria-label="Hidden dealer card">
         ${atlasSpriteMarkup(sheet, back, { className: 'card-sprite' })}
       </div>`;
   }
@@ -80,7 +83,7 @@ export function cardMarkup(
     // Flagged sheet cell (see CARD_ART_ISSUES): draw the card instead of showing wrong art.
     const issue = cardArtIssue(theme, card);
     return `
-    <div class="playing-card ${suitClass} ${gold ? 'gold-card' : ''} card-theme-${theme} art-fallback" role="img" aria-roledescription="playing card" data-suit="${card.suit}" data-art-issue="${issue?.key ?? ''}" style="--deal-delay:${delay}ms" aria-label="${label}">
+    <div class="playing-card ${suitClass} ${gold ? 'gold-card' : ''} card-theme-${theme} art-fallback${settled}" role="img" aria-roledescription="playing card" data-suit="${card.suit}" data-art-issue="${issue?.key ?? ''}" style="--deal-delay:${delay}ms" aria-label="${label}">
       ${goldLabel}
       ${cssFaceMarkup(card)}
     </div>
@@ -88,7 +91,7 @@ export function cardMarkup(
   }
 
   return `
-    <div class="playing-card sprite-card ${suitClass} ${gold ? 'gold-card' : ''} card-theme-${theme}" role="img" aria-roledescription="playing card" data-suit="${card.suit}" data-card="${card.rank}-${card.suit}" style="${spriteStyle(face, delay)}" aria-label="${label}">
+    <div class="playing-card sprite-card ${suitClass} ${gold ? 'gold-card' : ''} card-theme-${theme}${settled}" role="img" aria-roledescription="playing card" data-suit="${card.suit}" data-card="${card.rank}-${card.suit}" style="${spriteStyle(face, delay)}" aria-label="${label}">
       ${atlasSpriteMarkup(sheet, face, { className: 'card-sprite' })}
       ${gold ? '<span class="gold-card-overlay" aria-hidden="true"></span>' : ''}
       ${goldLabel}

@@ -341,6 +341,21 @@ The table keeps its native aspect ratio. The frame height follows the viewport: 
 
 Jak comes from `blackjak-sprite-sheet.png` and stands behind the dealer's cards; the lower part of his viewport fades out behind them. `src/data/dealer-visuals.ts` maps every `DialogueEvent` to a `DealerMood` and each mood to one or more sprite poses. Examples: `player_blackjack` → surprised, `dealer_blackjack` → smug, `player_bust` → shrug, `double_loss` → teasing. Short one-shot gestures (deal → card flick, hit → card toss, double → chips) play before he settles into the dialogue pose. The mapping reads only dialogue events and UI action cues, never rules or round state. Each pose is framed on its measured sunglasses position, so his head stays the same size whether a bust, half-body or full-body sprite is showing. The sprite is `aria-hidden`; his lines stay as text in the dialogue layer. With reduced motion, gestures and idle breathing are turned off.
 
+### Game-first table shell
+
+Tables use a compact, fixed rhythm:
+
+- **HUD:** ☰ Menu, chips, title with REP, and a deck button. The deck button cycles the card theme mid-hand; it's visual only, and the cards stay the same.
+- **Center:** Jak, the illustrated table and the cards.
+- **Below the table:** the wooden dialogue/status bar.
+- **Dock** (`src/ui/table-dock.ts`): one fixed-height strip that changes by phase.
+  - Betting: stake chips, then Deal.
+  - Playing: Hit, Stand, Double, Split.
+  - Resolved: Deal again, which gets focus so Enter or N redeals straight away, plus Run It Back in Jak's House when it's available.
+  - Out of chips: a free practice refill.
+
+Enabled buttons glow and disabled ones fade to grey. On phones the dock is sticky at the bottom. On desktop and tablet, Classic fits with no scrolling from 1280×720 up, and on phones from 320×568. Jak's House rules become one line of modifier pills with a collapsible rules note. Only newly dealt cards play the deal-in animation. Sound, haptics and shortcuts (N, H, S, D, P, Esc) are unchanged. Fictional practice chips only: no purchase, deposit, cash-out, crypto or operator UI, and a test enforces this.
+
 ### Main menu and pause board
 
 The main menu and the in-game pause board are both `menu-bar.png`, used as a wooden sign. Real `<button>`s sit over the header plaque and the four planks at hit areas normalized to the art (`src/config/menu-board-layout.ts`). Each hit area covers its whole row band, gap to gap, so rows never overlap. On phones the planks fill the width and the outer posts crop at the screen edges, leaving rows 26px or taller at 320px (WCAG 2.5.8) with no stretching. Tablets and desktop show the whole board. Main menu: Classic BlackJak (the plaque), Jak's House, Daily Hand, Stats, Settings.

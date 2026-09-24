@@ -46,6 +46,7 @@ import { CARD_THEMES } from '../data/card-atlas';
 import { CARD_THEME_IDS, type CardThemeId } from '../data/visual-atlas';
 import { loadVisualPreferences, saveVisualPreferences } from '../storage/visual-preferences';
 import { gameSceneMarkup } from './scene';
+import { ACTION_SHORTCUTS, dockPhaseFor, tableDockMarkup } from './table-dock';
 import { menuBoardMarkup } from './menu-board';
 import { escapeIntent, isTableScreen, pauseMenuMarkup } from './pause-menu';
 import { dialoguePanelMarkup, type PanelStatus } from './dialogue-panel';
@@ -78,16 +79,12 @@ interface AppModel {
   pauseMenuOpen: boolean;
   /** "Main Menu" was pressed once while a hand is in play; the next press leaves. */
   pauseConfirmLeave: boolean;
+  /** Increments per dealt round; keys card animations to a single round. */
+  roundSerial: number;
 }
 
 type RoundTone = 'idle' | 'playing' | 'blackjack' | 'win' | 'loss' | 'push' | 'mixed';
 
-const ACTION_SHORTCUTS: Record<PlayerAction, string> = {
-  hit: 'H',
-  stand: 'S',
-  double: 'D',
-  split: 'P',
-};
 
 const FOCUS_ATTRIBUTES = [
   'data-action',
@@ -98,6 +95,7 @@ const FOCUS_ATTRIBUTES = [
   'data-card-theme',
   'data-pause-action',
   'data-pause',
+  'data-deck-cycle',
   'data-screen',
 ] as const;
 
@@ -141,7 +139,18 @@ const model: AppModel = {
   dealerCue: null,
   pauseMenuOpen: false,
   pauseConfirmLeave: false,
+  roundSerial: 0,
 };
+
+/** Cards already on screen in the previous render: only new cards play the deal-in. */
+let renderedCardKeys = new Set<string>();
+let pendingCardKeys = new Set<string>();
+
+function cardIsNew(key: string): boolean {
+  const scoped = `${model.roundSerial}:${key}`;
+  pendingCardKeys.add(scoped);
+  return !renderedCardKeys.has(scoped);
+}
 
 const app = (): HTMLElement => {
   const root = document.querySelector<HTMLElement>('#app');
@@ -530,7 +539,10 @@ function playerHandsMarkup(round: RoundState | null, house: HouseState | null = 
             <strong>${evaluation.total}</strong>
             <span class="hand-wager">${formatChips(hand.wager)} chips</span>
           </div>
-          <div class="cards">${hand.cards.map((card, cardIndex) => cardMarkup(card, false, cardIndex + index * 2, house && isGoldCard(house, hand.id, cardIndex) ? 'gold' : 'standard')).join('')}</div>
+          <div class="cards">${hand.cards.map((card, cardIndex) => {
+            const fresh = cardIsNew(`p:${index}:${cardIndex}:${card.rank}${card.suit}`);
+            return cardMarkup(card, false, fresh ? cardIndex + index * 2 : 0, house && isGoldCard(house, hand.id, cardIndex) ? 'gold' : 'standard', undefined, fresh);
+          }).join('')}</div>
           <span class="hand-state">${handResultLabel(round, hand)}</span>
         </section>`;
     }).join('')}
@@ -566,73 +578,52 @@ function panelStatus(view: TableView, house: boolean): PanelStatus {
   return { tone, title: RESULT_TITLES[tone], text: `${netLabel}${detail}`, tags };
 }
 
-function bettingControlsMarkup(): string {
-  if (model.profile.chips <= 0) {
-    return `
-      <div class="betting-panel broke-panel">
-        <p>You're out of practice chips.</p>
-        <button class="primary-action" data-action="refill">Refill Practice Chips</button>
-        <span>No purchase required. This simply restores the practice stack.</span>
-      </div>`;
-  }
-
-  const selected = normalizedStake();
-  const maxValue = Math.min(model.profile.chips, MAX_STAKE);
-  return `
-    <div class="betting-panel" aria-label="Choose a fictional chip stake">
-      <div class="betting-heading"><span>STAKE</span><strong>${formatChips(selected)} CHIPS</strong></div>
-      <div class="stake-row">
-        ${STAKE_OPTIONS.map((stake) => `
-          <button class="stake-button ${selected === stake ? 'is-selected' : ''}" data-stake="${stake}" aria-pressed="${selected === stake}" ${stake > model.profile.chips ? 'disabled' : ''}>${stake}</button>`).join('')}
-        <button class="stake-button ${selected === maxValue ? 'is-selected' : ''}" data-stake="max" aria-pressed="${selected === maxValue}">MAX</button>
-      </div>
-      <button class="primary-action deal-button" data-action="deal" aria-keyshortcuts="N">${model.round?.phase === 'resolved' ? 'Deal Again' : 'Deal Hand'}</button>
-    </div>`;
-}
-
-function houseBettingControlsMarkup(): string {
-  const replay = model.house.replayAvailable && model.house.currentStake
-    ? `
-      <div class="run-it-back-panel">
-        <div><span>RUN IT BACK</span><strong>FREE REDEAL · ${formatChips(model.house.currentStake)} CHIP BASE STAKE</strong></div>
-        <button class="house-special-action" data-action="run-it-back">Use Token (${model.house.runItBackTokens})</button>
-      </div>`
-    : '';
-
-  return `${replay}${bettingControlsMarkup()}`;
-}
-
 function houseModifierStripMarkup(): string {
   const nextGoldIn = model.house.roundNumber % 3 === 0 ? 3 : 3 - (model.house.roundNumber % 3);
   const nextHotMultiplier = hotHandMultiplier(model.house.hotHandStreak + 1);
   const goldActive = Boolean(model.round && model.house.goldRound);
 
   const statusById: Record<string, string> = {
-    'gold-card': goldActive ? 'ACTIVE THIS HAND' : `IN ${nextGoldIn} PAID HAND${nextGoldIn === 1 ? '' : 'S'}`,
+    'gold-card': goldActive ? 'ACTIVE' : `IN ${nextGoldIn}`,
     'run-it-back': `${model.house.runItBackTokens} TOKEN${model.house.runItBackTokens === 1 ? '' : 'S'}`,
-    'hot-hand': `NEXT WIN ×${nextHotMultiplier.toFixed(2)} REP`,
+    'hot-hand': `NEXT ×${nextHotMultiplier.toFixed(2)} REP`,
   };
 
   return `
-    <div class="house-modifier-grid" aria-label="Jak's House active modifier rules">
-      ${HOUSE_MODIFIERS.map((modifier) => `
-        <article class="house-modifier ${modifier.id === 'gold-card' && goldActive ? 'is-active' : ''}">
-          <span>${modifier.name}</span>
-          <strong>${statusById[modifier.id]}</strong>
-          <p>${modifier.shortDescription}</p>
-        </article>`).join('')}
-    </div>`;
+    <section class="house-strip" aria-labelledby="house-mode-title">
+      <h1 id="house-mode-title" class="visually-hidden">Jak's House</h1>
+      <ul class="house-modifier-pills" aria-label="Jak's House active modifier rules">
+        ${HOUSE_MODIFIERS.map((modifier) => `
+          <li class="house-modifier-pill${modifier.id === 'gold-card' && goldActive ? ' is-active' : ''}"><span>${modifier.name}</span><strong>${statusById[modifier.id]}</strong></li>`).join('')}
+      </ul>
+      <details class="house-rules">
+        <summary>Arcade rules · not standard blackjack</summary>
+        <p>Blackjack-inspired arcade play. House modifiers can change a hand, but Classic BlackJak remains standard and separate.</p>
+        <ul>${HOUSE_MODIFIERS.map((modifier) => `<li><b>${modifier.name}.</b> ${modifier.shortDescription}</li>`).join('')}</ul>
+      </details>
+    </section>`;
 }
 
-function actionControlsMarkup(round: RoundState): string {
-  const activeHand = getActiveHand(round);
-  const valid = allowedActions(activeHand, model.profile.chips);
-  return `
-    <div class="action-bar" aria-label="Blackjack actions">
-      ${(['hit', 'stand', 'double', 'split'] as PlayerAction[])
-        .map((action) => `<button data-action="${action}" aria-label="${action.toUpperCase()}" aria-keyshortcuts="${ACTION_SHORTCUTS[action]}" ${valid.includes(action) ? '' : 'disabled'}>${action.toUpperCase()}</button>`)
-        .join('')}
-    </div>`;
+function tableDockFor(view: TableView, house: boolean): string {
+  const { round } = view;
+  const phase = dockPhaseFor(round?.phase ?? null, model.profile.chips);
+  const activeHand = round && round.phase === 'player-turn' ? getActiveHand(round) : null;
+  return tableDockMarkup({
+    phase,
+    stakeOptions: STAKE_OPTIONS,
+    selectedStake: normalizedStake(),
+    chips: model.profile.chips,
+    maxStake: MAX_STAKE,
+    allowed: activeHand ? allowedActions(activeHand, model.profile.chips) : [],
+    wager: activeHand ? `${formatChips(activeHand.wager)} chips` : undefined,
+    handLabel: round && round.hands.length > 1 ? `HAND ${round.activeHandIndex + 1}/${round.hands.length}` : 'IN PLAY',
+    runItBack: house && model.house.replayAvailable && model.house.currentStake
+      ? { tokens: model.house.runItBackTokens, stake: `${formatChips(model.house.currentStake)} chips` }
+      : null,
+    error: model.error,
+    house,
+    formatChips,
+  });
 }
 
 interface TableView {
@@ -658,15 +649,19 @@ function tableView(): TableView {
 
 function sceneHudMarkup(modePill = ''): string {
   const progression = titleProgressForRep(model.profile.rep);
+  const theme = model.visual.cardTheme;
   return `
-    <header class="table-header">
-      <button type="button" class="back-button pause-button" data-pause="open" aria-haspopup="dialog" aria-expanded="${model.pauseMenuOpen}" aria-keyshortcuts="Escape">☰ Menu</button>
+    <header class="table-header table-hud">
+      <button type="button" class="back-button pause-button" data-pause="open" aria-haspopup="dialog" aria-expanded="${model.pauseMenuOpen}" aria-keyshortcuts="Escape"><span aria-hidden="true">☰</span> <span class="hud-label">Menu</span></button>
       <div class="hud" aria-label="Player resources and progression">
         ${modePill}
-        <span>CHIPS <strong>${formatChips(model.profile.chips)}</strong></span>
-        <span class="title-pill">${progression.current.name}</span>
-        <span class="rep-pill">REP <strong>${model.profile.rep}</strong><i class="rep-mini-track" aria-hidden="true"><i style="width:${progression.percent}%"></i></i></span>
+        <span class="hud-chips">CHIPS <strong>${formatChips(model.profile.chips)}</strong></span>
+        <span class="rep-pill"><span class="title-pill">${progression.current.name}</span> <strong>${model.profile.rep}</strong> REP<i class="rep-mini-track" aria-hidden="true"><i style="width:${progression.percent}%"></i></i></span>
       </div>
+      <button type="button" class="hud-deck" data-deck-cycle aria-label="Card deck: ${CARD_THEMES[theme].label}. Change deck">
+        <span class="hud-deck-back" aria-hidden="true">${cardMarkup({ rank: 'A', suit: 'spades' }, true, 0, 'standard', theme, false)}</span>
+        <span class="hud-label">${CARD_THEMES[theme].label}</span>
+      </button>
     </header>`;
 }
 
@@ -678,7 +673,11 @@ function dealerHandMarkup(view: TableView): string {
   const dealerCards = view.round?.dealer ?? [];
   return `
     <div class="dealer-hand-row">
-      <div class="cards dealer-cards" aria-label="Dealer cards">${dealerCards.map((card, index) => cardMarkup(card, index === 1 && !view.revealDealer, index)).join('')}</div>
+      <div class="cards dealer-cards" aria-label="Dealer cards">${dealerCards.map((card, index) => {
+        const hidden = index === 1 && !view.revealDealer;
+        const fresh = cardIsNew(`d:${index}:${hidden ? 'hidden' : `${card.rank}${card.suit}`}`);
+        return cardMarkup(card, hidden, fresh ? index : 0, 'standard', undefined, fresh);
+      }).join('')}</div>
       ${dealerCards.length ? `<strong class="dealer-total" aria-label="${view.revealDealer ? `Dealer total ${view.dealerTotal}` : 'Dealer total hidden'}">${view.dealerTotal}</strong>` : ''}
     </div>`;
 }
@@ -711,11 +710,8 @@ function classicMarkup(): string {
         dialogue: sceneDialogueMarkup(view, false),
       })}
 
-      <section class="game-controls" aria-label="Classic BlackJak controls">
-        ${model.error ? `<p class="error-line" role="alert">${model.error}</p>` : ''}
-        ${view.showActions && round ? actionControlsMarkup(round) : bettingControlsMarkup()}
-        <p class="practice-note">Practice chips have no monetary value.</p>
-      </section>
+      <h1 class="visually-hidden">Classic BlackJak</h1>
+      ${tableDockFor(view, false)}
       ${achievementToastMarkup()}
     </main>`;
 }
@@ -730,29 +726,15 @@ function houseMarkup(): string {
       ${gameSceneMarkup({
         mode: 'house',
         label: "Jak's House arcade blackjack table",
-        hud: sceneHudMarkup(`<span class="house-hud-pill">JAK'S HOUSE <strong>HAND ${model.house.roundNumber || '—'}</strong></span>`),
+        hud: sceneHudMarkup(`<span class="house-hud-pill">HOUSE <strong>H${model.house.roundNumber || '—'}</strong></span>`),
         npc: dealerNpcMarkup(true),
         dealerHand: dealerHandMarkup(view),
         playerHands: playerHandsMarkup(round, model.house),
         dialogue: sceneDialogueMarkup(view, true),
       })}
 
-      <section class="game-controls house-controls" aria-label="Jak's House controls">
-        ${model.error ? `<p class="error-line" role="alert">${model.error}</p>` : ''}
-        ${view.showActions && round ? actionControlsMarkup(round) : houseBettingControlsMarkup()}
-        <p class="practice-note">Jak's House uses fictional practice chips and arcade modifiers. No monetary value.</p>
-      </section>
-
-      <section class="house-mode-banner" aria-labelledby="house-mode-title">
-        <div>
-          <span class="house-kicker">ARCADE RULES · NOT STANDARD BLACKJACK</span>
-          <h1 id="house-mode-title">JAK'S HOUSE</h1>
-          <p>Blackjack-inspired arcade play. House modifiers can change a hand, but Classic BlackJak remains standard and separate.</p>
-        </div>
-        <b>HOUSE HAND ${model.house.roundNumber || '—'}</b>
-      </section>
-
       ${houseModifierStripMarkup()}
+      ${tableDockFor(view, true)}
       ${achievementToastMarkup()}
     </main>`;
 }
@@ -830,6 +812,7 @@ function dealRound(): void {
 
   try {
     model.round = startRound(stake);
+    model.roundSerial += 1;
     model.dealerCue = 'deal';
     feedback('deal', 'deal');
     if (model.round.phase === 'resolved') {
@@ -871,6 +854,7 @@ function dealHouseRound(): void {
     const started = startHouseRound(stake, model.house);
     model.house = started.house;
     model.round = started.round;
+    model.roundSerial += 1;
     model.dealerCue = 'deal';
     feedback('deal', 'deal');
 
@@ -900,6 +884,7 @@ function runHouseReplay(): void {
     const replay = replayHouseRound(model.house);
     model.house = replay.house;
     model.round = replay.round;
+    model.roundSerial += 1;
     model.dealerCue = 'deal';
     feedback('deal', 'deal');
 
@@ -1327,6 +1312,8 @@ function render(options: RenderOptions = {}): void {
   // Dealer gestures are one-shot: later re-renders show the dialogue pose only.
   model.dealerCue = null;
   app().querySelector('#app-main')?.classList.toggle('is-static-render', Boolean(options.staticTable));
+  renderedCardKeys = pendingCardKeys;
+  pendingCardKeys = new Set<string>();
   bindEvents();
   if (model.pauseMenuOpen) mountPauseOverlay(null);
   const screenChanged = previousScreen !== null && previousScreen !== model.screen;
@@ -1343,6 +1330,17 @@ function bindEvents(): void {
       feedbackEngine.activate();
       feedback('button', 'tap');
       goToScreen(screen);
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-deck-cycle]').forEach((element) => {
+    element.addEventListener('click', () => {
+      if (!element.isConnected) return;
+      feedbackEngine.activate();
+      const index = CARD_THEME_IDS.indexOf(model.visual.cardTheme);
+      setCardTheme(CARD_THEME_IDS[(index + 1) % CARD_THEME_IDS.length]);
+      feedback('button', 'tap');
+      render({ staticTable: true });
     });
   });
 

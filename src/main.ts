@@ -11,6 +11,7 @@ import './styles/dealer.css';
 import './styles/cards.css';
 import './styles/dialogue-panel.css';
 import './styles/menu-board.css';
+import './styles/dock.css';
 import { registerPWA } from './pwa/register';
 import { initializeUI } from './ui/render';
 
