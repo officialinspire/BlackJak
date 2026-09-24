@@ -343,6 +343,32 @@ async function layoutMetrics(p) {
     await ctx.close();
   }
 
+  // ---- Haptics: distinct action patterns; iOS switch fallback without vibrate() ----
+  {
+    const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });
+    await ctx.addInitScript(() => { window.__vib = []; navigator.vibrate = (pattern) => { window.__vib.push(JSON.stringify(pattern)); return true; }; });
+    const p = await ctx.newPage(); await p.goto(URL); await p.evaluate(() => localStorage.clear()); await p.reload(); await enterGame(p);
+    await p.click('[data-screen="classic"]'); await dealPlaying(p); await p.waitForTimeout(320);
+    const mark = await p.evaluate(() => window.__vib.length);
+    if (await p.$('[data-action="hit"]:not([disabled])')) { await p.click('[data-action="hit"]'); await p.waitForTimeout(320); }
+    const afterHit = await p.evaluate((m) => window.__vib.slice(m), mark);
+    await ctx.close();
+
+    const ios = await b.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' });
+    await ios.addInitScript(() => {
+      Object.defineProperty(Navigator.prototype, 'vibrate', { value: undefined, configurable: true });
+      window.__ticks = 0;
+      document.addEventListener('click', (event) => { if (event.target instanceof HTMLInputElement && event.target.hasAttribute('switch')) window.__ticks++; }, true);
+    });
+    const q = await ios.newPage(); const errs = []; q.on('pageerror', (e) => errs.push(String(e)));
+    await q.goto(URL); await q.evaluate(() => localStorage.clear()); await q.reload(); await enterGame(q);
+    await q.click('[data-screen="classic"]'); await dealPlaying(q); await q.waitForTimeout(400);
+    const ticks = await q.evaluate(() => window.__ticks);
+    const focusSafe = await q.evaluate(() => !(document.activeElement instanceof HTMLInputElement));
+    check('haptics: Hit has its own pattern; iOS gets switch ticks without focus theft', afterHit.includes('14') && ticks > 0 && focusSafe && errs.length === 0, JSON.stringify({ afterHit, ticks, focusSafe, errs }));
+    await ios.close();
+  }
+
   // ---- Refresh mid-hand: stake not charged, no stuck round ----
   {
     const { ctx, p } = await fresh(b);

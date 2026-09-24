@@ -149,9 +149,15 @@
   pointer-events: none;
 }
 
-.deck-shoe > span { position: absolute; inset: 0; display: block; }
-.deck-shoe > span:first-child { transform: translate(-4px, 2px) rotate(-3deg); }
-.deck-shoe > span:last-child { transform: translate(3px, -2px) rotate(2deg); }
+.deck-shoe > span {
+  --i: 0;
+  position: absolute;
+  inset: 0;
+  display: block;
+  transform-origin: 50% 88%;
+  /* A squared-up stack with a slightly messy edge. */
+  transform: translate(calc((var(--i) - 2) * 1.5px), calc((var(--i) - 2) * -1px)) rotate(calc((var(--i) - 2) * 1.4deg));
+}
 .deck-shoe .playing-card { width: 100%; margin: 0; }
 
 .anchor-player-hands {

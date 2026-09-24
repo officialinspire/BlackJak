@@ -22,13 +22,20 @@ export type FxCue =
 
 /** Effect durations (ms). All sit inside the 120–500ms feel budget. */
 export const FX_TIMING = {
-  cardDeal: 200,
+  cardDeal: 260,
+  /** Cardistry: Jak thumb-fans the deck on the shuffle cue. */
+  cardistryFan: 480,
+  /** Cardistry: a Hit card twirls in off the deck. */
+  cardTwirl: 300,
+  /** Cardistry: the top card springs up as a card leaves the deck. */
+  deckSpring: 240,
   cardFlip: 320,
-  shuffle: 360,
   splitMove: 240,
   chipBounce: 260,
   actionFlash: 180,
   resultPop: 450,
+  /** Cardistry: a blackjack fans open and snaps shut. */
+  cardFlourish: 460,
   bustImpact: 260,
   achievementPop: 320,
   panelArrive: 280,

@@ -18,7 +18,22 @@ export type FeedbackCue =
   | 'blackjack'
   | 'achievement';
 
-export type HapticCue = 'tap' | 'deal' | 'result' | 'blackjack' | 'achievement';
+export type HapticCue =
+  | 'tap'
+  | 'select'
+  | 'toggle'
+  | 'deal'
+  | 'hit'
+  | 'stand'
+  | 'double'
+  | 'split'
+  | 'flip'
+  | 'win'
+  | 'loss'
+  | 'bust'
+  | 'result'
+  | 'blackjack'
+  | 'achievement';
 
 interface ToneLayer {
   readonly frequency: number;
@@ -251,21 +266,91 @@ export class FeedbackEngine {
 
 export const feedbackEngine = new FeedbackEngine();
 
+/**
+ * Vibration patterns (ms, on/off/on…). Each action has its own feel so the
+ * player can tell Hit from Stand without looking: a crisp tick for Hit, a
+ * settled double-tap for Stand, a heavier press for Double, a split "da-dum".
+ */
+export const HAPTIC_PATTERNS: Readonly<Record<HapticCue, number | readonly number[]>> = {
+  tap: 8,
+  select: 6,
+  toggle: [6, 40, 6],
+  deal: [10, 45, 10],
+  hit: 14,
+  stand: [10, 60, 18],
+  double: [22, 50, 22],
+  split: [14, 70, 14],
+  flip: 9,
+  win: [16, 40, 24],
+  loss: 30,
+  bust: [40, 30, 12],
+  result: [18, 28, 18],
+  blackjack: [25, 35, 35, 35, 45],
+  achievement: [16, 28, 16, 28, 28],
+};
+
+/** Number of discrete taps in a pattern (the "on" segments). */
+export function hapticPulseOffsets(pattern: number | readonly number[]): number[] {
+  if (typeof pattern === 'number') return [0];
+  const offsets: number[] = [];
+  let at = 0;
+  pattern.forEach((segment, index) => {
+    if (index % 2 === 0) offsets.push(at);
+    at += segment;
+  });
+  return offsets;
+}
+
+let iosSwitch: HTMLLabelElement | null = null;
+
+/**
+ * iOS Safari has no navigator.vibrate(), but toggling an `<input switch>`
+ * (Safari 18+) plays the system selection haptic. A hidden, inert-to-focus
+ * switch gives iPhone players a tick per pulse; elsewhere it is a no-op click.
+ */
+function iosHapticTick(): void {
+  if (typeof document === 'undefined' || !document.body) return;
+  if (!iosSwitch || !iosSwitch.isConnected) {
+    const label = document.createElement('label');
+    label.className = 'haptic-switch';
+    label.setAttribute('aria-hidden', 'true');
+    label.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.setAttribute('switch', '');
+    input.tabIndex = -1;
+    label.append(input);
+    document.body.append(label);
+    iosSwitch = label;
+  }
+  const focused = document.activeElement;
+  iosSwitch.click();
+  // Never let the hidden switch steal keyboard focus from the game.
+  if (focused instanceof HTMLElement && document.activeElement !== focused) focused.focus({ preventScroll: true });
+}
+
+function supportsSwitchHaptics(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent ?? '';
+  const iOS = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && (navigator.maxTouchPoints ?? 0) > 1);
+  return iOS;
+}
+
 export function haptic(cue: HapticCue, preferences: FeedbackPreferences): void {
   if (!preferences.master || !preferences.haptics || typeof navigator === 'undefined') return;
-  if (typeof navigator.vibrate !== 'function') return;
-
-  const pattern: Record<HapticCue, number | number[]> = {
-    tap: 10,
-    deal: 12,
-    result: [18, 28, 18],
-    blackjack: [25, 35, 35],
-    achievement: [16, 28, 16, 28, 28],
-  };
+  const pattern = HAPTIC_PATTERNS[cue];
 
   try {
-    navigator.vibrate(pattern[cue]);
+    if (typeof navigator.vibrate === 'function') {
+      navigator.vibrate(typeof pattern === 'number' ? pattern : [...pattern]);
+      return;
+    }
+    if (!supportsSwitchHaptics()) return;
+    for (const offset of hapticPulseOffsets(pattern)) {
+      if (offset === 0) iosHapticTick();
+      else if (typeof window !== 'undefined') window.setTimeout(iosHapticTick, offset);
+    }
   } catch {
-    // Vibration support varies by device/browser; feedback must never block gameplay.
+    // Haptics vary by device/browser; feedback must never block gameplay.
   }
 }
