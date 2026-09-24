@@ -1,4 +1,5 @@
 import type { PlayerAction } from '../game';
+import { escapeHtml } from '../util/html';
 
 /*
  * Bottom action dock for Classic and Jak's House: stake chips + the primary
@@ -73,7 +74,7 @@ function actionButtonsMarkup(input: DockInput): string {
 }
 
 export function tableDockMarkup(input: DockInput): string {
-  const error = input.error ? `<p class="error-line dock-error" role="alert">${input.error}</p>` : '';
+  const error = input.error ? `<p class="error-line dock-error" role="alert">${escapeHtml(input.error)}</p>` : '';
   const note = input.phase === 'broke'
     ? '<p class="dock-note">No purchase required · restores the fictional practice stack</p>'
     : `<p class="dock-note">${input.house ? 'Arcade rules · ' : ''}Fictional practice chips · no cash value</p>`;

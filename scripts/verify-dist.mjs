@@ -4,6 +4,7 @@
  *  - every dist file is in the service-worker precache list (offline play)
  *  - all seven runtime art sheets are present as optimized WebP
  *  - raw source PNG sheets are not shipped, and image weight stays in budget
+ *  - index.html carries the Content-Security-Policy and no inline scripts
  */
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
@@ -67,6 +68,10 @@ for (const file of files.filter((name) => /\.(webp|png|jpe?g|avif|svg)$/.test(na
   }
   if (size > SINGLE_IMAGE_BUDGET_BYTES) problems.push(`image over ${SINGLE_IMAGE_BUDGET_BYTES / 1024} KB budget: ${file} (${Math.round(size / 1024)} KB)`);
 }
+const indexHtml = (await readFile(join(DIST, 'index.html'), 'utf8')).replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+if (!/<meta http-equiv="Content-Security-Policy" content="[^"]*script-src 'self'/.test(indexHtml)) problems.push('index.html is missing the Content-Security-Policy meta tag');
+if (/<script(?![^>]*\bsrc=)[^>]*>/.test(indexHtml)) problems.push('index.html contains an inline <script> (blocked by the CSP)');
+
 if (imageBytes > IMAGE_BUDGET_BYTES) problems.push(`total image weight ${Math.round(imageBytes / 1024)} KB exceeds ${IMAGE_BUDGET_BYTES / 1024} KB`);
 
 if (problems.length) {

@@ -46,6 +46,7 @@ import { CARD_THEMES } from '../data/card-atlas';
 import { CARD_THEME_IDS, type CardThemeId } from '../data/visual-atlas';
 import { loadVisualPreferences, saveVisualPreferences } from '../storage/visual-preferences';
 import { gameSceneMarkup } from './scene';
+import { escapeHtml } from '../util/html';
 import { ACTION_SHORTCUTS, dockPhaseFor, tableDockMarkup, type DockPhase } from './table-dock';
 import { FxQueue, fxClassNames, fxStyleVars, shouldIgnoreActivation, type FxCue } from './fx';
 import { menuBoardMarkup } from './menu-board';
@@ -1074,6 +1075,8 @@ function prepareDailyRound(): void {
     return;
   }
   model.dailyRound = createDailyChallenge(model.dailyDateKey).round;
+  // New card-animation scope, so the Daily hand deals in even if a table hand showed the same cards.
+  model.roundSerial += 1;
   model.lastRepEarned = 0;
   model.dailyShareStatus = null;
 }
@@ -1139,7 +1142,7 @@ function dailyMarkup(): string {
           <span>+75 REP · ONCE TODAY</span>
         </div>
         <p class="daily-policy">The date + game version deterministically creates today's opening hand. Reloading before resolution regenerates the same challenge; once resolved, today's REP reward is locked.</p>
-        ${model.error ? `<p class="error-line" role="alert">${model.error}</p>` : ''}
+        ${model.error ? `<p class="error-line" role="alert">${escapeHtml(model.error)}</p>` : ''}
         <div class="daily-table">
           <section>
             <span>DEALER UP-CARD</span>
@@ -1163,7 +1166,7 @@ function dailyMarkup(): string {
             ${round.phase === 'player-turn' ? dailyControlsMarkup(round) : '<button class="primary-action" data-action="share-daily">Share Result</button>'}
           </div>` : ''}
         ${!completed && !round ? '<button class="primary-action" data-action="start-daily">Play Today\'s Hand</button>' : ''}
-        ${model.dailyShareStatus ? `<p class="daily-share-status" role="status">${model.dailyShareStatus}</p>` : ''}
+        ${model.dailyShareStatus ? `<p class="daily-share-status" role="status">${escapeHtml(model.dailyShareStatus)}</p>` : ''}
       </section>
     </main>`;
 }
