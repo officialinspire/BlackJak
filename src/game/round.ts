@@ -85,7 +85,7 @@ export function performAction(state: RoundState, action: PlayerAction, available
   if (state.phase !== 'player-turn') throw new Error('Player actions are only valid during the player turn.');
 
   const hand = getActiveHand(state);
-  const validActions = allowedActions(hand, availableBankroll);
+  const validActions = allowedActions(hand, availableBankroll, state.hands.length);
   if (!validActions.includes(action)) throw new Error(`Action "${action}" is not currently allowed.`);
 
   switch (action) {
@@ -114,6 +114,7 @@ export function performAction(state: RoundState, action: PlayerAction, available
       break;
     }
     case 'split': {
+      if (state.deck.length < 2) throw new Error('Cannot split without two cards remaining in the deck.');
       const movedCard = hand.cards.pop();
       if (!movedCard) throw new Error('Cannot split an empty hand.');
 
@@ -130,6 +131,10 @@ export function performAction(state: RoundState, action: PlayerAction, available
       };
 
       state.hands.splice(state.activeHandIndex + 1, 0, splitHand);
+      for (const splitResult of [hand, splitHand]) {
+        if (evaluateHand(splitResult.cards).total === 21) splitResult.status = 'stood';
+      }
+      if (hand.status !== 'active') advanceAfterHand(state);
       break;
     }
   }

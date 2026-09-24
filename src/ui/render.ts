@@ -48,7 +48,7 @@ import { loadVisualPreferences, saveVisualPreferences } from '../storage/visual-
 import { gameSceneMarkup } from './scene';
 import { escapeHtml } from '../util/html';
 import { ACTION_SHORTCUTS, dockPhaseFor, tableDockMarkup, type DockPhase } from './table-dock';
-import { FxQueue, fxClassNames, fxStyleVars, shouldIgnoreActivation, type FxCue } from './fx';
+import { FxQueue, controlsStateKey, fxClassNames, fxStyleVars, shouldIgnoreActivation, type FxCue } from './fx';
 import { menuBoardMarkup } from './menu-board';
 import { escapeIntent, isTableScreen, pauseMenuMarkup } from './pause-menu';
 import { dialoguePanelMarkup, type PanelStatus } from './dialogue-panel';
@@ -151,9 +151,9 @@ let pendingCardKeys = new Set<string>();
 const fxQueue = new FxQueue();
 /** Cues for the render in progress (one-shot; empty for plain re-renders). */
 let currentFx: ReadonlySet<FxCue> = new Set();
-/** When the dock last changed phase: pointer taps just after are stale double-taps. */
+/** When gameplay controls last changed identity: pointer taps just after are stale double-taps. */
 let controlsChangedAt = -Infinity;
-let lastDockPhase: DockPhase | null = null;
+let lastControlsState: string | null = null;
 
 function cueFx(...cues: FxCue[]): void {
   fxQueue.cue(...cues);
@@ -633,7 +633,7 @@ function tableDockFor(view: TableView, house: boolean): string {
     selectedStake: normalizedStake(),
     chips: model.profile.chips,
     maxStake: MAX_STAKE,
-    allowed: activeHand ? allowedActions(activeHand, model.profile.chips) : [],
+    allowed: activeHand ? allowedActions(activeHand, model.profile.chips, round?.hands.length) : [],
     wager: activeHand ? `${formatChips(activeHand.wager)} chips` : undefined,
     handLabel: round && round.hands.length > 1 ? `HAND ${round.activeHandIndex + 1}/${round.hands.length}` : 'IN PLAY',
     runItBack: house && model.house.replayAvailable && model.house.currentStake
@@ -947,7 +947,7 @@ function takePlayerAction(action: PlayerAction): void {
   const before = model.profile;
   const additionalStake = action === 'double' || action === 'split' ? hand.wager : 0;
 
-  if (!allowedActions(hand, before.chips).includes(action)) {
+  if (!allowedActions(hand, before.chips, model.round.hands.length).includes(action)) {
     throw new Error(`Action "${action}" is not currently allowed.`);
   }
 
@@ -1008,7 +1008,7 @@ function takeHouseAction(action: PlayerAction): void {
   const before = model.profile;
   const additionalStake = action === 'double' || action === 'split' ? hand.wager : 0;
 
-  if (!allowedActions(hand, before.chips).includes(action)) {
+  if (!allowedActions(hand, before.chips, model.round.hands.length).includes(action)) {
     throw new Error(`Action "${action}" is not currently allowed.`);
   }
 
@@ -1093,7 +1093,7 @@ function completeDailyIfResolved(): void {
 function takeDailyAction(action: PlayerAction): void {
   if (!model.dailyRound || model.dailyRound.phase !== 'player-turn') throw new Error('Today\'s Daily Hand is not active.');
   const hand = getActiveHand(model.dailyRound);
-  if (!allowedActions(hand, Number.POSITIVE_INFINITY).includes(action)) throw new Error(`Action "${action}" is not available.`);
+  if (!allowedActions(hand, Number.POSITIVE_INFINITY, model.dailyRound.hands.length).includes(action)) throw new Error(`Action "${action}" is not available.`);
 
   if (action === 'hit') feedback('flip', 'tap');
   else if (action === 'double' || action === 'split') feedback('chip', 'tap');
@@ -1105,7 +1105,7 @@ function takeDailyAction(action: PlayerAction): void {
 
 function dailyControlsMarkup(round: RoundState): string {
   const hand = getActiveHand(round);
-  const valid = allowedActions(hand, Number.POSITIVE_INFINITY);
+  const valid = allowedActions(hand, Number.POSITIVE_INFINITY, round.hands.length);
   return `
     <div class="action-bar daily-action-bar" aria-label="Daily Hand actions">
       ${(['hit', 'stand', 'double', 'split'] as PlayerAction[])
@@ -1357,9 +1357,15 @@ function render(options: RenderOptions = {}): void {
   renderedCardKeys = pendingCardKeys;
   pendingCardKeys = new Set<string>();
   const dockPhase = (app().querySelector('.table-dock')?.className.match(/phase-(\w+)/)?.[1] ?? null) as DockPhase | null;
-  if (dockPhase !== lastDockPhase) {
+  const controlsState = controlsStateKey({
+    screen: model.screen,
+    dockPhase,
+    dailyPhase: model.dailyRound?.phase,
+    dailyHandIndex: model.dailyRound?.activeHandIndex,
+  });
+  if (controlsState !== lastControlsState) {
     controlsChangedAt = performance.now();
-    lastDockPhase = dockPhase;
+    lastControlsState = controlsState;
   }
   currentFx = new Set();
   bindEvents();
@@ -1452,8 +1458,8 @@ function bindEvents(): void {
   });
 
   document.querySelectorAll<HTMLButtonElement>('[data-daily-action]').forEach((element) => {
-    element.addEventListener('click', () => {
-      if (!element.isConnected) return;
+    element.addEventListener('click', (event) => {
+      if (!element.isConnected || isStaleTap(event)) return;
       feedbackEngine.activate();
       model.error = null;
       try {
