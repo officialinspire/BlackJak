@@ -74,11 +74,20 @@ async function enterGame(p) {
     const initial = await daily.evaluate(() => [...document.querySelectorAll('.daily-table [data-motion="NEW"]')]
       .map((card) => ({ owner: card.getAttribute('data-visual-id').includes(':player:') ? 'P' : 'D', delay: Number.parseInt(getComputedStyle(card).getPropertyValue('--deal-delay')) }))
       .sort((a, b) => a.delay - b.delay));
-    await daily.click('[data-action="start-daily"]');
-    const replayed = await daily.$$eval('.daily-table [data-motion]:not([data-motion="SETTLED"])', (cards) => cards.length);
-    check('Daily opening uses one P/D/P/D deal and does not redeal on start', initial.length === 4
+    await daily.click('[data-daily-action="stand"]');
+    const transition = await daily.evaluate(() => {
+      const cards = [...document.querySelectorAll('.daily-table [data-visual-id]')];
+      const openingReplayed = cards.filter((card) => {
+        const slot = Number(card.getAttribute('data-visual-id').split(':').at(-1));
+        return slot < 2 && card.getAttribute('data-motion') === 'NEW';
+      }).length;
+      const flips = cards.filter((card) => card.getAttribute('data-motion') === 'FLIPPING').length;
+      return { openingReplayed, flips };
+    });
+    check('Daily opening uses P/D/P/D and settled opening cards do not redeal on Stand', initial.length === 4
       && initial.map((card) => card.owner).join('') === 'PDPD'
-      && initial.map((card) => card.delay).join(',') === '0,38,76,114' && replayed === 0);
+      && initial.map((card) => card.delay).join(',') === '0,38,76,114'
+      && transition.openingReplayed === 0 && transition.flips === 1, JSON.stringify(transition));
     await dailyContext.close();
   }
 

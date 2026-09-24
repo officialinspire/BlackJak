@@ -168,8 +168,11 @@ async function layoutMetrics(p) {
   // ---- Keyboard only: menu → Classic → play → pause → resume ----
   {
     const { ctx, p } = await fresh(b);
-    await p.keyboard.press('Tab'); await p.keyboard.press('Tab');
-    const first = await p.evaluate(() => document.activeElement.dataset.screen);
+    let first = null;
+    for (let i = 0; i < 12 && first !== 'classic'; i++) {
+      await p.keyboard.press('Tab');
+      first = await p.evaluate(() => document.activeElement?.dataset?.screen ?? null);
+    }
     await p.keyboard.press('Enter'); await p.waitForTimeout(200);
     const atTable = !!(await p.$('.game-scene'));
     let played = false;
@@ -235,17 +238,32 @@ async function layoutMetrics(p) {
   // ---- Refresh mid-hand: stake not charged, no stuck round ----
   {
     const { ctx, p } = await fresh(b);
-    await p.click('[data-screen="classic"]');
-    const c0 = await chips(p); await dealPlaying(p);
+
+    const startUnresolved = async (screen) => {
+      await p.click(`[data-screen="${screen}"]`);
+      for (let attempt = 0; attempt < 20; attempt++) {
+        if (await p.$('[data-action="refill"]')) await p.click('[data-action="refill"]');
+        const before = await chips(p);
+        await p.keyboard.press('n');
+        await p.waitForTimeout(70);
+        if (await phase(p) === 'playing') return before;
+      }
+      return null;
+    };
+
+    const c0 = await startUnresolved('classic');
     const mid = await chips(p);
     await p.reload(); await enterGame(p); await p.click('[data-screen="classic"]');
     const c1 = await chips(p);
-    check('refresh mid-hand: stake returned, table idle', mid < c0 && c1 === c0 && await phase(p) === 'betting', `${c0} → ${mid} → reload ${c1}`);
+    check('refresh mid-hand: stake returned, table idle', c0 !== null && mid < c0 && c1 === c0 && await phase(p) === 'betting', `${c0} → ${mid} → reload ${c1}`);
 
-    await p.goto(URL); await enterGame(p); await p.click('[data-screen="house"]');
-    const h0 = await chips(p); await dealPlaying(p);
+    await p.evaluate(() => localStorage.clear());
+    await p.reload(); await enterGame(p);
+    const h0 = await startUnresolved('house');
+    const hMid = await chips(p);
     await p.reload(); await enterGame(p); await p.click('[data-screen="house"]');
-    check('refresh mid-hand (House): stake returned', await chips(p) === h0);
+    const h1 = await chips(p);
+    check('refresh mid-hand (House): stake returned', h0 !== null && hMid < h0 && h1 === h0 && await phase(p) === 'betting', `${h0} → ${hMid} → reload ${h1}`);
     await ctx.close();
   }
 

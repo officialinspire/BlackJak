@@ -36,6 +36,25 @@
 .game-footer-compact .game-footer-copy { display: flex; align-items: baseline; gap: .45rem; font-size: .58rem; }
 .game-footer-compact .game-footer-copy strong { font-size: .61rem; }
 
+/* The action dock is sticky, so reserve its visual footprint before the dock's
+   natural position. Without this clearance the compact footer can sit under the
+   dock on short phones / House layouts. */
+@media (max-width: 900px) {
+  .table-screen > .game-footer-compact {
+    margin-bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 520px) {
+  .table-screen > .game-footer-compact {
+    margin-bottom: calc(7.75rem + env(safe-area-inset-bottom));
+  }
+}
+
+@media (orientation: landscape) and (max-height: 540px) {
+  .table-screen > .game-footer-compact { margin-bottom: 0; }
+}
+
 @media (max-width: 420px) {
   .game-footer-copy { font-size: .61rem; }
   .game-footer-copy strong { font-size: .65rem; }
