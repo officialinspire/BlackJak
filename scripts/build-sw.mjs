@@ -102,14 +102,14 @@ async function rangeResponse(request, response) {
   if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || start >= size || end < start) {
     return new Response(null, {
       status: 416,
-      headers: { 'Content-Range': `bytes */${size}` },
+      headers: { 'Content-Range': 'bytes */' + size },
     });
   }
 
   end = Math.min(end, size - 1);
   const headers = new Headers(response.headers);
   headers.set('Accept-Ranges', 'bytes');
-  headers.set('Content-Range', `bytes ${start}-${end}/${size}`);
+  headers.set('Content-Range', 'bytes ' + start + '-' + end + '/' + size);
   headers.set('Content-Length', String(end - start + 1));
 
   return new Response(bytes.slice(start, end + 1), {
