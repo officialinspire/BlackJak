@@ -1,5 +1,6 @@
 import { APP_NAME, APP_TAGLINE, MAX_STAKE, STAKE_OPTIONS } from '../config/constants';
 import { feedbackEngine, haptic, type FeedbackCue, type HapticCue } from '../feedback/feedback';
+import { gameSfxSequence, SfxEventGate, type GameSfxEvent } from '../feedback/game-sfx';
 import { HOUSE_MODIFIERS } from '../data/house';
 import { ACHIEVEMENTS, titleProgressForRep, type AchievementDefinition } from '../data/progression';
 import {
@@ -151,6 +152,7 @@ const model: AppModel = {
 const cardMotion = new CardMotionPlanner();
 
 const fxQueue = new FxQueue();
+const sfxGate = new SfxEventGate();
 /** Cues for the render in progress (one-shot; empty for plain re-renders). */
 let currentFx: ReadonlySet<FxCue> = new Set();
 /** When gameplay controls last changed identity: pointer taps just after are stale double-taps. */
@@ -321,20 +323,32 @@ function feedback(cue: FeedbackCue, vibration: HapticCue | null = 'tap'): void {
   if (vibration) haptic(vibration, model.preferences);
 }
 
+function playGameSfx(event: GameSfxEvent, token?: string): void {
+  if (!sfxGate.accept(token)) return;
+
+  for (const step of gameSfxSequence(event)) {
+    const play = (): void => feedback(step.cue, step.haptic);
+    if (step.delayMs > 0 && typeof window !== 'undefined') window.setTimeout(play, step.delayMs);
+    else play();
+  }
+}
+
 function playRoundFeedback(round: RoundState, unlockedCount = 0): void {
   const outcomes = round.results.map((result) => result.outcome);
+  const token = `round:${model.roundSerial}:result`;
+
   if (outcomes.includes('blackjack')) {
-    feedback('blackjack', 'blackjack');
+    playGameSfx('result-blackjack', token);
   } else if (outcomes.length > 0 && outcomes.every((outcome) => outcome === 'win')) {
-    feedback('win', 'result');
+    playGameSfx('result-win', token);
   } else if (outcomes.length > 0 && outcomes.every((outcome) => outcome === 'loss')) {
-    feedback('loss', 'result');
+    playGameSfx('result-loss', token);
   } else {
-    feedback('flip', 'result');
+    playGameSfx('result-neutral', token);
   }
 
   if (unlockedCount > 0 && typeof window !== 'undefined') {
-    window.setTimeout(() => feedbackEngine.play('achievement', model.preferences), 130);
+    window.setTimeout(() => feedbackEngine.play('achievement', model.preferences), 240);
     haptic('achievement', model.preferences);
   }
 }
@@ -886,7 +900,7 @@ function dealRound(): void {
     model.roundSerial += 1;
     cueFx('shuffle', 'deal');
     model.dealerCue = 'deal';
-    feedback('deal', 'deal');
+    playGameSfx('round-start-paid', `round:${model.roundSerial}:start`);
     if (model.round.phase === 'resolved') {
       settleIfResolved();
     } else {
@@ -930,7 +944,7 @@ function dealHouseRound(): void {
     model.roundSerial += 1;
     cueFx('shuffle', 'deal');
     model.dealerCue = 'deal';
-    feedback('deal', 'deal');
+    playGameSfx('round-start-paid', `round:${model.roundSerial}:start`);
 
     if (model.round.phase === 'resolved') {
       settleHouseIfResolved();
@@ -961,7 +975,7 @@ function runHouseReplay(): void {
     model.roundSerial += 1;
     cueFx('shuffle', 'deal');
     model.dealerCue = 'deal';
-    feedback('deal', 'deal');
+    playGameSfx('round-start-free', `round:${model.roundSerial}:start`);
 
     if (model.round.phase === 'resolved') {
       settleHouseIfResolved();
@@ -1001,9 +1015,10 @@ function takePlayerAction(action: PlayerAction): void {
   if (action === 'double') model.roundProgress.doublesAttempted = (model.roundProgress.doublesAttempted ?? 0) + 1;
   if (action === 'split') model.roundProgress.splitsAttempted = (model.roundProgress.splitsAttempted ?? 0) + 1;
 
-  if (action === 'hit') feedback('flip', 'tap');
-  else if (action === 'double' || action === 'split') feedback('chip', 'tap');
-  else feedback('button', 'tap');
+  playGameSfx(
+    action,
+    `round:${model.roundSerial}:hand:${activeHandId}:cards:${hand.cards.length}:action:${action}`,
+  );
 
   if (additionalStake > 0) model.profile = reserveStake(before, additionalStake);
 
@@ -1062,9 +1077,10 @@ function takeHouseAction(action: PlayerAction): void {
   if (action === 'double') model.roundProgress.doublesAttempted = (model.roundProgress.doublesAttempted ?? 0) + 1;
   if (action === 'split') model.roundProgress.splitsAttempted = (model.roundProgress.splitsAttempted ?? 0) + 1;
 
-  if (action === 'hit') feedback('flip', 'tap');
-  else if (action === 'double' || action === 'split') feedback('chip', 'tap');
-  else feedback('button', 'tap');
+  playGameSfx(
+    action,
+    `round:${model.roundSerial}:hand:${activeHandId}:cards:${hand.cards.length}:action:${action}`,
+  );
 
   if (additionalStake > 0) model.profile = reserveStake(before, additionalStake);
 
@@ -1126,6 +1142,7 @@ function prepareDailyRound(): void {
   model.lastRepEarned = 0;
   model.dailyShareStatus = null;
   cueFx('shuffle', 'deal');
+  playGameSfx('round-start-free', `daily:${model.dailyDateKey}:round:${model.roundSerial}:start`);
 }
 
 function completeDailyIfResolved(): void {
@@ -1142,9 +1159,10 @@ function takeDailyAction(action: PlayerAction): void {
   const hand = getActiveHand(model.dailyRound);
   if (!allowedActions(hand, Number.POSITIVE_INFINITY, model.dailyRound.hands.length).includes(action)) throw new Error(`Action "${action}" is not available.`);
 
-  if (action === 'hit') feedback('flip', 'tap');
-  else if (action === 'double' || action === 'split') feedback('chip', 'tap');
-  else feedback('button', 'tap');
+  playGameSfx(
+    action,
+    `daily:${model.dailyDateKey}:round:${model.roundSerial}:hand:${hand.id}:cards:${hand.cards.length}:action:${action}`,
+  );
 
   model.dailyRound = performAction(model.dailyRound, action, Number.POSITIVE_INFINITY);
   completeDailyIfResolved();
@@ -1466,7 +1484,7 @@ function bindEvents(): void {
         model.selectedStake = next;
         model.error = null;
         cueFx('stake', `stake:${stake}`);
-        feedback('chip', 'tap');
+        playGameSfx('stake-select');
         render();
       }
     });
@@ -1533,7 +1551,6 @@ function bindEvents(): void {
           else dealRound();
         } else if (action === 'start-daily') {
           prepareDailyRound();
-          feedback('deal', 'deal');
         } else if (action === 'share-daily') {
           void shareDailyResult();
         } else if (action === 'run-it-back') {
@@ -1548,7 +1565,7 @@ function bindEvents(): void {
           model.houseLastBonusRep = 0;
           model.houseTokenAwarded = false;
           say('refill_chips');
-          feedback('chip', 'result');
+          playGameSfx('refill');
         } else if (action) {
           if (model.screen === 'house') takeHouseAction(action as PlayerAction);
           else takePlayerAction(action as PlayerAction);
