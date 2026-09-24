@@ -175,7 +175,10 @@ export class FeedbackEngine {
 
   activate(): void {
     const context = this.ensureContext();
-    if (context?.state === 'suspended') void context.resume().catch(() => undefined);
+    // iOS reports 'interrupted' after a call/background; both need a resume.
+    if (context && context.state !== 'running' && context.state !== 'closed') {
+      void context.resume().catch(() => undefined);
+    }
   }
 
   play(cue: FeedbackCue, preferences: FeedbackPreferences): void {

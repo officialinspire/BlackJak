@@ -384,18 +384,27 @@ input:focus-visible,
     width: min(100%, 840px);
   }
 
+  /*
+   * Fit the table to the viewport height so Jak's dialogue bar and the dock stay
+   * in the first screen (the dock is sticky and would otherwise cover the bar).
+   * 1.3333 is SCENE_TABLE_ASPECT (tests/responsive-qa.test.ts keeps them in sync).
+   */
+  .table-screen {
+    --scene-cap: 960px;
+    --scene-fit: min(100%, var(--scene-cap), max(18rem, calc((100dvh - 17rem) * 1.3333)));
+  }
+
+  .table-screen.house-screen {
+    --scene-fit: min(100%, var(--scene-cap), max(18rem, calc((100dvh - 18.5rem) * 1.3333)));
+  }
+
   .table-screen .game-scene {
     --scene-chrome: 17rem;
-    width: min(100%, 960px);
+    width: var(--scene-fit);
   }
 
   .house-screen .game-scene {
     --scene-chrome: 18.5rem;
-  }
-
-  .table-screen > .table-dock,
-  .table-screen > .house-strip {
-    width: min(100%, 960px);
   }
 
   .table-dock .dock-row {
@@ -413,10 +422,17 @@ input:focus-visible,
 
 /* Wide desktop: cap the scene instead of stretching art/UI into empty space. */
 @media (min-width: 1200px) {
-  .table-screen .game-scene,
-  .table-screen > .table-dock,
-  .table-screen > .house-strip {
-    width: min(100%, 1040px);
+  .table-screen {
+    --scene-cap: 1040px;
+    --scene-fit: min(100%, var(--scene-cap), max(18rem, calc((100dvh - 17rem) * 1.3333)));
+  }
+
+  .table-screen.house-screen {
+    --scene-fit: min(100%, var(--scene-cap), max(18rem, calc((100dvh - 18.5rem) * 1.3333)));
+  }
+
+  .table-screen .game-scene {
+    width: var(--scene-fit);
   }
 
   .menu-screen {
@@ -427,6 +443,12 @@ input:focus-visible,
 /* Short landscape: preserve the two-column game-first shell and keep every
    secondary element in the controls column instead of auto-flowing under art. */
 @media (orientation: landscape) and (max-height: 540px) {
+  /* The table has its own column here; the height fit above is for stacked layouts. */
+  .table-screen,
+  .table-screen.house-screen {
+    --scene-fit: min(100%, var(--scene-cap, 960px));
+  }
+
   .startup-awaiting {
     padding:
       max(.45rem, env(safe-area-inset-top))

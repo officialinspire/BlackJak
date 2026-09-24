@@ -57,6 +57,7 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Browser integration QA
+        timeout-minutes: 8
         env:
           PW: ${{ github.workspace }}/node_modules/playwright
           S: /tmp/blackjak-qa

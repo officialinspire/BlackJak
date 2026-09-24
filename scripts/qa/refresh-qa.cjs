@@ -9,11 +9,12 @@ async function enterGame(p) {
     await p.waitForTimeout(80);
   }
   const skip = await p.$('.startup-skip');
-  if (skip) await skip.click();
-  await p.waitForSelector('.menu-board', { timeout: 5000 });
+  if (skip) await skip.click().catch(() => undefined); // intro may end/fail first
+  await p.waitForSelector('.menu-board', { timeout: 10000 });
 }
 (async () => {
   const b = await chromium.launch(); let bad = 0;
+  try {
   for (const mode of ['classic', 'house']) for (let t = 0; t < 15; t++) {
     const p = await b.newPage({ viewport: { width: 390, height: 844 } });
     await p.goto('http://localhost:4173/BlackJak/'); await p.evaluate(() => localStorage.clear()); await p.reload(); await enterGame(p);
@@ -27,6 +28,8 @@ async function enterGame(p) {
     await p.close();
   }
   console.log(bad ? `${bad} mismatches` : 'refresh mid-hand: 30/30 restored to pre-hand chips');
-  await b.close();
+  } finally {
+    await b.close();
+  }
   if (bad) process.exitCode = 1;
-})().catch((error) => { console.error(error); process.exitCode = 1; });
+})().catch((error) => { console.error(error); process.exit(1); });

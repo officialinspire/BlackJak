@@ -51,6 +51,7 @@ describe('music engine', () => {
 
   it('unlocks both looping media elements only once and remains silent in intro', () => {
     const { engine, audios } = setup();
+    expect(audios.every((audio) => audio.loop && audio.preload === 'none')).toBe(true);
     engine.unlock();
     engine.unlock();
     expect(audios.every((audio) => audio.loop && audio.preload === 'auto')).toBe(true);

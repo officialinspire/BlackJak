@@ -17,6 +17,9 @@ export function startupEventForKey(state: StartupState, key: string): StartupEve
   return null;
 }
 
+/** An intro that has not started (or has stalled) this long is skipped. */
+export const INTRO_STALL_TIMEOUT_MS = 8000;
+
 export type StartupUnlockHook = () => void | Promise<void>;
 
 /** Extension point for future media unlock work that must happen inside the first gesture. */
@@ -33,6 +36,8 @@ export class StartupController {
   private state: StartupState = 'AWAITING_INPUT';
   private readonly unlockMedia: StartupUnlockHook;
   private finished = false;
+  private stallTimer: ReturnType<typeof setTimeout> | null = null;
+  private introVideo: HTMLVideoElement | null = null;
 
   constructor(private readonly options: StartupOptions) {
     this.unlockMedia = options.unlockMedia ?? unlockStartupMedia;
@@ -109,6 +114,14 @@ export class StartupController {
       return;
     }
 
+    // A slow or unreachable video (offline before it was cached, flaky network)
+    // must not hold the player on a black screen: skip once it stalls too long.
+    this.introVideo = video;
+    video.addEventListener('playing', () => this.clearStallTimer());
+    video.addEventListener('waiting', () => this.armStallTimer());
+    this.armStallTimer();
+    document.addEventListener('visibilitychange', this.onVisibilityChange);
+
     try {
       const playback = video.play();
       if (playback) void playback.catch(() => this.dispatch('failed'));
@@ -116,6 +129,29 @@ export class StartupController {
       this.dispatch('failed');
     }
   }
+
+  private armStallTimer(): void {
+    this.clearStallTimer();
+    this.stallTimer = setTimeout(() => this.dispatch('failed'), INTRO_STALL_TIMEOUT_MS);
+  }
+
+  private clearStallTimer(): void {
+    if (this.stallTimer !== null) clearTimeout(this.stallTimer);
+    this.stallTimer = null;
+  }
+
+  /** Mobile browsers pause video in a background tab; resume it on return. */
+  private readonly onVisibilityChange = (): void => {
+    const video = this.introVideo;
+    if (this.state !== 'INTRO' || !video || document.visibilityState === 'hidden') return;
+    if (!video.paused || video.ended) return;
+    try {
+      const playback = video.play();
+      if (playback) void playback.catch(() => this.dispatch('failed'));
+    } catch {
+      this.dispatch('failed');
+    }
+  };
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     const startupEvent = startupEventForKey(this.state, event.key);
@@ -127,7 +163,12 @@ export class StartupController {
   private finish(): void {
     if (this.finished) return;
     this.finished = true;
+    this.clearStallTimer();
     document.removeEventListener('keydown', this.onKeyDown);
+    document.removeEventListener('visibilitychange', this.onVisibilityChange);
+    // Stop the intro's audio before the menu music starts: no overlap.
+    this.introVideo?.pause();
+    this.introVideo = null;
     this.options.root.innerHTML = '';
     this.options.onGameReady();
   }

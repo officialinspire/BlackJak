@@ -15,8 +15,8 @@ async function enterGame(p) {
     await p.waitForTimeout(80);
   }
   const skip = await p.$('.startup-skip');
-  if (skip) await skip.click();
-  await p.waitForSelector('.menu-board', { timeout: 5000 });
+  if (skip) await skip.click().catch(() => undefined); // intro may end/fail first
+  await p.waitForSelector('.menu-board', { timeout: 10000 });
 }
 
 async function gotoGame(p) {
@@ -78,6 +78,7 @@ async function layoutMetrics(p) {
 
 (async () => {
   const b = await chromium.launch();
+  try {
 
   // ---- Prompt 5 device matrix: startup, intro, menu/panels, tables, pause ----
   const sizes = [
@@ -108,13 +109,16 @@ async function layoutMetrics(p) {
           ov: document.documentElement.scrollWidth - document.documentElement.clientWidth,
           video: v ? { left: v.left, top: v.top, right: v.right, bottom: v.bottom } : null,
           skip: skip ? { width: skip.width, height: skip.height, right: skip.right, bottom: skip.bottom } : null,
-          fit: getComputedStyle(document.querySelector('.startup-video')).objectFit,
+          fit: document.querySelector('.startup-video') ? getComputedStyle(document.querySelector('.startup-video')).objectFit : null,
         };
       });
-      check(`intro ${w}x${h}`, intro.ov === 0 && intro.video && intro.video.left >= -1 && intro.video.right <= w + 1 && intro.video.top >= -1 && intro.video.bottom <= h + 1 && intro.skip?.height >= 44 && intro.fit === 'contain', JSON.stringify(intro));
-      await p.click('.startup-skip');
+      // Chromium builds without H.264 fail the intro and fall straight through to the
+      // menu (the designed failure path); only measure an intro that is still up.
+      if (intro.video) check(`intro ${w}x${h}`, intro.ov === 0 && intro.video && intro.video.left >= -1 && intro.video.right <= w + 1 && intro.video.top >= -1 && intro.video.bottom <= h + 1 && intro.skip?.height >= 44 && intro.fit === 'contain', JSON.stringify(intro));
+      const skip = await p.$('.startup-skip');
+      if (skip) await skip.click().catch(() => undefined);
     }
-    await p.waitForSelector('.menu-board');
+    await p.waitForSelector('.menu-board', { timeout: 10000 });
 
     const out = [];
     for (const screen of ['menu', 'stats', 'settings', 'daily', 'classic', 'house']) {
@@ -129,6 +133,15 @@ async function layoutMetrics(p) {
       const m = await layoutMetrics(p);
       if (S) await p.screenshot({ path: `${S}/qa-${screen}-${w}x${h}.png`, fullPage: true });
       out.push(`${screen}:ov=${m.ov},dock=${m.dockInView},scene=${m.sceneInWidth},broken=${m.brokenImg}`);
+      if ((screen === 'classic' || screen === 'house') && h > 540) {
+        // Stacked layouts: Jak's dialogue/result bar must not start the round hidden under the sticky dock.
+        const clear = await p.evaluate(() => {
+          const panel = document.querySelector('.dialogue-panel')?.getBoundingClientRect();
+          const dock = document.querySelector('.table-dock')?.getBoundingClientRect();
+          return Boolean(panel && dock && panel.bottom <= dock.top + 1);
+        });
+        check(`dialogue bar clear of the sticky dock ${screen} ${w}x${h}`, clear);
+      }
       check(`layout ${screen} ${w}x${h}`, m.ov === 0 && m.brokenImg === 0 && m.dockInView && m.sceneInWidth && !m.footerDockOverlap && m.footer, JSON.stringify(m));
 
       if (screen === 'classic' || screen === 'house') {
@@ -235,6 +248,65 @@ async function layoutMetrics(p) {
     await ctx.close();
   }
 
+  // ---- Startup media resilience: failed / stalled intro never strands the player ----
+  for (const mode of ['abort', 'stall']) {
+    const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
+    await ctx.route(/\.mp4$/, (route) => (mode === 'abort' ? route.abort() : new Promise(() => undefined)));
+    const p = await ctx.newPage(); const errs = [];
+    p.on('pageerror', (e) => errs.push(String(e)));
+    await p.goto(URL);
+    const started = Date.now();
+    await p.click('.startup-action');
+    const reached = await p.waitForSelector('.menu-board', { timeout: 12000 }).then(() => true).catch(() => false);
+    check(`startup: intro ${mode === 'abort' ? 'load failure' : 'stall'} falls through to the menu`, reached && errs.length === 0, `${Date.now() - started}ms ${errs.join(';')}`);
+    await ctx.close();
+  }
+
+  // ---- Music: one track at a time through rapid navigation, background tab, mute ----
+  {
+    const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
+    await ctx.addInitScript(() => {
+      window.__media = new Set();
+      const play = HTMLMediaElement.prototype.play;
+      HTMLMediaElement.prototype.play = function patchedPlay() { window.__media.add(this); return play.call(this); };
+    });
+    const p = await ctx.newPage(); const errs = [];
+    p.on('pageerror', (e) => errs.push(String(e)));
+    await p.goto(URL); await p.evaluate(() => localStorage.clear()); await p.reload(); await enterGame(p);
+    const audible = () => p.evaluate(() => [...window.__media]
+      .filter((m) => !m.paused && !m.muted && m.volume > 0.01)
+      .map((m) => (m.currentSrc || m.src).split('/').pop().replace(/-[\w-]{8}\.\w+$/, '')));
+    const setHidden = (hidden) => p.evaluate((h) => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (h ? 'hidden' : 'visible') });
+      document.dispatchEvent(new Event('visibilitychange'));
+    }, hidden);
+    await p.waitForTimeout(900);
+    const menu = await audible();
+    for (const screen of ['classic', 'menu', 'house', 'menu', 'daily', 'menu', 'classic']) {
+      if (screen === 'menu') {
+        // Tables: Esc opens the pause board, Main Menu asks to confirm mid-hand. Daily: Esc goes back.
+        await p.keyboard.press('Escape'); await p.waitForTimeout(120);
+        for (let tap = 0; tap < 2 && await p.$('.pause-overlay [data-pause-action="menu"]'); tap++) {
+          await p.click('.pause-overlay [data-pause-action="menu"]'); await p.waitForTimeout(60);
+        }
+      }
+      else { const target = await p.$(`[data-screen="${screen}"]`); if (target) await target.click(); }
+      await p.waitForTimeout(60);
+    }
+    await p.waitForTimeout(1100);
+    const afterRapid = await audible();
+    await setHidden(true); await p.waitForTimeout(100);
+    const hidden = await audible();
+    await setHidden(false); await p.waitForTimeout(900);
+    const shown = await audible();
+    const screen = await p.$eval('#app-main', (e) => e.className);
+    check('music: menu track alone after startup (intro audio stopped)', menu.length === 1 && menu[0].startsWith('jak-gold'), JSON.stringify(menu));
+    check('music: exactly one track after rapid navigation', afterRapid.length === 1, `${JSON.stringify(afterRapid)} on ${screen}`);
+    check('music: silent in background tab, one track on return', hidden.length === 0 && shown.length === 1 && shown[0] === afterRapid[0], `${JSON.stringify(hidden)} → ${JSON.stringify(shown)}`);
+    check('music: no page errors', errs.length === 0, errs.join(';'));
+    await ctx.close();
+  }
+
   // ---- Refresh mid-hand: stake not charged, no stuck round ----
   {
     const { ctx, p } = await fresh(b);
@@ -287,7 +359,9 @@ async function layoutMetrics(p) {
     const p = await ctx.newPage(); await p.goto(URL);
     await p.evaluate(async () => { await navigator.serviceWorker.ready; });
     await p.reload(); await p.waitForFunction(() => !!navigator.serviceWorker.controller);
-    await p.waitForTimeout(500);
+    // Play once online so the menu track lands in the runtime media cache.
+    await enterGame(p);
+    await p.waitForFunction(async () => (await (await caches.open('blackjak-media-v1')).keys()).some((r) => r.url.includes('jak-gold')), null, { timeout: 15000 }).catch(() => null);
     await ctx.setOffline(true);
     await p.reload(); await enterGame(p); await p.waitForTimeout(200);
     const booted = !!(await p.$('.menu-board'));
@@ -307,10 +381,24 @@ async function layoutMetrics(p) {
     });
     const notice = !!(await p.$('[data-pwa-notice="offline"]'));
     check('offline: boots, deals, all sprite sheets from cache', booted && assets.ok === assets.urls && sheetsCached === 7, `${assets.ok}/${assets.urls} fetched, ${sheetsCached} webp cached, offline notice=${notice}`);
+    const media = await p.evaluate(async () => {
+      const sw = await (await fetch('sw.js')).text();
+      const urls = JSON.parse(sw.match(/const MEDIA_URLS = (\[[\s\S]*?\]);/)[1]);
+      const precache = JSON.parse(sw.match(/const PRECACHE_URLS = (\[[\s\S]*?\]);/)[1]);
+      const cache = await caches.open('blackjak-media-v1');
+      const cached = (await cache.keys()).map((r) => new URL(r.url).pathname);
+      const menuTrack = urls.find((u) => u.includes('jak-gold'));
+      const ranged = await fetch(menuTrack, { headers: { Range: 'bytes=100-199' } }).then(async (r) => ({ status: r.status, bytes: (await r.arrayBuffer()).byteLength, range: r.headers.get('content-range') })).catch((e) => String(e));
+      return { urls: urls.length, inPrecache: urls.filter((u) => precache.includes(u)).length, cached, ranged };
+    });
+    check('offline: media runtime-cached (not precached) and served as byte ranges', media.urls === 3 && media.inPrecache === 0 && media.cached.some((u) => u.includes('jak-gold')) && media.ranged.status === 206 && media.ranged.bytes === 100 && /^bytes 100-199\/\d+$/.test(media.ranged.range), JSON.stringify(media));
     await ctx.close();
   }
 
   log(fails.length ? `\n${fails.length} FAILURE(S): ${fails.join(' | ')}` : '\nALL CHECKS PASSED');
-  await b.close();
+  } finally {
+    // Always release Chromium: a thrown assertion must fail fast, not hang CI.
+    await b.close();
+  }
   if (fails.length) process.exitCode = 1;
-})().catch((error) => { console.error(error); process.exitCode = 1; });
+})().catch((error) => { console.error(error); process.exit(1); });

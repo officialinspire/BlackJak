@@ -14,8 +14,8 @@ async function enterGame(p) {
     await p.waitForTimeout(80);
   }
   const skip = await p.$('.startup-skip');
-  if (skip) await skip.click();
-  await p.waitForSelector('.menu-board', { timeout: 5000 });
+  if (skip) await skip.click().catch(() => undefined); // intro may end/fail first
+  await p.waitForSelector('.menu-board', { timeout: 10000 });
 }
 (async () => {
   const originalServiceWorker = readFileSync(swPath);
@@ -128,7 +128,10 @@ async function enterGame(p) {
         && ['Standard', "Jak's Cosmic", 'Inspire Mono'].every((theme) => themes.some((label) => label.includes(theme))));
 
       if (!hitChecked && await page.$('[data-action="hit"]:not([disabled])')) {
-        const count = await page.$eval('.player-hands [data-visual-id]', (cards) => cards.length);
+        const count = await page.$$eval('.player-hands [data-visual-id]', (cards) => cards.length);
+        // Pointer taps within the dock's stale-tap window (260ms after the controls
+        // changed shape) are ignored on purpose; tap Hit as a deliberate new input.
+        await page.waitForTimeout(320);
         await page.click('[data-action="hit"]');
         const result = await page.evaluate((oldCount) => ({
           count: document.querySelectorAll('.player-hands [data-visual-id]').length,
@@ -194,4 +197,4 @@ async function enterGame(p) {
     await b.close();
   }
   if (fails.length) process.exitCode = 1;
-})().catch((error) => { console.error(error); process.exitCode = 1; });
+})().catch((error) => { console.error(error); process.exit(1); });

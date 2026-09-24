@@ -3,6 +3,7 @@ import qaCss from '../src/styles/qa.css?raw';
 import startupCss from '../src/styles/startup.css?raw';
 import dockCss from '../src/styles/dock.css?raw';
 import browserQa from '../scripts/qa/browser-qa.cjs?raw';
+import { SCENE_TABLE_ASPECT } from '../src/config/scene-layout';
 
 describe('Prompt 5 responsive contracts', () => {
   it('keeps the startup/intro surfaces viewport-bound and media contained', () => {
@@ -59,5 +60,12 @@ describe('Prompt 5 responsive contracts', () => {
     expect(browserQa).toContain('document.documentElement.scrollWidth');
     expect(browserQa).toContain('await ctx.setOffline(true)');
     expect(browserQa).toContain('await enterGame(p)');
+  });
+
+  it('fits tablet/desktop tables to the viewport height so the dialogue bar is not under the dock', () => {
+    const fits = [...qaCss.matchAll(/--scene-fit: min\(100%, var\(--scene-cap\), max\(18rem, calc\(\(100dvh - [\d.]+rem\) \* ([\d.]+)\)\)\)/g)];
+    expect(fits.length).toBe(4);
+    for (const [, aspect] of fits) expect(Number(aspect)).toBeCloseTo(SCENE_TABLE_ASPECT, 3);
+    expect(browserQa).toContain('dialogue bar clear of the sticky dock');
   });
 });

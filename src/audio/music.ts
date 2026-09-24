@@ -72,7 +72,9 @@ export class MusicEngine {
     };
     for (const track of Object.values(this.tracks)) {
       track.loop = true;
-      track.preload = 'auto';
+      // No download before the player opts in: ~5.7 MB of music must not compete
+      // with the core app/art on first load. unlock() switches to 'auto'.
+      track.preload = 'none';
       track.volume = 0;
     }
 
@@ -89,6 +91,7 @@ export class MusicEngine {
     if (this.unlocked) return;
     this.unlocked = true;
     for (const track of Object.values(this.tracks)) {
+      track.preload = 'auto';
       track.muted = true;
       track.volume = 0;
       try {
