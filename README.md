@@ -151,8 +151,9 @@ npm run release:check
 
 ```text
 src/
+  assets/      Vite `?url` imports for the PNG art sheets (fingerprinted + precached)
   config/      App constants and release/game configuration
-  data/        Dealer dialogue, progression, and House modifier definitions
+  data/        Dealer dialogue, progression, House modifiers, and the visual atlas
   feedback/    Synthesized audio and haptic feedback
   game/        Pure rules, round/session state, House mode, progression, and Daily Hand
   pwa/         Install/update/network-status registration behavior
@@ -162,7 +163,7 @@ src/
   ui/          Card markup and DOM rendering/event flow
 tests/         Vitest engine, persistence, accessibility-markup, and release-smoke suites
 public/        Manifest, install icons, and Pages static files
-scripts/       Post-build service-worker generation
+scripts/       Post-build service-worker generation; dev-only atlas measurement script
 .github/       CI and conditional GitHub Pages deployment workflow
 ```
 
@@ -329,6 +330,12 @@ The responsive QA layer keeps controls at roughly 44px or larger, applies `touch
 
 An unfinished Classic or House wager is held in memory and committed only when the round resolves. Refreshing or abandoning an unresolved hand therefore restores the last committed bankroll rather than charging for a round that no longer exists. Malformed JSON, wrong-version storage envelopes, missing values, and blocked browser storage all fall back safely.
 
+
+## Visual atlas (art sheets)
+
+The PNG sheets at the repository root (`blackjak-sprite-sheet.png`, `blackjak-table.png`, `dialogue-status-bar.png`, `menu-bar.png`, and the three `blackjak-cards-*.png` decks) are mapped in `src/data/visual-atlas.ts`. Every `SpriteRect` was measured from the actual pixels rather than an assumed grid — ace/court cards are wider, rows sit at different offsets, the Inspire deck orders its rows ♠ ♥ ♣ ♦, and neighbouring dealer poses overlap (their shared borders sit on min-cost cut lines so rects never intersect). `scripts/measure-visual-atlas.py` reproduces the measurements.
+
+`src/ui/atlas.ts` renders any rect via SVG `viewBox` cropping. Gameplay UI does not use the atlas yet; open `?debugVisuals=1` (e.g. `/BlackJak/?debugVisuals=1`) to load the lazy visual-atlas inspector, which overlays every rect on its sheet and previews each crop. `tests/visual-atlas.test.ts` checks sheet dimensions against the PNG headers plus bounds, duplicates, and overlaps.
 
 ## Current limitations
 

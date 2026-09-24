@@ -2,6 +2,16 @@
 
 All notable changes to BlackJak are documented here.
 
+## [Unreleased]
+
+### Added
+- Visual atlas for the art sheets: explicitly measured `SpriteRect`s for 19 dealer poses, 3 × 55 card cells, and menu/dialogue/table layout regions (`src/data/visual-atlas.ts`).
+- Vite `?url` asset module so all seven PNG sheets are fingerprinted into `dist/assets/` and precached by the service worker.
+- SVG `viewBox` atlas renderer (`src/ui/atlas.ts`) and a lazy dev inspector behind `?debugVisuals=1`.
+- Atlas tests covering real PNG dimensions, bounds, duplicate keys/rects, and overlaps.
+
+No rules, round state, or gameplay UI changed.
+
 ## [0.1.0] — 2026-09-23 — Demo release candidate
 
 ### Added

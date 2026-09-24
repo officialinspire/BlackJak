@@ -34,3 +34,10 @@ if (document.readyState === 'loading') {
 }
 
 registerPWA();
+
+// Dev aid: ?debugVisuals=1 opens the visual atlas inspector (lazy chunk, no game impact).
+if (new URLSearchParams(window.location.search).get('debugVisuals') === '1') {
+  void import('./ui/visual-atlas-inspector')
+    .then(({ mountVisualAtlasInspector }) => mountVisualAtlasInspector())
+    .catch((error) => console.error('Visual atlas inspector failed to load.', error));
+}
