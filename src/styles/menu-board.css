@@ -18,7 +18,7 @@
   position: relative;
   flex: 0 0 auto;
   /* Phones: size so the planks span --board-plank-fill of the width. */
-  width: min(var(--board-max-width), calc(100cqi * var(--board-plank-fill) / var(--board-plank-share)));
+  width: min(var(--board-max-width), max(620px, calc(100cqi * var(--board-plank-fill) / var(--board-plank-share))));
   aspect-ratio: var(--board-aspect);
   container-type: inline-size;
   margin: 0;

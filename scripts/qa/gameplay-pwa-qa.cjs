@@ -7,6 +7,16 @@ const S = process.env.S; const URL = 'http://localhost:4173/BlackJak/';
 const swPath = resolve(__dirname, '../../dist/sw.js');
 const phase = (p) => p.$eval('.table-dock', (e) => e.className.match(/phase-(\w+)/)[1]).catch(() => null);
 const fails = []; const check = (n, ok, d = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); if (!ok) fails.push(n); };
+async function enterGame(p) {
+  const start = await p.$('.startup-action');
+  if (start) {
+    await start.click();
+    await p.waitForTimeout(80);
+  }
+  const skip = await p.$('.startup-skip');
+  if (skip) await skip.click().catch(() => undefined); // intro may end/fail first
+  await p.waitForSelector('.menu-board', { timeout: 10000 });
+}
 (async () => {
   const originalServiceWorker = readFileSync(swPath);
   const b = await chromium.launch();
@@ -14,7 +24,7 @@ const fails = []; const check = (n, ok, d = '') => { console.log(`${ok ? 'PASS' 
   // ---- Hidden dealer card, layering, split, Gold Card (House) ----
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 } }); const p = await ctx.newPage();
   const errs = []; p.on('pageerror', (e) => errs.push(String(e)));
-  await p.goto(URL); await p.evaluate(() => localStorage.clear()); await p.reload();
+  await p.goto(URL); await p.evaluate(() => localStorage.clear()); await p.reload(); await enterGame(p);
   await p.click('[data-screen="house"]');
   let sawHidden = false, sawSplit = false, splitMotion = false, sawGold = false, layering = null, splitShot = false;
   for (let i = 0; i < 160 && !(sawSplit && sawGold && sawHidden); i++) {
@@ -59,16 +69,25 @@ const fails = []; const check = (n, ok, d = '') => { console.log(`${ok ? 'PASS' 
   {
     const dailyContext = await b.newContext({ viewport: { width: 390, height: 844 } });
     const daily = await dailyContext.newPage();
-    await daily.goto(URL); await daily.evaluate(() => localStorage.clear()); await daily.reload();
+    await daily.goto(URL); await daily.evaluate(() => localStorage.clear()); await daily.reload(); await enterGame(daily);
     await daily.click('[data-screen="daily"]');
     const initial = await daily.evaluate(() => [...document.querySelectorAll('.daily-table [data-motion="NEW"]')]
       .map((card) => ({ owner: card.getAttribute('data-visual-id').includes(':player:') ? 'P' : 'D', delay: Number.parseInt(getComputedStyle(card).getPropertyValue('--deal-delay')) }))
       .sort((a, b) => a.delay - b.delay));
-    await daily.click('[data-action="start-daily"]');
-    const replayed = await daily.$$eval('.daily-table [data-motion]:not([data-motion="SETTLED"])', (cards) => cards.length);
-    check('Daily opening uses one P/D/P/D deal and does not redeal on start', initial.length === 4
+    await daily.keyboard.press('s');
+    const transition = await daily.evaluate(() => {
+      const cards = [...document.querySelectorAll('.daily-table [data-visual-id]')];
+      const openingReplayed = cards.filter((card) => {
+        const slot = Number(card.getAttribute('data-visual-id').split(':').at(-1));
+        return slot < 2 && card.getAttribute('data-motion') === 'NEW';
+      }).length;
+      const flips = cards.filter((card) => card.getAttribute('data-motion') === 'FLIPPING').length;
+      return { openingReplayed, flips };
+    });
+    check('Daily opening uses P/D/P/D and settled opening cards do not redeal on Stand', initial.length === 4
       && initial.map((card) => card.owner).join('') === 'PDPD'
-      && initial.map((card) => card.delay).join(',') === '0,38,76,114' && replayed === 0);
+      && initial.map((card) => card.delay).join(',') === '0,38,76,114'
+      && transition.openingReplayed === 0 && transition.flips === 1, JSON.stringify(transition));
     await dailyContext.close();
   }
 
@@ -82,7 +101,7 @@ const fails = []; const check = (n, ok, d = '') => { console.log(`${ok ? 'PASS' 
     const page = await c.newPage(); const stressErrors = [];
     page.on('pageerror', (error) => stressErrors.push(String(error)));
     page.on('console', (message) => { if (message.type() === 'error') stressErrors.push(message.text()); });
-    await page.goto(URL); await page.evaluate(() => localStorage.clear()); await page.reload();
+    await page.goto(URL); await page.evaluate(() => localStorage.clear()); await page.reload(); await enterGame(page);
     await page.click('[data-screen="classic"]');
 
     let openingChecked = false; let hitChecked = false; let flipChecked = false; let rapidChecked = false;
@@ -108,14 +127,16 @@ const fails = []; const check = (n, ok, d = '') => { console.log(`${ok ? 'PASS' 
         && await page.$$eval('.scene-cards [data-motion]:not([data-motion="SETTLED"])', (cards) => cards.length) === 0
         && ['Standard', "Jak's Cosmic", 'Inspire Mono'].every((theme) => themes.some((label) => label.includes(theme))));
 
-      const total = await page.$eval('.player-hand.is-active .hand-meta strong', (node) => Number(node.textContent));
-      if (!hitChecked && total <= 11 && await page.$('[data-action="hit"]:not([disabled])')) {
-        const count = await page.$$eval('.scene-cards [data-visual-id]', (cards) => cards.length);
+      if (!hitChecked && await page.$('[data-action="hit"]:not([disabled])')) {
+        const count = await page.$$eval('.player-hands [data-visual-id]', (cards) => cards.length);
+        // Pointer taps within the dock's stale-tap window (260ms after the controls
+        // changed shape) are ignored on purpose; tap Hit as a deliberate new input.
+        await page.waitForTimeout(320);
         await page.click('[data-action="hit"]');
         const result = await page.evaluate((oldCount) => ({
-          count: document.querySelectorAll('.scene-cards [data-visual-id]').length,
-          moving: document.querySelectorAll('.scene-cards [data-motion="NEW"]').length,
-          priorMoving: [...document.querySelectorAll('.scene-cards [data-motion="NEW"]')].filter((card) => Number(card.getAttribute('data-visual-id').split(':').at(-1)) < 2).length,
+          count: document.querySelectorAll('.player-hands [data-visual-id]').length,
+          moving: document.querySelectorAll('.player-hands [data-motion="NEW"]').length,
+          priorMoving: [...document.querySelectorAll('.player-hands [data-motion="NEW"]')].filter((card) => Number(card.getAttribute('data-visual-id').split(':').at(-1)) < 2).length,
         }), count);
         hitChecked = result.count === count + 1 && result.moving === 1 && result.priorMoving === 0;
       }
@@ -129,11 +150,15 @@ const fails = []; const check = (n, ok, d = '') => { console.log(`${ok ? 'PASS' 
       }
 
       if (await phase(page) === 'resolved') {
-        const serial = await page.$eval('.scene-cards [data-visual-id]', (card) => card.getAttribute('data-visual-id').split(':')[0]);
+        const serial = await page.$eval('.scene-cards [data-visual-id]', (card) => Number(card.getAttribute('data-visual-id').split(':')[0]));
         await page.locator('[data-action="deal"]').click({ clickCount: 2, delay: 0 });
-        await page.waitForTimeout(20);
-        const serials = await page.$$eval('.scene-cards [data-visual-id]', (cards) => [...new Set(cards.map((card) => card.getAttribute('data-visual-id').split(':')[0]))]);
-        rapidChecked ||= serials.length === 1 && Number(serials[0]) === Number(serial) + 1;
+        await page.waitForTimeout(30);
+        const guarded = await page.$$eval('.scene-cards [data-visual-id]', (cards) => [...new Set(cards.map((card) => Number(card.getAttribute('data-visual-id').split(':')[0])))]);
+        await page.waitForTimeout(300);
+        await page.click('[data-action="deal"]');
+        await page.waitForTimeout(30);
+        const started = await page.$$eval('.scene-cards [data-visual-id]', (cards) => [...new Set(cards.map((card) => Number(card.getAttribute('data-visual-id').split(':')[0])))]);
+        rapidChecked ||= guarded.length === 1 && guarded[0] === serial && started.length === 1 && started[0] === serial + 1;
       }
       while (await phase(page) === 'playing') { await page.keyboard.press('s'); await page.waitForTimeout(10); }
     }
@@ -149,8 +174,9 @@ const fails = []; const check = (n, ok, d = '') => { console.log(`${ok ? 'PASS' 
   const c2 = await b.newContext({ viewport: { width: 390, height: 844 } }); const q = await c2.newPage();
   await q.goto(URL); await q.evaluate(async () => { await navigator.serviceWorker.ready; }); await q.reload();
   await q.waitForFunction(() => !!navigator.serviceWorker.controller);
+  await enterGame(q);
   const v1 = await q.evaluate(async () => (await caches.keys()).find((k) => k.startsWith('blackjak-app-')));
-  execSync(`sed -i 's#Generated by scripts/build-sw.mjs.#Generated by scripts/build-sw.mjs. qa-bump#; s#const CACHE_NAME = "blackjak-app-[a-z0-9]*"#const CACHE_NAME = "blackjak-app-qaupdate"#' dist/sw.js`);
+  execSync(`sed -i 's#Generated by scripts/build-sw.mjs.#Generated by scripts/build-sw.mjs. qa-bump#; s#const APP_CACHE_NAME = "blackjak-app-[a-z0-9]*"#const APP_CACHE_NAME = "blackjak-app-qaupdate"#' dist/sw.js`);
   await q.evaluate(async () => { const r = await navigator.serviceWorker.getRegistration(); await r.update(); });
   await q.waitForSelector('[data-pwa-notice="update"] button', { timeout: 10000 }).catch(() => null);
   const notice = await q.$('[data-pwa-notice="update"] button:not(.pwa-notice-dismiss)');
@@ -171,4 +197,4 @@ const fails = []; const check = (n, ok, d = '') => { console.log(`${ok ? 'PASS' 
     await b.close();
   }
   if (fails.length) process.exitCode = 1;
-})().catch((error) => { console.error(error); process.exitCode = 1; });
+})().catch((error) => { console.error(error); process.exit(1); });

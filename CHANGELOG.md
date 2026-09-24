@@ -2,6 +2,34 @@
 
 All notable changes to BlackJak are documented here.
 
+## [0.3.0] — 2026-09-24 — Startup, music, SFX, and integration hardening
+
+Blackjack rules, odds and payouts are unchanged, and existing saves load as-is.
+
+### Added
+- Startup flow: an INSPIRE lockup waits for a tap, click or Enter, which unlocks audio. The INSPIRE intro video follows, skippable with Skip, Enter or Esc. The game starts when the intro ends, is skipped, fails, or stalls for 8 seconds, and a background tab resumes a paused intro.
+- Background music: *Jak Gold's Table* on the menu screens and *Minimal Gameplay Background* at the tables, with a 700ms crossfade, a Music toggle, and pausing in a background tab.
+- Event-driven synthesized SFX (shuffle, chip, deal, actions, flips, results), deduplicated per game event.
+- A reusable OFFICIAL INSPIRE footer.
+- Phone, tablet, desktop and short-landscape layout hardening.
+- The GitHub Actions gate now runs Chromium browser QA: a 10-size device matrix, startup/intro (including failed and stalled intro media), music (one track through rapid navigation, background tab, return), Classic/House/Daily, split/Gold Card, card-motion stress, keyboard, reduced motion, mute persistence, refresh mid-hand, corrupt storage, PWA update, and offline play, including media served as cached byte ranges.
+- `verify-dist` requires the startup logo, intro video and both music tracks. Each must be present, not truncated, referenced by the app and routed through the runtime media cache. It also checks URL-safe dist filenames, CSP `media-src 'self'`, and media weight budgets.
+
+### Changed
+- Service worker: the game shell and art are precached (about 3.2MB), and the MP3s and MP4 (about 5.7MB) are runtime-cached. Install and update no longer depend on large media. The media cache is stable across releases (files are content-hashed, and stale files are pruned on activate), answers `Range` requests with `206` responses, and downloads each file once even under concurrent range requests.
+- Built asset names are URL-safe (`jak-gold-s-table-<hash>.mp3`), so no percent-encoded URLs or cache keys.
+- Music tracks aren't downloaded until the start gesture (`preload="none"` until then).
+- The production CSP declares `media-src 'self'` explicitly.
+- Tablet and desktop tables are sized to the viewport height, so Jak's dialogue/result bar is visible above the sticky dock at 1024×768, 1280×720, 1366×768 and 1440×900 instead of hidden behind it.
+
+### Fixed
+- Music: routine UI re-renders restarted an in-flight crossfade, so fades crawled and replayed `play()`.
+- The intro video is paused before the menu music starts, so the two never overlap.
+- SFX resume after iOS reports the audio context as `interrupted` (after a call or backgrounding).
+- CI: browser QA could hang until the job was cancelled after an assertion threw. Scripts now always close Chromium and exit non-zero, and the QA step has its own timeout, so a hang fails with a clear error instead of being cancelled.
+- CI: the "Hit moves exactly one new card" check read one element's `.length` and could never pass. The check now reads the whole card list, and waits out the dock's stale-tap guard before tapping Hit.
+- QA: intro measurements no longer crash when the intro legitimately fails before it can be measured.
+
 ## [0.2.1] — 2026-09-24 — Hardening
 
 ### Security

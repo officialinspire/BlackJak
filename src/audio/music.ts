@@ -72,7 +72,9 @@ export class MusicEngine {
     };
     for (const track of Object.values(this.tracks)) {
       track.loop = true;
-      track.preload = 'auto';
+      // No download before the player opts in: ~5.7 MB of music must not compete
+      // with the core app/art on first load. unlock() switches to 'auto'.
+      track.preload = 'none';
       track.volume = 0;
     }
 
@@ -89,6 +91,7 @@ export class MusicEngine {
     if (this.unlocked) return;
     this.unlocked = true;
     for (const track of Object.values(this.tracks)) {
+      track.preload = 'auto';
       track.muted = true;
       track.volume = 0;
       try {
@@ -110,12 +113,24 @@ export class MusicEngine {
     this.preferences = preferences;
     if (!this.unlocked || !this.visible) return;
 
-    const sameTarget = this.targetFor(previousState, previousPreferences) === this.targetFor(state, preferences);
-    if (sameTarget && this.frame === null) {
-      const target = this.targetFor(state, preferences);
-      if (target) this.tracks[target].volume = preferences.volume;
+    const previousTarget = this.targetFor(previousState, previousPreferences);
+    const nextTarget = this.targetFor(state, preferences);
+    const sameTarget = previousTarget === nextTarget;
+    const sameVolume = previousPreferences?.volume === preferences.volume;
+
+    // render() calls sync after every UI update. A same-target rerender must not
+    // restart an in-flight fade (which would repeatedly call play() and make the
+    // transition asymptotically slow). Volume changes are the one exception.
+    if (sameTarget && sameVolume) {
+      if (this.frame === null && nextTarget) this.tracks[nextTarget].volume = preferences.volume;
       return;
     }
+
+    if (sameTarget && this.frame === null) {
+      if (nextTarget) this.tracks[nextTarget].volume = preferences.volume;
+      return;
+    }
+
     this.crossfade();
   }
 

@@ -6,7 +6,7 @@ BlackJak is a mobile-first blackjack game from OFFICIAL INSPIRE, inspired in per
 
 ## Current status
 
-**BlackJak Visual Demo v0.2.x** (v0.2.1 adds security hardening: a production CSP, escaped runtime text, patched tooling and lockfile-based CI). v0.1.0 delivered the full game: Classic play, Jak's House, local progression, Daily Hand, audio/haptics, accessibility, offline PWA and CI. v0.2.0 dresses it in the illustrated art set:
+**BlackJak v0.3.0** adds the INSPIRE startup intro, menu/gameplay music with crossfades, event-driven table SFX, phone-to-desktop layout hardening, and a PWA that precaches the game but runtime-caches its large media. v0.2.1 added security hardening: a production CSP, escaped runtime text, patched tooling and lockfile-based CI. v0.1.0 delivered the full game: Classic play, Jak's House, local progression, Daily Hand, audio/haptics, accessibility, offline PWA and CI. v0.2.0 dresses it in the illustrated art set:
 
 - the **illustrated table** (`blackjak-table.png`) as a shared, responsive game scene for Classic and Jak's House
 - **Jak as a reactive dealer NPC**, with 19 sprite poses driven by dialogue events plus deal, draw and chip gestures
@@ -224,15 +224,19 @@ Hot Hand changes **REP rewards only**, never deck order, card values, payouts, o
 A loss, push, or mixed split result resets the House Hot Hand streak.
 
 
-## Audio, haptics, and game feel
+## Startup, music, audio, haptics, and game feel
 
-Prompt 7 uses the browser's Web Audio API to synthesize lightweight original cues at runtime rather than downloading third-party sound packs. Supported cues include card/deal movement, chip/button feedback, win/loss/blackjack stings, and achievement unlocks.
+**Startup.** The app opens on an INSPIRE lockup: *Tap / click / press Enter to start*. That first gesture unlocks audio, then the INSPIRE intro video plays (Skip, Enter or Esc skips it). The game starts when the video ends, is skipped, fails to load or play, or stalls for 8 seconds, so missing, blocked or offline media never strands the player. Returning to a background tab resumes a paused intro.
 
-Audio begins only after a user gesture because browsers restrict autoplay. Settings persist locally:
+**Music.** `src/audio/music.ts` plays *Jak Gold's Table* on the menu, Stats and Settings, and *Minimal Gameplay Background* at the tables and Daily Hand, with a 700ms crossfade. Exactly one track is audible at a time: re-renders never restart a fade, rapid navigation cancels stale fades, the intro's audio stops before the menu music starts, and all music pauses in a background tab and resumes on return. Tracks don't download until the start gesture. Playback errors are swallowed, so music can never block navigation.
 
-- Master feedback
+**SFX.** The Web Audio API synthesizes original cues at runtime (no sound packs): shuffle, chip, deal, hit/stand/double/split, card flip, win/loss/blackjack stings and achievements. Each gameplay event plays once, even when it causes several renders.
+
+Settings persist locally, and missing or corrupt values fall back to defaults:
+
+- Master feedback (music, SFX and haptics)
+- Music
 - SFX
-- Room ambience
 - Haptics
 - Volume
 
@@ -284,6 +288,13 @@ This keeps generated JS, CSS, manifest, icon, and service-worker URLs inside the
 3. `scripts/build-sw.mjs` scans the completed `dist/` tree and generates `dist/sw.js`.
 
 Generating the service worker **after** Vite is important because Vite fingerprints production JS/CSS filenames. The generated worker precaches the real output filenames rather than guessing them.
+
+The worker splits assets in two:
+
+- **Core (precached on install):** HTML, JS, CSS, manifest, icons, the startup logo and all WebP art, about 3.2MB. Installing means the game is playable offline.
+- **Media (runtime-cached):** the intro MP4 and both MP3s (about 5.7MB) are **not** in the install list, so a slow or failed media download can never break install or startup. They are cached in `blackjak-media-v1` the first time they play, and later answered from cache, including the HTTP `Range` requests that audio/video elements make (`206 Partial Content`; Safari requires it). Media filenames are content-hashed, so this cache survives app updates, and files a new build no longer ships are pruned on activate. Offline without cached media, the intro is skipped and music stays silent. The game itself is unaffected.
+
+Vite emits URL-safe asset names (`jak-gold-s-table-<hash>.mp3` rather than `Jak Gold's Table-<hash>.mp3`), so no URL or cache key needs percent-encoding.
 
 Each build creates a content-derived cache name. On activation, older BlackJak app caches are removed. Same-origin requests outside `/BlackJak/` are ignored.
 
@@ -410,7 +421,10 @@ Weight falls from 13.8MB to 2.9MB. A manifest records each source PNG's SHA-256,
 
 - the Content-Security-Policy meta tag is missing, or an inline script appears
 
-- any file in dist is missing from the service-worker precache, or any referenced asset is missing
+- any core file in dist is missing from the service-worker precache, a media file *is* precached, or any referenced asset is missing
+- the startup logo, intro video or either music track is missing, truncated, unreferenced by the app, or not routed through the runtime media cache
+- a dist filename isn't URL-safe, or the CSP doesn't allow same-origin media (`media-src 'self'`)
+- media weight goes over budget (7MB total, 3.2MB per file)
 - any of the seven sheets isn't present as WebP
 - a raw source PNG is shipped
 - image weight goes over budget (4.5MB total, 900KB per image)
@@ -439,8 +453,10 @@ The PNG sheets at the repository root (`blackjak-sprite-sheet.png`, `blackjak-ta
 - **Browser-local persistence:** clearing site data removes chips, REP, stats, achievements, Daily completion, and settings.
 - **Classic v1 scope:** no insurance, surrender, side bets, or real-money functionality.
 - **Art notes:** the Inspire deck's 7♠, 7♥ and 7♣ are misdrawn in the source sheet (six pips); they render as a drawn fallback face until the art is corrected. Jak's shuffling pose isn't used by any mood yet.
-- **PWA deployment dependency:** GitHub Pages must be enabled once in repository settings before the production URL can deploy.
-- **Automated browser E2E:** CI runs the unit/integration suite and the production build gate; the Playwright checks in `scripts/qa/` are run manually (Chromium only).
+- **Media caching:** the core PWA is precached; the intro video and two music tracks are runtime-cached after first play, so installs/updates never block on ~5.7MB of media. If media is unavailable, the intro is skipped and gameplay still starts.
+- **iOS music volume:** iOS Safari ignores `HTMLMediaElement.volume`, so on iPhone/iPad the Volume slider affects SFX but not music, and a music crossfade is a short overlap then a cut. The music toggles work everywhere.
+- **Intro codec:** the intro is H.264 MP4. Chromium builds without proprietary codecs (such as Playwright's) can't play it, and skip straight to the menu.
+- **Automated browser E2E:** CI now runs Chromium device/integration QA across startup, menu, Classic, Jak's House, Daily, responsive layouts, input stress, refresh recovery, PWA update, reduced motion, mute, and offline core play.
 
 ## Roadmap after v0.2.0
 
@@ -460,7 +476,7 @@ A dedicated release-smoke suite covers:
 - Jak's House isolation and Gold Card scheduling
 - deterministic Daily Hand and one-award-per-date behavior
 
-GitHub Actions remains the source of truth for the final build gate.
+GitHub Actions remains the source of truth for the final build gate and now includes the Chromium browser QA suites in addition to Vitest, TypeScript, production build, artifact validation, and Pages deployment.
 
 ## Practice-chip economy
 

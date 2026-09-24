@@ -51,6 +51,7 @@ describe('music engine', () => {
 
   it('unlocks both looping media elements only once and remains silent in intro', () => {
     const { engine, audios } = setup();
+    expect(audios.every((audio) => audio.loop && audio.preload === 'none')).toBe(true);
     engine.unlock();
     engine.unlock();
     expect(audios.every((audio) => audio.loop && audio.preload === 'auto')).toBe(true);
@@ -83,6 +84,24 @@ describe('music engine', () => {
     engine.sync('MENU', { ...defaultFeedbackPreferences(), music: false });
     advance(700);
     expect(engine.snapshot()).toMatchObject({ target: null, menuVolume: 0, gameplayVolume: 0 });
+  });
+
+
+  it('does not restart an in-flight fade on ordinary same-target rerenders', () => {
+    const { engine, audios, advance, callbacks } = setup();
+    const preferences = defaultFeedbackPreferences();
+    engine.unlock();
+    engine.sync('MENU', preferences);
+    advance(180);
+    const playsBefore = audios[0].playCount;
+    const pendingBefore = callbacks.size;
+
+    for (let rerender = 0; rerender < 8; rerender += 1) engine.sync('MENU', preferences);
+
+    expect(audios[0].playCount).toBe(playsBefore);
+    expect(callbacks.size).toBe(pendingBefore);
+    advance(520);
+    expect(engine.snapshot()).toMatchObject({ target: 'menu', menuVolume: preferences.volume, gameplayVolume: 0 });
   });
 
   it('cancels stale fades during rapid switching without orphan playback', () => {

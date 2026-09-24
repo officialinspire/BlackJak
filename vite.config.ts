@@ -14,6 +14,7 @@ export const CONTENT_SECURITY_POLICY = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self'",
+  "media-src 'self'",
   "connect-src 'self'",
   "manifest-src 'self'",
   "worker-src 'self'",
@@ -21,6 +22,16 @@ export const CONTENT_SECURITY_POLICY = [
   "base-uri 'self'",
   "form-action 'none'",
 ].join('; ');
+
+/**
+ * URL-safe asset names: the source MP3s have spaces and an apostrophe in their
+ * names, which would otherwise ship as `Jak Gold's Table-<hash>.mp3` and need
+ * percent-encoding everywhere (HTML, service-worker cache keys, CDN logs).
+ */
+export function safeAssetName(name: string): string {
+  const stem = name.replace(/^.*[\\/]/, '').replace(/\.[^.]+$/, '');
+  return stem.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'asset';
+}
 
 const contentSecurityPolicy = (): Plugin => ({
   name: 'blackjak-csp',
@@ -36,6 +47,11 @@ export default defineConfig({
   plugins: [contentSecurityPolicy()],
   build: {
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        assetFileNames: (asset) => `assets/${safeAssetName(asset.names[0] ?? 'asset')}-[hash][extname]`,
+      },
+    },
   },
   test: {
     // Process CSS so tests can read stylesheets via `?raw` (Vitest blanks CSS by default).

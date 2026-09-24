@@ -14,7 +14,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: read
       pages: write
@@ -50,6 +50,40 @@ jobs:
           test -f dist/manifest.webmanifest
           test -f dist/icons/icon-192.png
           test -f dist/icons/icon-512.png
+
+      - name: Install browser QA runtime
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Browser integration QA
+        timeout-minutes: 8
+        env:
+          PW: ${{ github.workspace }}/node_modules/playwright
+          S: /tmp/blackjak-qa
+        shell: bash
+        run: |
+          mkdir -p "$S"
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/blackjak-preview.log 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+
+          ready=false
+          for attempt in {1..40}; do
+            if curl --fail --silent --show-error http://127.0.0.1:4173/BlackJak/ > /dev/null; then
+              ready=true
+              break
+            fi
+            sleep .25
+          done
+          if [ "$ready" != "true" ]; then
+            cat /tmp/blackjak-preview.log
+            exit 1
+          fi
+
+          node scripts/qa/browser-qa.cjs
+          node scripts/qa/gameplay-pwa-qa.cjs
+          node scripts/qa/refresh-qa.cjs
 
       - name: Check GitHub Pages availability
         if: github.event_name != 'pull_request'
