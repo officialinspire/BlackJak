@@ -1,0 +1,29 @@
+.startup {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  width: 100%;
+  min-height: 100dvh;
+  background: #000;
+  color: var(--cream);
+}
+
+.startup-awaiting {
+  display: grid;
+  place-items: center;
+  padding: max(1.25rem, env(safe-area-inset-top)) max(1.25rem, env(safe-area-inset-right)) max(1.25rem, env(safe-area-inset-bottom)) max(1.25rem, env(safe-area-inset-left));
+  text-align: center;
+}
+
+.startup-lockup { display: grid; justify-items: center; gap: clamp(.75rem, 3vh, 1.5rem); width: min(100%, 52rem); }
+.startup-logo { width: clamp(5rem, 14vw, 8rem); height: auto; object-fit: contain; }
+.startup-presents { margin: 0; color: var(--gold); font-size: clamp(.65rem, 2vw, .9rem); font-weight: 800; letter-spacing: .3em; text-transform: uppercase; }
+.startup-lockup h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(3.5rem, 15vw, 9rem); line-height: .85; letter-spacing: -.06em; text-shadow: 0 0 4rem rgba(212, 175, 55, .2); }
+.startup-action, .startup-skip { min-width: 44px; min-height: 44px; border: 1px solid rgba(212, 175, 55, .7); border-radius: 999px; background: #17130c; color: var(--cream); font-weight: 800; letter-spacing: .08em; }
+.startup-action { width: min(100%, 30rem); padding: .9rem 1.25rem; font-size: clamp(.7rem, 2.5vw, .9rem); }
+.startup-action:hover, .startup-skip:hover { border-color: var(--gold); background: #29200f; }
+
+.startup-intro { display: grid; place-items: center; overflow: hidden; }
+.startup-video { display: block; width: 100%; height: 100%; max-width: 100vw; max-height: 100dvh; object-fit: contain; background: #000; }
+.startup-skip { position: fixed; z-index: 1; right: max(1rem, env(safe-area-inset-right)); bottom: max(1rem, env(safe-area-inset-bottom)); padding: .65rem 1.15rem; background: rgba(9, 9, 9, .82); }
+

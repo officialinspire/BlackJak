@@ -16,8 +16,6 @@ type AudioWindow = typeof window & { webkitAudioContext?: typeof AudioContext };
 
 class FeedbackEngine {
   private context: AudioContext | null = null;
-  private ambience: OscillatorNode[] = [];
-  private ambienceGain: GainNode | null = null;
 
   private ensureContext(): AudioContext | null {
     if (typeof window === 'undefined') return null;
@@ -73,45 +71,6 @@ class FeedbackEngine {
     }
   }
 
-  syncAmbience(preferences: FeedbackPreferences, active = true): void {
-    const shouldPlay = active && preferences.master && preferences.ambience && preferences.volume > 0;
-    if (!shouldPlay) {
-      this.stopAmbience();
-      return;
-    }
-    if (this.ambience.length > 0) {
-      if (this.ambienceGain) this.ambienceGain.gain.value = preferences.volume * 0.018;
-      return;
-    }
-
-    const context = this.ensureContext();
-    if (!context) return;
-    this.activate();
-
-    const gain = context.createGain();
-    gain.gain.value = preferences.volume * 0.018;
-    gain.connect(context.destination);
-    this.ambienceGain = gain;
-
-    for (const [frequency, type] of [[55, 'sine'], [82.41, 'triangle']] as const) {
-      const osc = context.createOscillator();
-      osc.type = type;
-      osc.frequency.value = frequency;
-      osc.connect(gain);
-      osc.start();
-      this.ambience.push(osc);
-    }
-  }
-
-  stopAmbience(): void {
-    for (const osc of this.ambience) {
-      try { osc.stop(); } catch { /* already stopped */ }
-      osc.disconnect();
-    }
-    this.ambience = [];
-    this.ambienceGain?.disconnect();
-    this.ambienceGain = null;
-  }
 }
 
 export const feedbackEngine = new FeedbackEngine();

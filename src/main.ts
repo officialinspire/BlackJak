@@ -13,12 +13,24 @@ import './styles/dialogue-panel.css';
 import './styles/menu-board.css';
 import './styles/dock.css';
 import './styles/fx.css';
+import './styles/startup.css';
+import './styles/game-footer.css';
 import { registerPWA } from './pwa/register';
 import { initializeUI } from './ui/render';
+import { feedbackEngine } from './feedback/feedback';
+import { StartupController } from './startup/startup';
+import { musicEngine } from './audio/music';
 
 function boot(): void {
   try {
-    initializeUI();
+    const root = document.querySelector<HTMLElement>('#app');
+    if (!root) throw new Error('App root #app was not found.');
+    new StartupController({
+      root,
+      unlockAudio: () => feedbackEngine.activate(),
+      unlockMedia: () => musicEngine.unlock(),
+      onGameReady: initializeUI,
+    }).mount();
   } catch (error) {
     const root = document.querySelector<HTMLElement>('#app');
     if (root) {

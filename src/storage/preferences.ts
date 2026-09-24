@@ -5,8 +5,8 @@ const PREFERENCES_KEY = 'feedback-preferences';
 
 export const defaultFeedbackPreferences = (): FeedbackPreferences => ({
   master: true,
+  music: true,
   sfx: true,
-  ambience: false,
   haptics: true,
   volume: 0.65,
 });
@@ -18,8 +18,8 @@ export function loadFeedbackPreferences(): FeedbackPreferences {
 
   return {
     master: stored.master !== false,
+    music: stored.music !== false,
     sfx: stored.sfx !== false,
-    ambience: stored.ambience === true,
     haptics: stored.haptics !== false,
     volume: typeof stored.volume === 'number' && Number.isFinite(stored.volume)
       ? Math.max(0, Math.min(1, stored.volume))

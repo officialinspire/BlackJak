@@ -56,6 +56,8 @@ import { escapeIntent, isTableScreen, pauseMenuMarkup } from './pause-menu';
 import { dialoguePanelMarkup, type PanelStatus } from './dialogue-panel';
 import { dealerMarkup } from './dealer';
 import type { DealerAction } from '../data/dealer-visuals';
+import { gameFooterMarkup } from './game-footer';
+import { musicEngine, musicStateForScreen } from '../audio/music';
 
 interface AppModel {
   screen: AppScreen;
@@ -311,7 +313,7 @@ function deckThemeSettingMarkup(): string {
 function persistPreferences(preferences: FeedbackPreferences): void {
   model.preferences = preferences;
   saveFeedbackPreferences(preferences);
-  feedbackEngine.syncAmbience(preferences, true);
+  musicEngine.sync(musicStateForScreen(model.screen), preferences);
 }
 
 function feedback(cue: FeedbackCue, vibration: HapticCue | null = 'tap'): void {
@@ -422,12 +424,13 @@ function menuMarkup(): string {
       </div>
       <div class="menu-bankroll" aria-label="Saved Classic BlackJak bankroll">Practice chips <strong>${formatChips(model.profile.chips)}</strong></div>
       <p class="fine-print">Fictional practice chips only. No purchases, cash-out, or real-money wagering.</p>
+      ${gameFooterMarkup()}
     </main>`;
 }
 
 function settingsMarkup(): string {
   const prefs = model.preferences;
-  const toggle = (key: 'master' | 'sfx' | 'ambience' | 'haptics', label: string, copy: string): string => `
+  const toggle = (key: 'master' | 'music' | 'sfx' | 'haptics', label: string, copy: string): string => `
     <div class="setting-row">
       <span><strong>${label}</strong><small>${copy}</small></span>
       <button class="setting-toggle ${prefs[key] ? 'is-on' : ''}" data-setting-toggle="${key}" aria-pressed="${prefs[key]}">${prefs[key] ? 'ON' : 'OFF'}</button>
@@ -443,19 +446,20 @@ function settingsMarkup(): string {
         <div class="settings-list">
           ${deckThemeSettingMarkup()}
           <div class="setting-row"><span><strong>Motion</strong><small>Animations follow your device's reduced-motion preference.</small></span><b>System</b></div>
-          ${toggle('master', 'Master feedback', 'Master switch for synthesized sound and haptic feedback.')}
+          ${toggle('master', 'Master feedback', 'Master switch for music, sound effects, and haptic feedback.')}
+          ${toggle('music', 'Music', 'Looping menu and gameplay background music.')}
           ${toggle('sfx', 'Sound effects', 'Cards, chips, buttons, results, and achievement stings.')}
-          ${toggle('ambience', 'Room ambience', 'Very quiet synthesized table-room hum after a user gesture.')}
           ${toggle('haptics', 'Haptics', 'Defensive mobile vibration feedback where supported.')}
           <div class="setting-row volume-setting">
-            <span><strong>Volume</strong><small>Synthesized sound level. The game remains fully usable muted.</small></span>
+            <span><strong>Volume</strong><small>Music and sound-effect level. The game remains fully usable muted.</small></span>
             <label><span>${Math.round(prefs.volume * 100)}%</span><input type="range" min="0" max="100" step="5" value="${Math.round(prefs.volume * 100)}" data-setting-volume aria-label="Sound volume"></label>
           </div>
           <div class="setting-row"><span><strong>Dealer commentary</strong><small>Reactive Jak lines are enabled and never block play.</small></span><b>On</b></div>
           <div class="setting-row"><span><strong>Classic rules</strong><small>3:2 blackjack · dealer stands on soft 17.</small></span><b>Locked</b></div>
         </div>
-        <p class="panel-footnote">Browser autoplay rules require a tap/click before audio can begin. No external audio files are used in this build.</p>
+        <p class="panel-footnote">Browser autoplay rules require a tap/click before music or sound effects can begin.</p>
       </section>
+      ${gameFooterMarkup()}
     </main>`;
 }
 
@@ -509,6 +513,7 @@ function statsMarkup(): string {
         </div>
         <p class="stats-note">Split hands are counted individually in win/loss statistics.</p>
       </section>
+      ${gameFooterMarkup()}
     </main>`;
 }
 
@@ -771,6 +776,7 @@ function classicMarkup(): string {
       })}
 
       <h1 class="visually-hidden">Classic BlackJak</h1>
+      ${gameFooterMarkup('compact')}
       ${tableDockFor(view, false)}
       ${achievementToastMarkup()}
     </main>`;
@@ -795,6 +801,7 @@ function houseMarkup(): string {
       })}
 
       ${houseModifierStripMarkup()}
+      ${gameFooterMarkup('compact')}
       ${tableDockFor(view, true)}
       ${achievementToastMarkup()}
     </main>`;
@@ -1208,6 +1215,7 @@ function dailyMarkup(): string {
         ${!completed && !round ? '<button class="primary-action" data-action="start-daily">Play Today\'s Hand</button>' : ''}
         ${model.dailyShareStatus ? `<p class="daily-share-status" role="status">${escapeHtml(model.dailyShareStatus)}</p>` : ''}
       </section>
+      ${gameFooterMarkup()}
     </main>`;
 }
 
@@ -1265,7 +1273,6 @@ function goToScreen(screen: AppScreen): void {
   }
   model.screen = screen;
   model.error = null;
-  feedbackEngine.syncAmbience(model.preferences, true);
   render();
 }
 
@@ -1392,6 +1399,8 @@ function render(options: RenderOptions = {}): void {
       break;
   }
 
+  musicEngine.sync(musicStateForScreen(model.screen), model.preferences);
+
   // Dealer gestures are one-shot: later re-renders show the dialogue pose only.
   model.dealerCue = null;
   app().querySelector('#app-main')?.classList.toggle('is-static-render', Boolean(options.staticTable));
@@ -1467,7 +1476,7 @@ function bindEvents(): void {
     element.addEventListener('click', () => {
       if (!element.isConnected) return;
       feedbackEngine.activate();
-      const key = element.dataset.settingToggle as 'master' | 'sfx' | 'ambience' | 'haptics' | undefined;
+      const key = element.dataset.settingToggle as 'master' | 'music' | 'sfx' | 'haptics' | undefined;
       if (!key) return;
       const next = { ...model.preferences, [key]: !model.preferences[key] };
       persistPreferences(next);
