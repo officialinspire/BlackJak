@@ -39,7 +39,7 @@ function installMemoryStorage(): void {
   });
 }
 
-describe('BlackJak v0.1.0 release smoke', () => {
+describe('BlackJak release smoke (rules unchanged since v0.1.0)', () => {
   it('boots from safe fresh defaults and can recover a zero-chip profile', () => {
     const fresh = defaultProfile();
 

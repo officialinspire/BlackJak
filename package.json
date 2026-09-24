@@ -1,7 +1,7 @@
 {
   "name": "blackjak",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -17,7 +17,7 @@
     "vite": "7.1.7",
     "vitest": "3.2.4"
   },
-  "description": "Mobile-first BlackJak demo: classic blackjack, Jak's House arcade rules, local progression, Daily Hand, and offline PWA support.",
+  "description": "Mobile-first BlackJak visual demo: illustrated table, reactive Jak dealer NPC, three sprite card decks, classic blackjack, Jak's House arcade rules, local progression, Daily Hand, and offline PWA support.",
   "engines": {
     "node": ">=22"
   }

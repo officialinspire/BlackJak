@@ -2,7 +2,9 @@
 
 All notable changes to BlackJak are documented here.
 
-## [Unreleased]
+## [0.2.0] — 2026-09-24 — Visual Demo
+
+The illustrated art set replaces the CSS-drawn presentation. Blackjack rules, odds, payouts and saved progress are unchanged; existing v0.1.0 saves load as-is.
 
 ### Added
 - Visual atlas for the art sheets: explicitly measured `SpriteRect`s for 19 dealer poses, 3 × 55 card cells, and menu/dialogue/table layout regions (`src/data/visual-atlas.ts`).

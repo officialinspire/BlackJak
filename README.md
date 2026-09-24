@@ -6,9 +6,23 @@ BlackJak is a mobile-first blackjack game from OFFICIAL INSPIRE, inspired in per
 
 ## Current status
 
-**BlackJak Demo v0.1.0 release candidate. Prompts 0–11 are implemented, including Classic play, Jak's House, local progression, Daily Hand, audio/haptics, accessibility/mobile QA, offline PWA support, release smoke coverage, and CI validation.**
+**BlackJak Visual Demo v0.2.0.** v0.1.0 delivered the full game: Classic play, Jak's House, local progression, Daily Hand, audio/haptics, accessibility, offline PWA and CI. v0.2.0 dresses it in the illustrated art set:
 
-Current demo features:
+- the **illustrated table** (`blackjak-table.png`) as a shared, responsive game scene for Classic and Jak's House
+- **Jak as a reactive dealer NPC**, with 19 sprite poses driven by dialogue events plus deal, draw and chip gestures
+- **three sprite card decks**: Standard, Jak's Cosmic and Inspire Mono, chosen in Settings, the HUD or the pause menu
+- a **wooden dialogue/status bar** for Jak's lines, the game status, results and REP
+- a **graphical main menu and in-game pause board** built from `menu-bar.png`
+- a game-first table shell: compact HUD, sticky action dock, immediate Deal again, and restrained game feel
+- optimized WebP runtime art (2.9MB, down from 13.8MB), fully precached for offline play
+
+| Desktop table | Pause board | Mobile (Jak's Cosmic deck) | Jak's House (Inspire Mono) |
+|---|---|---|---|
+| ![Classic table on desktop](docs/screenshots/desktop-classic.jpg) | ![Pause board](docs/screenshots/desktop-pause.jpg) | ![Mobile Classic with Jak deck](docs/screenshots/mobile-classic-jak-deck.jpg) | ![Mobile Jak's House with Inspire deck](docs/screenshots/mobile-house-inspire-deck.jpg) |
+
+More in [`docs/screenshots/`](docs/screenshots/). Blackjack rules and odds are unchanged from v0.1.0.
+
+Core game features:
 
 - Vite + TypeScript foundation
 - responsive mobile-first black/gold table UI
@@ -40,7 +54,7 @@ Current demo features:
 - data-driven Jak dealer commentary with 90+ original short reactions across 23 gameplay contexts
 - weighted dialogue selection with recent-line anti-repeat memory
 - reactions for blackjacks, dealer blackjacks, wins/losses, pushes, risky hits, doubles, splits, streaks, busts, refills, and return visits
-- compact JG monogram dealer identity placeholder; no unapproved photo likeness or cloned voice
+- Jak dealer NPC from the project's own illustrated sprite sheet; no photo likeness or cloned voice
 - commentary stays non-blocking and updates as a subtitle/status layer during play
 - persistent REP progression that never changes card odds or dealer behavior
 - REP rewards for wins, natural BlackJak, successful doubles, split sweeps, five-card wins, and survived risky hits
@@ -94,7 +108,7 @@ Current demo features:
 
 See **[BlackJak-Development-Prompts.md](./BlackJak-Development-Prompts.md)**.
 
-Prompt 11 is complete. The demo is at **v0.1.0 release-candidate** status; post-demo expansion work remains intentionally out of scope until this build is stable.
+Prompts 0–11 delivered the v0.1.0 game. The visual-development phase (atlas, scene, Jak NPC, sprite decks, dialogue bar, menu board, shell, game feel and QA) is v0.2.0.
 
 ## Controls
 
@@ -109,7 +123,7 @@ Touch/click controls are always available. Keyboard users can Tab / Shift+Tab th
 
 ## Local progression and saves
 
-BlackJak stores chips, REP, achievements, stats, Daily Hand completion, and feedback settings locally in the browser. There is no account or backend requirement in v0.1.0. Clearing browser/site data removes that local progress.
+BlackJak stores chips, REP, achievements, stats, Daily Hand completion, and feedback settings locally in the browser. There is no account or backend requirement. Clearing browser/site data removes that local progress.
 
 REP is a progression score only. It never changes deck order, odds, dealer behavior, or Classic blackjack payouts.
 
@@ -145,7 +159,7 @@ npm run build
 npm run release:check
 ```
 
-`npm run release:check` is the v0.1.0 release gate and runs the complete test suite, explicit TypeScript validation, and the production PWA build.
+`npm run release:check` is the release gate and runs the complete test suite, explicit TypeScript validation, and the production PWA build.
 
 ## Project structure
 
@@ -422,19 +436,19 @@ The PNG sheets at the repository root (`blackjak-sprite-sheet.png`, `blackjak-ta
 - **Single-player/local-first demo:** no multiplayer, backend account system, cloud save, or global leaderboard.
 - **Browser-local persistence:** clearing site data removes chips, REP, stats, achievements, Daily completion, and settings.
 - **Classic v1 scope:** no insurance, surrender, side bets, or real-money functionality.
-- **Jak collaboration assets:** the current JG presentation is a placeholder-safe identity treatment; no unapproved photo likeness or cloned voice is included.
+- **Art notes:** the Inspire deck's 7♠, 7♥ and 7♣ are misdrawn in the source sheet (six pips); they render as a drawn fallback face until the art is corrected. Jak's shuffling pose isn't used by any mood yet.
 - **PWA deployment dependency:** GitHub Pages must be enabled once in repository settings before the production URL can deploy.
-- **Automated browser E2E:** v0.1.0 uses deterministic engine/state tests plus GitHub Actions production-build validation; a full cross-browser/device automation lab is a future improvement.
+- **Automated browser E2E:** CI runs the unit/integration suite and the production build gate; the Playwright checks in `scripts/qa/` are run manually (Chromium only).
 
-## Roadmap after v0.1.0
+## Roadmap after v0.2.0
 
-Post-demo work is intentionally deferred until the release candidate is stable. Potential later work includes approved Jak Gold voice/likeness assets, additional dealer rooms, cosmetic card/chip themes, expanded House modifiers, richer Daily analytics, multiplayer/pass-and-play experiments, cloud saves, leaderboards, seasonal events, and deeper achievement content.
+Potential later work includes corrected Inspire sevens, a Daily Hand screen on the illustrated scene, voice assets, additional dealer rooms, cosmetic card/chip themes, expanded House modifiers, richer Daily analytics, multiplayer/pass-and-play experiments, cloud saves, leaderboards, seasonal events, and deeper achievement content.
 
 See **[BlackJak-Development-Prompts.md](./BlackJak-Development-Prompts.md)** for the original staged development roadmap and **[CHANGELOG.md](./CHANGELOG.md)** for release history.
 
 ## Release validation
 
-The v0.1.0 release-candidate pass reviews package scripts/dependencies, PWA configuration, deployment behavior, TODO/scaffold residue, repository assets, TypeScript diagnostics, test output, and production-build output.
+The release pass reviews package scripts/dependencies, PWA configuration, deployment behavior, TODO/scaffold residue, repository assets, TypeScript diagnostics, test output, and production-build output.
 
 A dedicated release-smoke suite covers:
 - fresh profile/default bankroll and zero-chip refill
@@ -458,7 +472,7 @@ BlackJak is an entertainment game using **fictional practice chips and REP only*
 
 - **Design, development, and publishing:** OFFICIAL INSPIRE
 - **Jak Gold collaboration credit:** *Placeholder — replace with approved collaboration / likeness / voice credit before any build using those assets.*
-- The current v0.1.0 build uses original/project-safe interface art, a JG monogram placeholder, browser-synthesized audio, and no unapproved cloned voice or photo likeness.
+- The v0.2.0 build uses the project's illustrated art sheets (table, Jak sprites, card decks, dialogue bar, menu board), browser-synthesized audio, and no photo likeness or cloned voice.
 
 ## OFFICIAL INSPIRE
 
