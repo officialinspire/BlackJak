@@ -20,6 +20,8 @@ All notable changes to BlackJak are documented here.
 - Game-first table shell: compact HUD (menu, chips, REP/title, deck), fixed-height action dock (`src/ui/table-dock.ts`, `src/styles/dock.css`) that is sticky on phones, immediate Deal again, clear enabled/disabled states, a compact Jak's House modifier strip, and deal-in animation limited to new cards.
 - Game feel (`src/ui/fx.ts`, `src/styles/fx.css`): card slide and hole-card flip, chip bounce, action flash, blackjack pop and win lift, bust impact, dialogue panel arrival and line fade, dealer reaction squash, and achievement pop. All effects are 120–500ms one-shot cues and are off with reduced motion.
 - A stale double-tap guard on the dock (260ms after the controls change shape; pointer only).
+- Optimized runtime art: WebP copies of the seven sheets, generated from the untouched PNG sources (`scripts/optimize-assets.py`). Download weight drops from 13.8MB to 2.9MB, and the dealer sheet's overlapping-pose pixels are cleared.
+- `scripts/verify-dist.mjs` build gate (precache completeness, referenced assets, no raw PNGs, image budget) and repeatable Playwright QA scripts in `scripts/qa/`.
 
 ### Known art issues
 - In the Inspire deck, 7♠, 7♥ and 7♣ show six pips. They're flagged in `CARD_ART_ISSUES` and render as the drawn face until the art is fixed.
@@ -34,6 +36,8 @@ All notable changes to BlackJak are documented here.
 - The dealer total now sits beside the dealer's cards. Dealer cards are slightly smaller on tall frames so Jak's face stays visible, and the empty dealer placeholder is gone.
 
 ### Fixed
+- The empty scene overlay layer covered the whole felt and intercepted taps on the cards.
+- Dealer poses showed slivers of neighbouring poses (a red card corner, part of an arm) at the edges of their frame.
 - The bust shake, dialogue line fade and achievement toast no longer replay on every re-render.
 - The primary button no longer turns dark-on-dark while hovered (a sticky hover after a tap made Deal again look disabled).
 - Sticky positioning on table screens (`overflow-x: clip` instead of `hidden`).

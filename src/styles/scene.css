@@ -107,7 +107,13 @@
 
 .scene-npc { z-index: 1; }
 .scene-cards { z-index: 2; }
-.scene-ui { z-index: 3; }
+.scene-ui {
+  z-index: 3;
+  /* Empty overlay layer: must not swallow taps meant for the cards beneath. */
+  pointer-events: none;
+}
+
+.scene-ui > * { pointer-events: auto; }
 
 /* ---- Anchors (normalized table coordinates) ---- */
 

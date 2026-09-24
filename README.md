@@ -382,6 +382,25 @@ Jak's lines, the gameplay status, round results and REP notes share one `Dialogu
 
 All text is semantic HTML over the art: speaker tab, commentary line, and one compact status/result line. That status line is the only live region, so a result such as "PAID +25 chips +50 REP" is announced once; Jak's commentary is visible but not live, as before. The panel has no focusable parts and never waits, so play is never paused. With reduced motion, the line fade is off; with forced colors, the art is dropped for a plain border.
 
+### Runtime art and offline
+
+The seven original PNG sheets at the repository root stay the untouched source art. `scripts/optimize-assets.py` builds optimized WebP copies in `src/assets/runtime/`:
+
+- The pixel dimensions are identical, so every atlas coordinate still applies.
+- Colour is quality 92, or 95 for the card sheets because of their small corner indices. Alpha is lossless.
+- On the dealer sheet, pixels from neighbouring poses that overlap inside each pose's rect are cleared, so no pose shows slivers of another.
+
+Weight falls from 13.8MB to 2.9MB. A manifest records each source PNG's SHA-256, and `tests/runtime-assets.test.ts` fails if a PNG changes without the WebP being regenerated.
+
+`npm run build` ends with `scripts/verify-dist.mjs`, which fails the build if:
+
+- any file in dist is missing from the service-worker precache, or any referenced asset is missing
+- any of the seven sheets isn't present as WebP
+- a raw source PNG is shipped
+- image weight goes over budget (4.5MB total, 900KB per image)
+
+Browser QA scripts for layout, keyboard, reduced motion, mute, refresh, corrupt storage, offline and PWA update are in `scripts/qa/`.
+
 ### Card decks
 
 Cards are drawn from the three deck sheets through a strict `Card {rank, suit}` → sprite mapping in `src/data/card-atlas.ts` (52 faces plus a back per deck). Every face was checked by eye: the corner index (rank and suit) matches its key in all three sheets, and pip counts were counted on every number card. The Inspire deck orders its rows ♠ ♥ ♣ ♦ and prints all suits in black.

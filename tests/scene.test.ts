@@ -122,3 +122,10 @@ describe('game scene component', () => {
     expect(markup).not.toMatch(/(left|top|bottom):\s*\d/);
   });
 });
+
+describe('scene layering', () => {
+  it('keeps the empty UI overlay from swallowing taps on the cards', () => {
+    expect(sceneCss).toMatch(/\.scene-ui\s*{[^}]*pointer-events:\s*none/);
+    expect(sceneCss).toMatch(/\.scene-ui > \*\s*{\s*pointer-events:\s*auto/);
+  });
+});
