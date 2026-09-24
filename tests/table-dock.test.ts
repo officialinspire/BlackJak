@@ -115,3 +115,13 @@ describe('Run It Back visibility', () => {
     expect(rule).toContain('color: #1a1204');
   });
 });
+
+describe('House modifier pills', () => {
+  it('render as gold chips with dark text, the active one brighter', async () => {
+    const buttonsCss = (await import('../src/styles/buttons.css?raw')).default;
+    const rules = buttonsCss.slice(buttonsCss.indexOf('.house-strip .house-modifier-pill {'));
+    expect(rules).toMatch(/\.house-strip \.house-modifier-pill \{[^}]*#e9bd55/);
+    expect(rules).toMatch(/\.house-strip \.house-modifier-pill strong \{[^}]*#1a1204/);
+    expect(rules).toMatch(/\.house-strip \.house-modifier-pill\.is-active \{[^}]*#ffe38a/);
+  });
+});
