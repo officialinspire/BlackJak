@@ -17,6 +17,7 @@ const slots = (mode: GameSceneSlots['mode']): GameSceneSlots => ({
   label: `${mode} table`,
   hud: '<div id="hud-slot"></div>',
   npc: '<div id="npc-slot"></div>',
+  shoe: '<div id="shoe-slot"></div>',
   dealerHand: '<div id="dealer-slot"></div>',
   playerHands: '<div id="player-slot"></div>',
   dialogue: '<div id="dialogue-slot"></div>',
@@ -98,7 +99,7 @@ describe('game scene component', () => {
     // Dialogue/status bar follows the table frame.
     expect(at('scene-ui')).toBeLessThan(at('scene-dialogue-bar'));
     expect(at('scene-dialogue-bar')).toBeLessThan(at('id="dialogue-slot"'));
-    for (const id of ['hud', 'npc', 'dealer', 'player', 'dialogue', 'overlay']) expect(markup).toContain(`id="${id}-slot"`);
+    for (const id of ['hud', 'npc', 'shoe', 'dealer', 'player', 'dialogue', 'overlay']) expect(markup).toContain(`id="${id}-slot"`);
   });
 
   it('uses blackjak-table.png as a decorative base image', () => {

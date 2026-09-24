@@ -14,18 +14,40 @@
 }
 
 .playing-card.is-new {
+  --deal-from-x: clamp(26px, 9vw, 110px);
+  --deal-from-y: clamp(-150px, -16vw, -50px);
   animation: fx-card-deal var(--fx-card-deal, 200ms) cubic-bezier(.2,.8,.3,1.1) both;
   animation-delay: var(--deal-delay, 0ms);
 }
 
 .playing-card.is-moving-split {
-  animation: fx-card-split var(--fx-card-deal, 200ms) cubic-bezier(.2,.8,.3,1.1) both;
+  animation: fx-card-split var(--fx-split-move, 240ms) cubic-bezier(.2,.8,.3,1.1) both;
 }
 
 @keyframes fx-card-deal {
-  from { opacity: 0; transform: translate3d(18px, -26px, 0) rotate(4deg) scale(.94); }
+  from { opacity: 0; transform: translate3d(var(--deal-from-x), var(--deal-from-y), 0) rotate(4deg) scale(.94); }
   70% { opacity: 1; }
   to { opacity: 1; transform: none; }
+}
+
+[data-visual-id*=':dealer:'].playing-card.is-new {
+  --deal-from-x: clamp(20px, 6vw, 72px);
+  --deal-from-y: clamp(-70px, -8vw, -28px);
+}
+
+.fx-shuffle .deck-shoe > span:first-child { animation: fx-shuffle-left var(--fx-shuffle, 360ms) ease-in-out both; }
+.fx-shuffle .deck-shoe > span:last-child { animation: fx-shuffle-right var(--fx-shuffle, 360ms) ease-in-out both; }
+.fx-shuffle .playing-card.is-new { animation-delay: calc(var(--deal-delay, 0ms) + 180ms); }
+.fx-action-split .playing-card.is-new { animation-delay: calc(var(--deal-delay, 0ms) + 220ms); }
+
+@keyframes fx-shuffle-left {
+  0%, 100% { transform: translate(-4px, 2px) rotate(-3deg); }
+  45% { transform: translate(-14px, -3px) rotate(-9deg); }
+}
+
+@keyframes fx-shuffle-right {
+  0%, 100% { transform: translate(3px, -2px) rotate(2deg); }
+  55% { transform: translate(14px, 2px) rotate(8deg); }
 }
 
 @keyframes fx-card-split {
@@ -113,6 +135,12 @@
 
 .fx-result .player-hand.is-win .playing-card {
   animation: fx-win-lift var(--fx-result-pop, 450ms) ease-out both;
+}
+
+.fx-result .player-hand.is-win .playing-card,
+.fx-result .player-hand.is-blackjack .playing-card,
+.fx-result .dialogue-panel-status {
+  animation-delay: 340ms;
 }
 
 @keyframes fx-blackjack-pop {
@@ -224,6 +252,7 @@
   .game-scene .playing-card,
   .playing-card,
   .card-flipper,
+  .deck-shoe > span,
   .fx-bust .player-hand.is-bust,
   .fx-result .player-hand.is-bust,
   .fx-result .player-hand .playing-card,

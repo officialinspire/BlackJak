@@ -569,7 +569,9 @@ function playerHandsMarkup(round: RoundState | null, house: HouseState | null = 
             const splitSourceId = index > 0 && cardIndex === 0
               ? cardVisualId(model.roundSerial, 'player', round.hands[index - 1].id, 1)
               : undefined;
-            const dealOrder = round.hands.length === 1 && cardIndex === 1 ? 2 : 0;
+            const dealOrder = round.hands.length === 1 && cardIndex === 1
+              ? 2
+              : round.hands.length > 1 && cardIndex > 0 ? index + 1 : 0;
             const plan = planCard('player', hand.id, cardIndex, card, false, dealOrder, splitSourceId);
             return cardMarkup(card, false, 0, house && isGoldCard(house, hand.id, cardIndex) ? 'gold' : 'standard', undefined, plan);
           }).join('')}</div>
@@ -700,13 +702,19 @@ function dealerNpcMarkup(house: boolean): string {
   return dealerMarkup({ event: model.commentary.event, seed: model.commentary.text, action: model.dealerCue, house });
 }
 
+function deckShoeMarkup(): string {
+  const back = cardMarkup({ rank: 'A', suit: 'spades' }, true, 0, 'standard', model.visual.cardTheme, false);
+  return `<div class="deck-shoe" aria-hidden="true"><span>${back}</span><span>${back}</span></div>`;
+}
+
 function dealerHandMarkup(view: TableView): string {
   const dealerCards = view.round?.dealer ?? [];
   return `
     <div class="dealer-hand-row">
       <div class="cards dealer-cards" aria-label="Dealer cards">${dealerCards.map((card, index) => {
         const hidden = index === 1 && !view.revealDealer;
-        const plan = planCard('dealer', 'dealer', index, card, hidden, index === 0 ? 1 : index === 1 ? 3 : 0);
+        const dealOrder = index === 0 ? 1 : index === 1 ? 3 : 4 + (index - 2) * 2;
+        const plan = planCard('dealer', 'dealer', index, card, hidden, dealOrder);
         return cardMarkup(card, hidden, 0, 'standard', undefined, plan);
       }).join('')}</div>
       ${dealerCards.length ? `<strong class="dealer-total" aria-label="${view.revealDealer ? `Dealer total ${view.dealerTotal}` : 'Dealer total hidden'}">${view.dealerTotal}</strong>` : ''}
@@ -717,7 +725,7 @@ function dailyDealerCardsMarkup(round: RoundState, revealDealer: boolean): strin
   return round.dealer.map((card, index) => {
     const hidden = index === 1 && !revealDealer;
     return cardMarkup(card, hidden, 0, 'standard', undefined,
-      planCard('dealer', 'dealer', index, card, hidden, index === 0 ? 1 : index === 1 ? 3 : 0));
+      planCard('dealer', 'dealer', index, card, hidden, index === 0 ? 1 : index === 1 ? 3 : 4 + (index - 2) * 2));
   }).join('');
 }
 
@@ -756,6 +764,7 @@ function classicMarkup(): string {
         label: 'Classic BlackJak table',
         hud: sceneHudMarkup(),
         npc: dealerNpcMarkup(false),
+        shoe: deckShoeMarkup(),
         dealerHand: dealerHandMarkup(view),
         playerHands: playerHandsMarkup(round),
         dialogue: sceneDialogueMarkup(view, false),
@@ -779,6 +788,7 @@ function houseMarkup(): string {
         label: "Jak's House arcade blackjack table",
         hud: sceneHudMarkup(`<span class="house-hud-pill">HOUSE <strong>H${model.house.roundNumber || '—'}</strong></span>`),
         npc: dealerNpcMarkup(true),
+        shoe: deckShoeMarkup(),
         dealerHand: dealerHandMarkup(view),
         playerHands: playerHandsMarkup(round, model.house),
         dialogue: sceneDialogueMarkup(view, true),
@@ -867,7 +877,7 @@ function dealRound(): void {
   try {
     model.round = startRound(stake);
     model.roundSerial += 1;
-    cueFx('deal');
+    cueFx('shuffle', 'deal');
     model.dealerCue = 'deal';
     feedback('deal', 'deal');
     if (model.round.phase === 'resolved') {
@@ -911,7 +921,7 @@ function dealHouseRound(): void {
     model.house = started.house;
     model.round = started.round;
     model.roundSerial += 1;
-    cueFx('deal');
+    cueFx('shuffle', 'deal');
     model.dealerCue = 'deal';
     feedback('deal', 'deal');
 
@@ -942,7 +952,7 @@ function runHouseReplay(): void {
     model.house = replay.house;
     model.round = replay.round;
     model.roundSerial += 1;
-    cueFx('deal');
+    cueFx('shuffle', 'deal');
     model.dealerCue = 'deal';
     feedback('deal', 'deal');
 
@@ -1108,6 +1118,7 @@ function prepareDailyRound(): void {
   model.roundSerial += 1;
   model.lastRepEarned = 0;
   model.dailyShareStatus = null;
+  cueFx('shuffle', 'deal');
 }
 
 function completeDailyIfResolved(): void {
@@ -1161,7 +1172,7 @@ function dailyMarkup(): string {
   const result = completed && state.outcome ? state.outcome.toUpperCase() : null;
 
   return `
-    <main id="app-main" tabindex="-1" class="screen panel-screen daily-screen">
+    <main id="app-main" tabindex="-1" class="screen panel-screen daily-screen ${fxClassNames(currentFx)}" style="${fxStyleVars()}">
       <div class="ambient-lamp" aria-hidden="true"></div>
       <button class="back-button" data-screen="menu" aria-keyshortcuts="Escape">← Menu</button>
       <section class="glass-panel daily-panel">
@@ -1174,6 +1185,7 @@ function dailyMarkup(): string {
         <div class="daily-table">
           <section>
             <span>DEALER UP-CARD</span>
+            ${deckShoeMarkup()}
             <div class="cards">${dailyDealerCardsMarkup(displayRound, revealDealer)}</div>
           </section>
           <div class="daily-vs">VS</div>

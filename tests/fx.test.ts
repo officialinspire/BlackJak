@@ -80,7 +80,7 @@ describe('one-shot cues', () => {
   });
 
   it('map to screen classes', () => {
-    expect(fxClassNames(new Set(['stake:25', 'stake', 'action:hit', 'bust']))).toBe('fx-action fx-bust fx-stake');
+    expect(fxClassNames(new Set(['stake:25', 'stake', 'action:hit', 'bust']))).toBe('fx-action fx-action-hit fx-bust fx-stake fx-stake-25');
     expect(fxClassNames(new Set())).toBe('');
   });
 
