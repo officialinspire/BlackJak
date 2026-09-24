@@ -35,4 +35,15 @@ describe('Classic BlackJak session economy', () => {
     expect(refillPracticeChips({ ...defaultProfile(), chips: 0 }).chips).toBe(1000);
     expect(refillPracticeChips({ ...defaultProfile(), chips: 5 }).chips).toBe(5);
   });
+
+  it('supports a split plus double down to zero chips without mutating the refresh checkpoint', () => {
+    const checkpoint = { ...defaultProfile(), chips: 75 };
+    const afterDeal = reserveStake(checkpoint, 25);
+    const afterSplit = reserveStake(afterDeal, 25);
+    const afterDouble = reserveStake(afterSplit, 25);
+
+    expect(afterDouble.chips).toBe(0);
+    expect(checkpoint.chips).toBe(75);
+    expect(() => reserveStake(afterDouble, 25)).toThrow('Not enough');
+  });
 });

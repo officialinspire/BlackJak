@@ -75,6 +75,19 @@ export function fxClassNames(cues: ReadonlySet<string>): string {
  */
 export const INPUT_GUARD_MS = 260;
 
+/** Stable identity for the controls currently occupying the action area. */
+export function controlsStateKey(input: {
+  readonly screen: string;
+  readonly dockPhase: string | null;
+  readonly dailyPhase?: string;
+  readonly dailyHandIndex?: number;
+}): string | null {
+  if (input.screen === 'daily') {
+    return `daily:${input.dailyPhase ?? 'preview'}:${input.dailyHandIndex ?? -1}`;
+  }
+  return input.dockPhase ? `dock:${input.dockPhase}` : null;
+}
+
 export function shouldIgnoreActivation(input: {
   readonly now: number;
   readonly controlsChangedAt: number;

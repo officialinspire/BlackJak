@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allowedActions, dealerShouldHit, determineOutcome, payoutFor, type Card, type PlayerHand } from '../src/game';
+import { MAX_PLAYER_HANDS, allowedActions, dealerShouldHit, determineOutcome, payoutFor, type Card, type PlayerHand } from '../src/game';
 
 const c = (rank: Card['rank'], suit: Card['suit'] = 'clubs'): Card => ({ rank, suit });
 const hand = (cards: Card[], wager = 25): PlayerHand => ({ id: 'h1', cards, wager, status: 'active', doubled: false, fromSplit: false });
@@ -20,6 +20,11 @@ describe('actions', () => {
     expect(allowedActions(hand([c('8'), c('8')]), 25)).toEqual(['hit', 'stand', 'double', 'split']);
     expect(allowedActions(hand([c('8'), c('8')]), 10)).toEqual(['hit', 'stand']);
     expect(allowedActions(hand([c('8'), c('8'), c('2')]), 25)).toEqual(['hit', 'stand']);
+  });
+
+  it('stops offering split at the hand cap without removing double', () => {
+    expect(allowedActions(hand([c('8'), c('8')]), 25, MAX_PLAYER_HANDS)).toEqual(['hit', 'stand', 'double']);
+    expect(allowedActions(hand([c('K'), c('Q')]), 25, MAX_PLAYER_HANDS - 1)).toContain('split');
   });
 });
 
