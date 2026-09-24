@@ -10,6 +10,7 @@ import './styles/scene.css';
 import './styles/dealer.css';
 import './styles/cards.css';
 import './styles/dialogue-panel.css';
+import './styles/menu-board.css';
 import { registerPWA } from './pwa/register';
 import { initializeUI } from './ui/render';
 
@@ -41,6 +42,8 @@ registerPWA();
 
 // Dev aid: ?debugVisuals=1 opens the visual atlas inspector (lazy chunk, no game impact).
 if (new URLSearchParams(window.location.search).get('debugVisuals') === '1') {
+  // Outlines menu hit areas (menu-board.css) alongside the atlas inspector.
+  document.documentElement.classList.add('debug-visuals');
   void import('./ui/visual-atlas-inspector')
     .then(({ mountVisualAtlasInspector }) => mountVisualAtlasInspector())
     .catch((error) => console.error('Visual atlas inspector failed to load.', error));

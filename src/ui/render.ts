@@ -46,6 +46,8 @@ import { CARD_THEMES } from '../data/card-atlas';
 import { CARD_THEME_IDS, type CardThemeId } from '../data/visual-atlas';
 import { loadVisualPreferences, saveVisualPreferences } from '../storage/visual-preferences';
 import { gameSceneMarkup } from './scene';
+import { menuBoardMarkup } from './menu-board';
+import { escapeIntent, isTableScreen, pauseMenuMarkup } from './pause-menu';
 import { dialoguePanelMarkup, type PanelStatus } from './dialogue-panel';
 import { dealerMarkup } from './dealer';
 import type { DealerAction } from '../data/dealer-visuals';
@@ -72,6 +74,10 @@ interface AppModel {
   dailyShareStatus: string | null;
   /** One-shot Jak gesture for the next render (visual only). */
   dealerCue: DealerAction | null;
+  /** In-game pause board is open over the table (the round is untouched). */
+  pauseMenuOpen: boolean;
+  /** "Main Menu" was pressed once while a hand is in play; the next press leaves. */
+  pauseConfirmLeave: boolean;
 }
 
 type RoundTone = 'idle' | 'playing' | 'blackjack' | 'win' | 'loss' | 'push' | 'mixed';
@@ -90,6 +96,8 @@ const FOCUS_ATTRIBUTES = [
   'data-setting-toggle',
   'data-setting-volume',
   'data-card-theme',
+  'data-pause-action',
+  'data-pause',
   'data-screen',
 ] as const;
 
@@ -131,6 +139,8 @@ const model: AppModel = {
   dailyRound: null,
   dailyShareStatus: null,
   dealerCue: null,
+  pauseMenuOpen: false,
+  pauseConfirmLeave: false,
 };
 
 const app = (): HTMLElement => {
@@ -196,10 +206,17 @@ function clickShortcut(selector: string): boolean {
 function handleGlobalKeyboard(event: KeyboardEvent): void {
   if (event.defaultPrevented || event.repeat || event.ctrlKey || event.metaKey || event.altKey || isEditableTarget(event.target)) return;
 
-  if (event.key === 'Escape' && model.screen !== 'menu') {
-    if (clickShortcut('.back-button[data-screen="menu"]')) event.preventDefault();
+  if (event.key === 'Escape') {
+    const intent = escapeIntent(model.screen, model.pauseMenuOpen);
+    if (intent === 'open-pause') openPauseMenu();
+    else if (intent === 'close-pause') closePauseMenu();
+    else if (intent === 'back') clickShortcut('.back-button[data-screen="menu"]');
+    if (intent !== 'none') event.preventDefault();
     return;
   }
+
+  // The table is inert behind the pause board: no gameplay shortcuts while paused.
+  if (model.pauseMenuOpen) return;
 
   const key = event.key.toUpperCase();
   const action = (Object.entries(ACTION_SHORTCUTS).find(([, shortcut]) => shortcut === key)?.[0] ?? null) as PlayerAction | null;
@@ -226,9 +243,6 @@ function bindGlobalKeyboardOnce(): void {
   document.addEventListener('keydown', handleGlobalKeyboard);
   globalKeyboardBound = true;
 }
-
-const button = (label: string, screen: AppScreen): string =>
-  `<button class="menu-button" data-screen="${screen}">${label}</button>`;
 
 const formatChips = (value: number): string =>
   new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(value);
@@ -355,13 +369,18 @@ function menuMarkup(): string {
         <p class="tagline">${APP_TAGLINE}</p>
         <p class="brand-note">Private table. Fictional chips. Questionable judgment.</p>
       </section>
-      <nav class="menu-grid" aria-label="BlackJak modes">
-        ${button('Classic BlackJak · Standard', 'classic')}
-        ${button("Jak's House · Arcade", 'house')}
-        ${button('Daily Hand · Challenge', 'daily')}
-        ${button('Stats', 'stats')}
-        ${button('Settings', 'settings')}
-      </nav>
+      ${menuBoardMarkup({
+        as: 'nav',
+        label: 'BlackJak modes',
+        className: 'main-menu-board',
+        items: [
+          { slot: 'header', label: 'Classic BlackJak', detail: 'Standard rules · 3:2', attributes: 'data-screen="classic"' },
+          { slot: 'row1', label: "Jak's House", detail: 'Arcade', attributes: 'data-screen="house"' },
+          { slot: 'row2', label: 'Daily Hand', detail: 'Challenge', attributes: 'data-screen="daily"' },
+          { slot: 'row3', label: 'Stats', attributes: 'data-screen="stats"' },
+          { slot: 'row4', label: 'Settings', attributes: 'data-screen="settings"' },
+        ],
+      })}
       <div class="menu-progression" aria-label="BlackJak progression">
         <span>${title.current.name}</span>
         <b>${model.profile.rep} REP</b>
@@ -641,7 +660,7 @@ function sceneHudMarkup(modePill = ''): string {
   const progression = titleProgressForRep(model.profile.rep);
   return `
     <header class="table-header">
-      <button class="back-button" data-screen="menu" aria-keyshortcuts="Escape">← Menu</button>
+      <button type="button" class="back-button pause-button" data-pause="open" aria-haspopup="dialog" aria-expanded="${model.pauseMenuOpen}" aria-keyshortcuts="Escape">☰ Menu</button>
       <div class="hud" aria-label="Player resources and progression">
         ${modePill}
         <span>CHIPS <strong>${formatChips(model.profile.chips)}</strong></span>
@@ -1158,7 +1177,127 @@ async function shareDailyResult(): Promise<void> {
   render();
 }
 
-function render(): void {
+function goToScreen(screen: AppScreen): void {
+  model.pauseMenuOpen = false;
+  model.pauseConfirmLeave = false;
+  if (screen === 'menu' && isTableScreen(model.screen) && model.round?.phase !== 'resolved') {
+    // Abandoning an unfinished hand: the reserved stake was never saved, so nothing is charged.
+    model.profile = loadProfile();
+    model.selectedStake = model.profile.chips > 0 ? Math.min(model.selectedStake || 25, model.profile.chips) : 0;
+    if (model.screen === 'house' && model.houseCheckpoint) {
+      model.house = model.houseCheckpoint;
+      model.houseCheckpoint = null;
+    }
+  }
+  if ((screen === 'classic' || screen === 'house') && screen !== model.screen) {
+    model.round = null;
+    model.roundProgress = emptyRoundProgressionContext();
+    model.achievementToasts = [];
+    model.lastRepEarned = 0;
+    model.houseLastBonusRep = 0;
+    model.houseTokenAwarded = false;
+    say(model.profile.stats.totalHands > 0 ? 'return_player' : 'game_start');
+  }
+  if (screen === 'daily' && screen !== model.screen) {
+    prepareDailyRound();
+    if (model.dailyRound) feedback('deal', 'deal');
+  }
+  model.screen = screen;
+  model.error = null;
+  feedbackEngine.syncAmbience(model.preferences, true);
+  render();
+}
+
+const handInProgress = (): boolean => Boolean(model.round && model.round.phase !== 'resolved');
+
+function pauseOverlayMarkup(): string {
+  const progression = titleProgressForRep(model.profile.rep);
+  return pauseMenuMarkup({
+    modeLabel: model.screen === 'house' ? "Jak's House" : 'Classic',
+    chips: formatChips(model.profile.chips),
+    rep: model.profile.rep,
+    title: progression.current.name,
+    handInProgress: handInProgress(),
+    confirmLeave: model.pauseConfirmLeave,
+    deckLabel: CARD_THEMES[model.visual.cardTheme].label,
+    soundOn: model.preferences.master,
+  });
+}
+
+/**
+ * Mounts (or refreshes) the pause board beside the table without re-rendering
+ * the table, so cards don't replay their deal animation and the round is untouched.
+ */
+function mountPauseOverlay(focusAction: string | null = 'resume'): void {
+  const root = app();
+  root.querySelector('.pause-overlay')?.remove();
+  const main = root.querySelector<HTMLElement>('#app-main');
+  if (!model.pauseMenuOpen || !isTableScreen(model.screen)) {
+    if (main) main.inert = false;
+    return;
+  }
+  root.insertAdjacentHTML('beforeend', pauseOverlayMarkup());
+  if (main) main.inert = true;
+  root.querySelector('[data-pause="open"]')?.setAttribute('aria-expanded', 'true');
+  bindPauseEvents();
+  if (focusAction) root.querySelector<HTMLElement>(`.pause-overlay [data-pause-action="${focusAction}"].menu-board-item`)?.focus({ preventScroll: true });
+}
+
+function openPauseMenu(): void {
+  if (!isTableScreen(model.screen) || model.pauseMenuOpen) return;
+  model.pauseMenuOpen = true;
+  model.pauseConfirmLeave = false;
+  mountPauseOverlay('resume');
+}
+
+function closePauseMenu(): void {
+  if (!model.pauseMenuOpen) return;
+  model.pauseMenuOpen = false;
+  model.pauseConfirmLeave = false;
+  mountPauseOverlay(null);
+  const toggle = app().querySelector<HTMLElement>('[data-pause="open"]');
+  toggle?.setAttribute('aria-expanded', 'false');
+  toggle?.focus({ preventScroll: true });
+}
+
+function bindPauseEvents(): void {
+  app().querySelectorAll<HTMLElement>('.pause-overlay [data-pause-action]').forEach((element) => {
+    element.addEventListener('click', () => {
+      if (!element.isConnected) return;
+      feedbackEngine.activate();
+      const action = element.dataset.pauseAction;
+      if (action === 'resume') {
+        feedback('button', 'tap');
+        closePauseMenu();
+      } else if (action === 'deck') {
+        const index = CARD_THEME_IDS.indexOf(model.visual.cardTheme);
+        setCardTheme(CARD_THEME_IDS[(index + 1) % CARD_THEME_IDS.length]);
+        feedback('button', 'tap');
+        // Cards change, so the table re-renders; static mode skips deal animations.
+        render({ staticTable: true });
+      } else if (action === 'sound') {
+        persistPreferences({ ...model.preferences, master: !model.preferences.master });
+        feedback('button', 'tap');
+        mountPauseOverlay('sound');
+      } else if (action === 'menu') {
+        feedback('button', 'tap');
+        if (handInProgress() && !model.pauseConfirmLeave) {
+          model.pauseConfirmLeave = true;
+          mountPauseOverlay('menu');
+        } else {
+          goToScreen('menu');
+        }
+      }
+    });
+  });
+}
+
+interface RenderOptions {
+  /** Re-render without replaying card deal / dealer entrance animations. */
+  readonly staticTable?: boolean;
+}
+
+function render(options: RenderOptions = {}): void {
   const previousScreen = lastRenderedScreen;
   const activeBeforeRender = document.activeElement;
   const hadInteractiveFocus = activeBeforeRender instanceof HTMLElement && activeBeforeRender !== document.body;
@@ -1187,7 +1326,9 @@ function render(): void {
 
   // Dealer gestures are one-shot: later re-renders show the dialogue pose only.
   model.dealerCue = null;
+  app().querySelector('#app-main')?.classList.toggle('is-static-render', Boolean(options.staticTable));
   bindEvents();
+  if (model.pauseMenuOpen) mountPauseOverlay(null);
   const screenChanged = previousScreen !== null && previousScreen !== model.screen;
   lastRenderedScreen = model.screen;
   focusAfterRender(focusKey, screenChanged, hadInteractiveFocus);
@@ -1201,31 +1342,16 @@ function bindEvents(): void {
       if (!screen) return;
       feedbackEngine.activate();
       feedback('button', 'tap');
-      if (screen === 'menu' && (model.screen === 'classic' || model.screen === 'house') && model.round?.phase !== 'resolved') {
-        model.profile = loadProfile();
-        model.selectedStake = model.profile.chips > 0 ? Math.min(model.selectedStake || 25, model.profile.chips) : 0;
-        if (model.screen === 'house' && model.houseCheckpoint) {
-          model.house = model.houseCheckpoint;
-          model.houseCheckpoint = null;
-        }
-      }
-      if ((screen === 'classic' || screen === 'house') && screen !== model.screen) {
-        model.round = null;
-        model.roundProgress = emptyRoundProgressionContext();
-        model.achievementToasts = [];
-        model.lastRepEarned = 0;
-        model.houseLastBonusRep = 0;
-        model.houseTokenAwarded = false;
-        say(model.profile.stats.totalHands > 0 ? 'return_player' : 'game_start');
-      }
-      if (screen === 'daily' && screen !== model.screen) {
-        prepareDailyRound();
-        if (model.dailyRound) feedback('deal', 'deal');
-      }
-      model.screen = screen;
-      model.error = null;
-      feedbackEngine.syncAmbience(model.preferences, true);
-      render();
+      goToScreen(screen);
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-pause="open"]').forEach((element) => {
+    element.addEventListener('click', () => {
+      if (!element.isConnected) return;
+      feedbackEngine.activate();
+      feedback('button', 'tap');
+      openPauseMenu();
     });
   });
 
