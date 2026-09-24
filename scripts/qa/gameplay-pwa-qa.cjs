@@ -128,12 +128,12 @@ async function enterGame(p) {
         && ['Standard', "Jak's Cosmic", 'Inspire Mono'].every((theme) => themes.some((label) => label.includes(theme))));
 
       if (!hitChecked && await page.$('[data-action="hit"]:not([disabled])')) {
-        const count = await page.$$eval('.scene-cards [data-visual-id]', (cards) => cards.length);
+        const count = await page.$eval('.player-hands [data-visual-id]', (cards) => cards.length);
         await page.click('[data-action="hit"]');
         const result = await page.evaluate((oldCount) => ({
-          count: document.querySelectorAll('.scene-cards [data-visual-id]').length,
-          moving: document.querySelectorAll('.scene-cards [data-motion="NEW"]').length,
-          priorMoving: [...document.querySelectorAll('.scene-cards [data-motion="NEW"]')].filter((card) => Number(card.getAttribute('data-visual-id').split(':').at(-1)) < 2).length,
+          count: document.querySelectorAll('.player-hands [data-visual-id]').length,
+          moving: document.querySelectorAll('.player-hands [data-motion="NEW"]').length,
+          priorMoving: [...document.querySelectorAll('.player-hands [data-motion="NEW"]')].filter((card) => Number(card.getAttribute('data-visual-id').split(':').at(-1)) < 2).length,
         }), count);
         hitChecked = result.count === count + 1 && result.moving === 1 && result.priorMoving === 0;
       }
