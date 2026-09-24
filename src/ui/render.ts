@@ -56,6 +56,7 @@ import { escapeIntent, isTableScreen, pauseMenuMarkup } from './pause-menu';
 import { dialoguePanelMarkup, type PanelStatus } from './dialogue-panel';
 import { dealerMarkup } from './dealer';
 import type { DealerAction } from '../data/dealer-visuals';
+import { gameFooterMarkup } from './game-footer';
 
 interface AppModel {
   screen: AppScreen;
@@ -422,6 +423,7 @@ function menuMarkup(): string {
       </div>
       <div class="menu-bankroll" aria-label="Saved Classic BlackJak bankroll">Practice chips <strong>${formatChips(model.profile.chips)}</strong></div>
       <p class="fine-print">Fictional practice chips only. No purchases, cash-out, or real-money wagering.</p>
+      ${gameFooterMarkup()}
     </main>`;
 }
 
@@ -456,6 +458,7 @@ function settingsMarkup(): string {
         </div>
         <p class="panel-footnote">Browser autoplay rules require a tap/click before audio can begin. No external audio files are used in this build.</p>
       </section>
+      ${gameFooterMarkup()}
     </main>`;
 }
 
@@ -509,6 +512,7 @@ function statsMarkup(): string {
         </div>
         <p class="stats-note">Split hands are counted individually in win/loss statistics.</p>
       </section>
+      ${gameFooterMarkup()}
     </main>`;
 }
 
@@ -771,6 +775,7 @@ function classicMarkup(): string {
       })}
 
       <h1 class="visually-hidden">Classic BlackJak</h1>
+      ${gameFooterMarkup('compact')}
       ${tableDockFor(view, false)}
       ${achievementToastMarkup()}
     </main>`;
@@ -795,6 +800,7 @@ function houseMarkup(): string {
       })}
 
       ${houseModifierStripMarkup()}
+      ${gameFooterMarkup('compact')}
       ${tableDockFor(view, true)}
       ${achievementToastMarkup()}
     </main>`;
@@ -1208,6 +1214,7 @@ function dailyMarkup(): string {
         ${!completed && !round ? '<button class="primary-action" data-action="start-daily">Play Today\'s Hand</button>' : ''}
         ${model.dailyShareStatus ? `<p class="daily-share-status" role="status">${escapeHtml(model.dailyShareStatus)}</p>` : ''}
       </section>
+      ${gameFooterMarkup()}
     </main>`;
 }
 
