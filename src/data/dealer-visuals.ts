@@ -89,9 +89,9 @@ export const DEALER_ACTION_POSES: Readonly<Record<DealerAction, DealerSpriteId>>
 
 /** How long each gesture holds before the dialogue pose returns (ms). */
 export const DEALER_ACTION_MS: Readonly<Record<DealerAction, number>> = {
-  deal: 1100,
-  draw: 850,
-  chips: 950,
+  deal: 750,
+  draw: 600,
+  chips: 650,
 };
 
 // ---------------------------------------------------------------------------

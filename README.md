@@ -356,6 +356,20 @@ Tables use a compact, fixed rhythm:
 
 Enabled buttons glow and disabled ones fade to grey. On phones the dock is sticky at the bottom. On desktop and tablet, Classic fits with no scrolling from 1280×720 up, and on phones from 320×568. Jak's House rules become one line of modifier pills with a collapsible rules note. Only newly dealt cards play the deal-in animation. Sound, haptics and shortcuts (N, H, S, D, P, Esc) are unchanged. Fictional practice chips only: no purchase, deposit, cash-out, crypto or operator UI, and a test enforces this.
 
+### Game feel
+
+Short, restrained cartoon effects, each 120–500ms (`FX_TIMING` in `src/ui/fx.ts`, emitted as `--fx-*` properties for `src/styles/fx.css`):
+
+- New cards slide in from the shoe, and the dealer's hole card flips over when it's revealed.
+- Stake chips bounce when chosen, and the pressed action button flashes.
+- Blackjack gives the hand a gold pop, a win lifts the cards, and a bust gives a short knock with a red flash (no screen shake).
+- The dialogue panel slides in when you sit down, and each new Jak line fades in. Jak reacts with a quick squash-and-settle and plays his deal, draw and chips gestures.
+- Achievements pop in.
+
+Effects are one-shot cues consumed by the next render, so an ordinary re-render (choosing a stake, say) never replays a bust shake or a dialogue fade. Game state always updates first, and nothing waits on an animation. Sound and haptics are the existing WebAudio and vibration cues. With reduced motion, every effect is off.
+
+A pointer tap that lands within 260ms of the dock changing shape is ignored, so a double-tap on Stand can't hit the Deal again that appears in its place, and a double-tap on Deal can't hit Hit. Keyboard input is never guarded, and repeated taps on the same control (Hit, Hit) are never delayed.
+
 ### Main menu and pause board
 
 The main menu and the in-game pause board are both `menu-bar.png`, used as a wooden sign. Real `<button>`s sit over the header plaque and the four planks at hit areas normalized to the art (`src/config/menu-board-layout.ts`). Each hit area covers its whole row band, gap to gap, so rows never overlap. On phones the planks fill the width and the outer posts crop at the screen edges, leaving rows 26px or taller at 320px (WCAG 2.5.8) with no stretching. Tablets and desktop show the whole board. Main menu: Classic BlackJak (the plaque), Jak's House, Daily Hand, Stats, Settings.

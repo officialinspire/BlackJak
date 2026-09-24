@@ -57,11 +57,11 @@ export function cardMarkup(
   dealIndex = 0,
   variant: CardVariant = 'standard',
   theme: CardThemeId = activeTheme,
-  /** False for cards already on screen: they skip the deal-in animation. */
-  animate = true,
+  /** true: deal in · false: already on screen (no animation) · 'flip': hole card turning over. */
+  animate: boolean | 'flip' = true,
 ): string {
   const delay = Math.min(Math.max(dealIndex, 0), 8) * 38;
-  const settled = animate ? '' : ' is-settled';
+  const settled = animate === 'flip' ? ' is-flip' : animate ? '' : ' is-settled';
   const sheet = cardThemeSheet(theme);
 
   if (hidden) {

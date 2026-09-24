@@ -46,7 +46,8 @@ import { CARD_THEMES } from '../data/card-atlas';
 import { CARD_THEME_IDS, type CardThemeId } from '../data/visual-atlas';
 import { loadVisualPreferences, saveVisualPreferences } from '../storage/visual-preferences';
 import { gameSceneMarkup } from './scene';
-import { ACTION_SHORTCUTS, dockPhaseFor, tableDockMarkup } from './table-dock';
+import { ACTION_SHORTCUTS, dockPhaseFor, tableDockMarkup, type DockPhase } from './table-dock';
+import { FxQueue, fxClassNames, fxStyleVars, shouldIgnoreActivation, type FxCue } from './fx';
 import { menuBoardMarkup } from './menu-board';
 import { escapeIntent, isTableScreen, pauseMenuMarkup } from './pause-menu';
 import { dialoguePanelMarkup, type PanelStatus } from './dialogue-panel';
@@ -145,6 +146,22 @@ const model: AppModel = {
 /** Cards already on screen in the previous render: only new cards play the deal-in. */
 let renderedCardKeys = new Set<string>();
 let pendingCardKeys = new Set<string>();
+
+const fxQueue = new FxQueue();
+/** Cues for the render in progress (one-shot; empty for plain re-renders). */
+let currentFx: ReadonlySet<FxCue> = new Set();
+/** When the dock last changed phase: pointer taps just after are stale double-taps. */
+let controlsChangedAt = -Infinity;
+let lastDockPhase: DockPhase | null = null;
+
+function cueFx(...cues: FxCue[]): void {
+  fxQueue.cue(...cues);
+}
+
+/** Card key already shown face-down in the previous render (so a reveal flips). */
+function wasRenderedHidden(key: string): boolean {
+  return renderedCardKeys.has(`${model.roundSerial}:${key}`);
+}
 
 function cardIsNew(key: string): boolean {
   const scoped = `${model.roundSerial}:${key}`;
@@ -316,6 +333,7 @@ function say(event: DialogueEvent): void {
   const next = selectDialogue(event, model.dialogueMemory);
   model.commentary = next.selection;
   model.dialogueMemory = next.memory;
+  cueFx('line');
 }
 
 function normalizedStake(): number {
@@ -623,6 +641,7 @@ function tableDockFor(view: TableView, house: boolean): string {
     error: model.error,
     house,
     formatChips,
+    fx: currentFx,
   });
 }
 
@@ -676,7 +695,9 @@ function dealerHandMarkup(view: TableView): string {
       <div class="cards dealer-cards" aria-label="Dealer cards">${dealerCards.map((card, index) => {
         const hidden = index === 1 && !view.revealDealer;
         const fresh = cardIsNew(`d:${index}:${hidden ? 'hidden' : `${card.rank}${card.suit}`}`);
-        return cardMarkup(card, hidden, fresh ? index : 0, 'standard', undefined, fresh);
+        // The hole card that was face-down last render flips over instead of re-dealing.
+        const reveal = fresh && !hidden && wasRenderedHidden(`d:${index}:hidden`);
+        return cardMarkup(card, hidden, fresh ? index : 0, 'standard', undefined, reveal ? 'flip' : fresh);
       }).join('')}</div>
       ${dealerCards.length ? `<strong class="dealer-total" aria-label="${view.revealDealer ? `Dealer total ${view.dealerTotal}` : 'Dealer total hidden'}">${view.dealerTotal}</strong>` : ''}
     </div>`;
@@ -698,7 +719,7 @@ function classicMarkup(): string {
   const { round } = view;
 
   return `
-    <main id="app-main" tabindex="-1" class="screen table-screen round-${view.tone}">
+    <main id="app-main" tabindex="-1" class="screen table-screen round-${view.tone} ${fxClassNames(currentFx)}" style="${fxStyleVars()}">
       <div class="ambient-lamp ambient-lamp-table" aria-hidden="true"></div>
       ${gameSceneMarkup({
         mode: 'classic',
@@ -721,7 +742,7 @@ function houseMarkup(): string {
   const { round } = view;
 
   return `
-    <main id="app-main" tabindex="-1" class="screen table-screen house-screen round-${view.tone}">
+    <main id="app-main" tabindex="-1" class="screen table-screen house-screen round-${view.tone} ${fxClassNames(currentFx)}" style="${fxStyleVars()}">
       <div class="ambient-lamp ambient-lamp-table house-lamp" aria-hidden="true"></div>
       ${gameSceneMarkup({
         mode: 'house',
@@ -766,6 +787,7 @@ function settleIfResolved(): void {
   persistProfile(progression.profile);
   model.lastRepEarned = progression.repEarned;
   model.achievementToasts = [...model.achievementToasts, ...progression.unlocked];
+  cueFx('result', ...(progression.unlocked.length ? ['achievement' as const] : []));
   say(resolutionDialogueEvent(model.round));
   playRoundFeedback(model.round, progression.unlocked.length);
 }
@@ -785,6 +807,7 @@ function settleHouseIfResolved(): void {
   model.houseTokenAwarded = houseResolution.tokenAwarded;
   model.lastRepEarned = progression.repEarned + houseResolution.hotHandBonusRep;
   model.achievementToasts = [...model.achievementToasts, ...progression.unlocked];
+  cueFx('result', ...(progression.unlocked.length ? ['achievement' as const] : []));
   say(resolutionDialogueEvent(model.round));
   playRoundFeedback(model.round, progression.unlocked.length);
 }
@@ -803,6 +826,7 @@ function dealRound(): void {
     if (again.unlocked.length > 0) {
       persistProfile(again.profile);
       model.achievementToasts = again.unlocked;
+      cueFx('achievement');
     }
   }
 
@@ -813,6 +837,7 @@ function dealRound(): void {
   try {
     model.round = startRound(stake);
     model.roundSerial += 1;
+    cueFx('deal');
     model.dealerCue = 'deal';
     feedback('deal', 'deal');
     if (model.round.phase === 'resolved') {
@@ -842,6 +867,7 @@ function dealHouseRound(): void {
     if (again.unlocked.length > 0) {
       persistProfile(again.profile);
       model.achievementToasts = again.unlocked;
+      cueFx('achievement');
     }
   }
 
@@ -855,6 +881,7 @@ function dealHouseRound(): void {
     model.house = started.house;
     model.round = started.round;
     model.roundSerial += 1;
+    cueFx('deal');
     model.dealerCue = 'deal';
     feedback('deal', 'deal');
 
@@ -885,6 +912,7 @@ function runHouseReplay(): void {
     model.house = replay.house;
     model.round = replay.round;
     model.roundSerial += 1;
+    cueFx('deal');
     model.dealerCue = 'deal';
     feedback('deal', 'deal');
 
@@ -936,6 +964,7 @@ function takePlayerAction(action: PlayerAction): void {
     const updatedRound = performAction(model.round, action, before.chips);
     model.round = updatedRound;
     model.dealerCue = dealerCueForAction(action);
+    cueFx(`action:${action}`);
 
     if (action === 'hit') {
       const updatedHand = updatedRound.hands.find((candidate) => candidate.id === activeHandId);
@@ -954,6 +983,7 @@ function takePlayerAction(action: PlayerAction): void {
         const updated = evaluateHand(updatedHand.cards);
         if (updated.isBust) {
           say('player_bust');
+          cueFx('bust');
         } else if (startingTotal >= 17 && startingTotal <= 20) {
           say(`hit_${startingTotal}` as DialogueEvent);
         } else if (startingTotal >= 16) {
@@ -995,6 +1025,7 @@ function takeHouseAction(action: PlayerAction): void {
     const updatedRound = performAction(model.round, action, before.chips);
     model.round = updatedRound;
     model.dealerCue = dealerCueForAction(action);
+    cueFx(`action:${action}`);
 
     if (action === 'hit') {
       const updatedHand = updatedRound.hands.find((candidate) => candidate.id === activeHandId);
@@ -1013,6 +1044,7 @@ function takeHouseAction(action: PlayerAction): void {
         const updated = evaluateHand(updatedHand.cards);
         if (updated.isBust) {
           say('player_bust');
+          cueFx('bust');
         } else if (startingTotal >= 17 && startingTotal <= 20) {
           say(`hit_${startingTotal}` as DialogueEvent);
         } else if (startingTotal >= 16) {
@@ -1182,6 +1214,7 @@ function goToScreen(screen: AppScreen): void {
     model.houseLastBonusRep = 0;
     model.houseTokenAwarded = false;
     say(model.profile.stats.totalHands > 0 ? 'return_player' : 'game_start');
+    cueFx('panel');
   }
   if (screen === 'daily' && screen !== model.screen) {
     prepareDailyRound();
@@ -1282,7 +1315,13 @@ interface RenderOptions {
   readonly staticTable?: boolean;
 }
 
+/** Pointer tap (detail > 0) landing right after the controls changed shape. */
+function isStaleTap(event: MouseEvent): boolean {
+  return shouldIgnoreActivation({ now: event.timeStamp, controlsChangedAt, pointer: event.detail > 0 });
+}
+
 function render(options: RenderOptions = {}): void {
+  currentFx = fxQueue.consume();
   const previousScreen = lastRenderedScreen;
   const activeBeforeRender = document.activeElement;
   const hadInteractiveFocus = activeBeforeRender instanceof HTMLElement && activeBeforeRender !== document.body;
@@ -1314,6 +1353,12 @@ function render(options: RenderOptions = {}): void {
   app().querySelector('#app-main')?.classList.toggle('is-static-render', Boolean(options.staticTable));
   renderedCardKeys = pendingCardKeys;
   pendingCardKeys = new Set<string>();
+  const dockPhase = (app().querySelector('.table-dock')?.className.match(/phase-(\w+)/)?.[1] ?? null) as DockPhase | null;
+  if (dockPhase !== lastDockPhase) {
+    controlsChangedAt = performance.now();
+    lastDockPhase = dockPhase;
+  }
+  currentFx = new Set();
   bindEvents();
   if (model.pauseMenuOpen) mountPauseOverlay(null);
   const screenChanged = previousScreen !== null && previousScreen !== model.screen;
@@ -1354,14 +1399,15 @@ function bindEvents(): void {
   });
 
   document.querySelectorAll<HTMLButtonElement>('[data-stake]').forEach((element) => {
-    element.addEventListener('click', () => {
-      if (!element.isConnected) return;
+    element.addEventListener('click', (event) => {
+      if (!element.isConnected || isStaleTap(event)) return;
       feedbackEngine.activate();
       const stake = element.dataset.stake;
       const next = stake === 'max' ? Math.min(model.profile.chips, MAX_STAKE) : Number(stake);
       if (Number.isFinite(next) && next > 0 && next <= model.profile.chips) {
         model.selectedStake = next;
         model.error = null;
+        cueFx('stake', `stake:${stake}`);
         feedback('chip', 'tap');
         render();
       }
@@ -1418,8 +1464,8 @@ function bindEvents(): void {
   });
 
   document.querySelectorAll<HTMLButtonElement>('[data-action]').forEach((element) => {
-    element.addEventListener('click', () => {
-      if (!element.isConnected) return;
+    element.addEventListener('click', (event) => {
+      if (!element.isConnected || isStaleTap(event)) return;
       feedbackEngine.activate();
       const action = element.dataset.action;
       model.error = null;

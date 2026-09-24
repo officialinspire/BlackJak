@@ -34,6 +34,8 @@ export interface DockInput {
   readonly error?: string | null;
   readonly house: boolean;
   readonly formatChips: (value: number) => string;
+  /** One-shot game-feel cues for this render (see fx.ts). */
+  readonly fx?: ReadonlySet<string>;
 }
 
 export function dockPhaseFor(roundPhase: string | null, chips: number): DockPhase {
@@ -48,7 +50,8 @@ function stakeChipsMarkup(input: DockInput): string {
   const chip = (value: number | 'max', label: string, disabled: boolean): string => {
     const amount = value === 'max' ? maxValue : value;
     const isSelected = selected === amount;
-    return `<button type="button" class="stake-button dock-chip${isSelected ? ' is-selected' : ''}" data-stake="${value}" aria-pressed="${isSelected}" aria-label="Stake ${label}${value === 'max' ? ` (${input.formatChips(maxValue)})` : ''} chips"${disabled ? ' disabled' : ''}>${label}</button>`;
+    const bounce = input.fx?.has(`stake:${value}`) ? ' is-bounce' : '';
+    return `<button type="button" class="stake-button dock-chip${isSelected ? ' is-selected' : ''}${bounce}" data-stake="${value}" aria-pressed="${isSelected}" aria-label="Stake ${label}${value === 'max' ? ` (${input.formatChips(maxValue)})` : ''} chips"${disabled ? ' disabled' : ''}>${label}</button>`;
   };
   return `
     <div class="dock-stakes" role="group" aria-label="Choose a fictional chip stake">
@@ -63,7 +66,8 @@ function actionButtonsMarkup(input: DockInput): string {
     <div class="dock-actions action-bar" aria-label="Blackjack actions">
       ${DOCK_ACTIONS.map((action) => {
         const enabled = input.allowed.includes(action);
-        return `<button type="button" class="dock-action dock-action-${action}${enabled ? ' is-ready' : ''}" data-action="${action}" aria-label="${action.toUpperCase()}" aria-keyshortcuts="${ACTION_SHORTCUTS[action]}"${enabled ? '' : ' disabled'}><strong>${action.toUpperCase()}</strong><kbd aria-hidden="true">${ACTION_SHORTCUTS[action]}</kbd></button>`;
+        const fired = input.fx?.has(`action:${action}`) ? ' is-fired' : '';
+        return `<button type="button" class="dock-action dock-action-${action}${enabled ? ' is-ready' : ''}${fired}" data-action="${action}" aria-label="${action.toUpperCase()}" aria-keyshortcuts="${ACTION_SHORTCUTS[action]}"${enabled ? '' : ' disabled'}><strong>${action.toUpperCase()}</strong><kbd aria-hidden="true">${ACTION_SHORTCUTS[action]}</kbd></button>`;
       }).join('')}
     </div>`;
 }
