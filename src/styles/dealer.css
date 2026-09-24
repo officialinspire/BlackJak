@@ -1,0 +1,134 @@
+/*
+ * Prompt 14 — Jak as the gameplay NPC.
+ *
+ * `.dealer-window` is Jak's viewport inside the scene's NPC layer (height from
+ * --npc-height in scene-layout.ts). Each pose is framed by dealerPoseFrame()
+ * so his eyes stay on one line across bust / half / full-body sprites. The
+ * window's lower part fades out behind the dealer's cards, so Jak reads as
+ * standing behind the table.
+ */
+
+.dealer-npc {
+  position: relative;
+  height: 100%;
+  aspect-ratio: var(--dealer-window-aspect);
+  pointer-events: none;
+}
+
+.dealer-window {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 58%, rgba(0,0,0,.55) 78%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 58%, rgba(0,0,0,.55) 78%, transparent 100%);
+}
+
+/* Soft contact shadow on the felt/tray behind him. */
+.dealer-npc::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 14%;
+  right: 14%;
+  bottom: 18%;
+  height: 26%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,.45), transparent 70%);
+}
+
+.dealer-pose {
+  position: absolute;
+  left: var(--pose-x);
+  top: var(--pose-y);
+  width: var(--pose-w);
+  transform-origin: 50% 30%;
+}
+
+.dealer-pose .atlas-sprite {
+  width: 100%;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,.45));
+}
+
+/* Idle breathing on the settled pose. */
+.dealer-pose-mood {
+  animation: dealer-breathe 4.2s ease-in-out infinite;
+}
+
+/* New dialogue pose: quick settle-in. */
+.dealer-npc.is-new-pose .dealer-pose-mood {
+  animation:
+    dealer-pose-in .24s ease-out both,
+    dealer-breathe 4.2s ease-in-out .24s infinite;
+}
+
+/* One-shot gesture (deal / draw / chips), then hand back to the dialogue pose. */
+.dealer-npc.is-acting .dealer-pose-action {
+  animation: dealer-action-out var(--dealer-action-ms, 900ms) ease-in both;
+}
+
+.dealer-npc.is-acting .dealer-pose-mood {
+  animation:
+    dealer-mood-return var(--dealer-action-ms, 900ms) ease-out both,
+    dealer-breathe 4.2s ease-in-out var(--dealer-action-ms, 900ms) infinite;
+}
+
+/* Dealer total rides beside the dealer's cards. */
+.dealer-hand-row {
+  position: relative;
+}
+
+.dealer-hand-row .dealer-total {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translate(.4rem, -50%);
+  min-width: 30px;
+  height: 30px;
+  padding-inline: .3rem;
+  border-color: rgba(214,182,80,.4);
+  background: rgba(8,8,7,.82);
+  box-shadow: 0 6px 14px rgba(0,0,0,.4);
+}
+
+@keyframes dealer-breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-.6%) scale(1.006); }
+}
+
+@keyframes dealer-pose-in {
+  from { opacity: 0; transform: translateY(3%) scale(.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes dealer-action-out {
+  0% { opacity: 0; transform: translateY(3%); }
+  12% { opacity: 1; transform: none; }
+  80% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(2%); }
+}
+
+@keyframes dealer-mood-return {
+  0%, 80% { opacity: 0; transform: translateY(2%); }
+  100% { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* No gestures or breathing: show the dialogue pose immediately. */
+  .dealer-npc .dealer-pose-action { display: none; }
+  .dealer-npc .dealer-pose-mood,
+  .dealer-npc.is-acting .dealer-pose-mood,
+  .dealer-npc.is-new-pose .dealer-pose-mood {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .dealer-window { -webkit-mask-image: none; mask-image: none; }
+}
+
+/* Dealer cards stay a touch smaller on tall frames so Jak's face keeps clear above them. */
+.game-scene .scene-cards .dealer-cards {
+  --card-w: clamp(48px, min(15.5cqi, 12cqh), 96px);
+}

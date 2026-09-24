@@ -1,0 +1,65 @@
+{
+  "blackjak-sprite-sheet.png": {
+    "webp": "blackjak-sprite-sheet.webp",
+    "sha256": "9a9e85fe5dc1a1f28be0f8f48dc87556995269340bd1e10ef3dd15e3ccb7e930",
+    "width": 1448,
+    "height": 1086,
+    "quality": 92,
+    "pngBytes": 2074459,
+    "webpBytes": 555842
+  },
+  "blackjak-table.png": {
+    "webp": "blackjak-table.webp",
+    "sha256": "d7dcc6455ce507679174a92469dda35349a35106391ae9cdbd072666c981d843",
+    "width": 1448,
+    "height": 1086,
+    "quality": 92,
+    "pngBytes": 1968781,
+    "webpBytes": 283576
+  },
+  "dialogue-status-bar.png": {
+    "webp": "dialogue-status-bar.webp",
+    "sha256": "90d8ad0b2779f98eebbbc5346139a0ab1f0b35b60e2c6f8cb3eb762d2decb7c0",
+    "width": 2172,
+    "height": 724,
+    "quality": 92,
+    "pngBytes": 1618233,
+    "webpBytes": 183476
+  },
+  "menu-bar.png": {
+    "webp": "menu-bar.webp",
+    "sha256": "a562f0d3d49bae62bec8a7868e88b4d0af2e0ecfd072482471e04d4d4971896b",
+    "width": 1672,
+    "height": 941,
+    "quality": 92,
+    "pngBytes": 2239522,
+    "webpBytes": 356680
+  },
+  "blackjak-cards-standard.png": {
+    "webp": "blackjak-cards-standard.webp",
+    "sha256": "7c9cb2b16b7a97deb424d5b9ce434e056ba04efc945f614b66bf7dfdcf8a3469",
+    "width": 1448,
+    "height": 1086,
+    "quality": 95,
+    "pngBytes": 1919770,
+    "webpBytes": 502766
+  },
+  "blackjak-cards-jak-theme.png": {
+    "webp": "blackjak-cards-jak-theme.webp",
+    "sha256": "5bdccb4e00f409e3d8f8cad7e5e4c66e656e90601e0cd80812fb84724fd90e6d",
+    "width": 1448,
+    "height": 1086,
+    "quality": 95,
+    "pngBytes": 2465853,
+    "webpBytes": 634246
+  },
+  "blackjak-cards-inspire-theme.png": {
+    "webp": "blackjak-cards-inspire-theme.webp",
+    "sha256": "dcfcd68bcee5a63cb52063952f6e25c50a69a6628fbd9fec0729ed5ebbf3610e",
+    "width": 1448,
+    "height": 1086,
+    "quality": 95,
+    "pngBytes": 1845569,
+    "webpBytes": 470300
+  }
+}

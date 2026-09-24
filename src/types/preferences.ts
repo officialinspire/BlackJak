@@ -5,3 +5,9 @@ export interface FeedbackPreferences {
   haptics: boolean;
   volume: number;
 }
+
+export type CardThemePreference = 'standard' | 'jak' | 'inspire';
+
+export interface VisualPreferences {
+  cardTheme: CardThemePreference;
+}

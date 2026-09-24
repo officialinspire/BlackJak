@@ -17,8 +17,10 @@ import {
 /*
  * Precise atlas rendering via SVG viewBox cropping: the whole sheet is placed
  * in sheet-pixel coordinates and the viewBox exposes exactly one SpriteRect.
- * The browser scales the crop without sub-pixel bleed from neighbours, and the
- * sheet is decoded/cached once no matter how many sprites reference it.
+ * An inner <svg> viewport equal to the rect clips the sheet exactly, so when the
+ * sprite is fitted into a box of a different shape (meet), the letterbox bands
+ * stay empty instead of showing neighbouring cells. The sheet is decoded and
+ * cached once no matter how many sprites reference it.
  */
 
 export interface AtlasSpriteOptions {
@@ -30,6 +32,8 @@ export interface AtlasSpriteOptions {
   readonly height?: string;
   /** Override the sheet URL (tests, previews). */
   readonly url?: string;
+  /** 'contain' (default) letterboxes the whole rect; 'cover' crops it to fill the box without distortion. */
+  readonly fit?: 'contain' | 'cover';
 }
 
 const escapeAttr = (value: string): string =>
@@ -49,7 +53,7 @@ export function atlasSpriteMarkup(sheetId: AtlasSheetId, rect: SpriteRect, optio
     options.height ? `height:${options.height}` : '',
   ].filter(Boolean).join(';');
 
-  return `<svg class="atlas-sprite${options.className ? ` ${escapeAttr(options.className)}` : ''}" ${a11y} xmlns="http://www.w3.org/2000/svg" viewBox="${atlasViewBox(rect)}" preserveAspectRatio="xMidYMid meet" data-atlas-sheet="${sheetId}" style="${style}"><image href="${href}" x="0" y="0" width="${sheet.width}" height="${sheet.height}" preserveAspectRatio="none"/></svg>`;
+  return `<svg class="atlas-sprite${options.className ? ` ${escapeAttr(options.className)}` : ''}" ${a11y} xmlns="http://www.w3.org/2000/svg" viewBox="${atlasViewBox(rect)}" preserveAspectRatio="xMidYMid ${options.fit === 'cover' ? 'slice' : 'meet'}" data-atlas-sheet="${sheetId}" style="${style}"><svg x="${rect.x}" y="${rect.y}" width="${rect.width}" height="${rect.height}" viewBox="${atlasViewBox(rect)}" overflow="hidden"><image href="${href}" x="0" y="0" width="${sheet.width}" height="${sheet.height}" preserveAspectRatio="none"/></svg></svg>`;
 }
 
 export function dealerSpriteMarkup(id: DealerSpriteId, options: AtlasSpriteOptions = {}): string {

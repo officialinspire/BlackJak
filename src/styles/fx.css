@@ -1,0 +1,201 @@
+/*
+ * Prompt 19 — restrained cartoon game-feel.
+ *
+ * Every effect is a short CSS animation (120–500ms, durations from FX_TIMING in
+ * src/ui/fx.ts via --fx-* properties) on DOM that already shows the new state,
+ * so play never waits. Most effects are gated by one-shot `fx-*` classes on
+ * the table screen, so ordinary re-renders (e.g. choosing a stake) don't replay them.
+ */
+
+/* ---- Card slide / deal (only new cards; see is-settled) ---- */
+
+.game-scene .playing-card:not(.is-settled):not(.is-flip) {
+  animation: fx-card-deal var(--fx-card-deal, 200ms) cubic-bezier(.2,.8,.3,1.1) both;
+  animation-delay: var(--deal-delay, 0ms);
+}
+
+@keyframes fx-card-deal {
+  from { opacity: 0; transform: translate3d(18px, -26px, 0) rotate(4deg) scale(.94); }
+  70% { opacity: 1; }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---- Hole card flip on reveal ---- */
+
+.game-scene .playing-card.is-flip {
+  animation: fx-card-flip var(--fx-card-flip, 320ms) cubic-bezier(.3,.9,.35,1) both;
+  transform-origin: 50% 50%;
+}
+
+@keyframes fx-card-flip {
+  0% { transform: perspective(700px) rotateY(88deg) scale(1.04); filter: brightness(.7); }
+  60% { transform: perspective(700px) rotateY(-8deg) scale(1.02); filter: none; }
+  100% { transform: none; }
+}
+
+/* ---- Bust impact: once, on the bust itself (was replaying every render) ---- */
+
+.player-hand.is-bust,
+.player-hand.is-loss {
+  animation: none;
+}
+
+.fx-bust .player-hand.is-bust,
+.fx-result .player-hand.is-bust {
+  animation: fx-bust-impact var(--fx-bust-impact, 260ms) ease-out both;
+}
+
+.fx-bust .player-hand.is-bust .card-sprite,
+.fx-result .player-hand.is-bust .card-sprite {
+  animation: fx-bust-flash var(--fx-bust-impact, 260ms) ease-out both;
+}
+
+@keyframes fx-bust-impact {
+  0%, 100% { transform: none; }
+  30% { transform: translate3d(-4px, 2px, 0) rotate(-.8deg); }
+  65% { transform: translate3d(3px, 0, 0) rotate(.5deg); }
+}
+
+@keyframes fx-bust-flash {
+  0% { filter: drop-shadow(0 8px 12px rgba(0,0,0,.42)); }
+  35% { filter: drop-shadow(0 0 10px rgba(230,70,55,.85)) saturate(.8); }
+  100% { filter: drop-shadow(0 8px 12px rgba(0,0,0,.42)); }
+}
+
+/* ---- Blackjack emphasis / win lift ---- */
+
+.fx-result .player-hand.is-blackjack .playing-card {
+  animation: fx-blackjack-pop var(--fx-result-pop, 450ms) cubic-bezier(.3,1.6,.5,1) both;
+}
+
+.fx-result .player-hand.is-blackjack .playing-card:nth-child(2) {
+  animation-delay: 60ms;
+}
+
+.fx-result .player-hand.is-win .playing-card {
+  animation: fx-win-lift var(--fx-result-pop, 450ms) ease-out both;
+}
+
+@keyframes fx-blackjack-pop {
+  0% { transform: none; filter: none; }
+  45% { transform: translateY(-8px) scale(1.08); filter: drop-shadow(0 0 14px rgba(242,193,78,.9)); }
+  100% { transform: none; filter: drop-shadow(0 0 6px rgba(242,193,78,.35)); }
+}
+
+@keyframes fx-win-lift {
+  0%, 100% { transform: none; }
+  45% { transform: translateY(-5px); }
+}
+
+/* Result line in the dialogue panel pops once when the round resolves. */
+.fx-result .dialogue-panel-status {
+  animation: fx-status-pop var(--fx-result-pop, 450ms) cubic-bezier(.3,1.5,.5,1) both;
+}
+
+.fx-result.round-blackjack .dialogue-panel-status {
+  box-shadow: 0 0 0 1px rgba(242,193,78,.6), 0 0 18px rgba(242,193,78,.45);
+}
+
+@keyframes fx-status-pop {
+  0% { transform: scale(.9); opacity: .4; }
+  55% { transform: scale(1.06); opacity: 1; }
+  100% { transform: none; }
+}
+
+/* ---- Stake chip bounce ---- */
+
+.table-dock .dock-chip.is-bounce {
+  animation: fx-chip-bounce var(--fx-chip-bounce, 260ms) cubic-bezier(.3,1.7,.5,1) both;
+}
+
+.fx-stake .table-dock .dock-readout b {
+  display: inline-block;
+  animation: fx-chip-bounce var(--fx-chip-bounce, 260ms) cubic-bezier(.3,1.7,.5,1) both;
+}
+
+@keyframes fx-chip-bounce {
+  0% { transform: translateY(0) scale(1); }
+  40% { transform: translateY(-6px) scale(1.12); }
+  100% { transform: none; }
+}
+
+/* ---- Selected action feedback ---- */
+
+.table-dock .dock-action.is-fired {
+  animation: fx-action-fire var(--fx-action-flash, 180ms) ease-out both;
+}
+
+@keyframes fx-action-fire {
+  0% { transform: scale(.95); background: rgba(240,215,122,.35); }
+  100% { transform: none; }
+}
+
+/* ---- Dialogue panel arrival + new line (was replaying every render) ---- */
+
+.dialogue-panel-line {
+  animation: none;
+}
+
+.fx-line .dialogue-panel-line {
+  animation: dlg-line-in var(--fx-line-arrive, 220ms) ease-out both;
+}
+
+.fx-panel .scene-dialogue-bar .dialogue-panel {
+  animation: fx-panel-arrive var(--fx-panel-arrive, 280ms) cubic-bezier(.2,.9,.3,1.15) both;
+}
+
+@keyframes fx-panel-arrive {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---- Dealer reaction transition ---- */
+
+.dealer-npc.is-new-pose .dealer-pose-mood {
+  animation:
+    fx-dealer-react var(--fx-dealer-reaction, 240ms) cubic-bezier(.3,1.4,.5,1) both,
+    dealer-breathe 4.2s ease-in-out var(--fx-dealer-reaction, 240ms) infinite;
+}
+
+@keyframes fx-dealer-react {
+  0% { opacity: 0; transform: translateY(4%) scale(.97, 1.03); }
+  60% { opacity: 1; transform: translateY(-1%) scale(1.02, .98); }
+  100% { transform: none; }
+}
+
+/* ---- Achievement pop (was replaying every render) ---- */
+
+.table-screen .achievement-toast {
+  animation: none;
+}
+
+.fx-achievement .achievement-toast {
+  animation: fx-toast-pop var(--fx-achievement-pop, 320ms) cubic-bezier(.3,1.5,.5,1) both;
+}
+
+@keyframes fx-toast-pop {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(.9); }
+  60% { opacity: 1; transform: translateX(-50%) translateY(2px) scale(1.03); }
+  100% { opacity: 1; transform: translateX(-50%); }
+}
+
+/* ---- Reduced motion: state changes are instant; nothing moves ---- */
+
+@media (prefers-reduced-motion: reduce) {
+  .game-scene .playing-card,
+  .fx-bust .player-hand.is-bust,
+  .fx-result .player-hand.is-bust,
+  .fx-result .player-hand .playing-card,
+  .fx-bust .card-sprite,
+  .fx-result .card-sprite,
+  .fx-result .dialogue-panel-status,
+  .table-dock .dock-chip.is-bounce,
+  .fx-stake .table-dock .dock-readout b,
+  .table-dock .dock-action.is-fired,
+  .fx-line .dialogue-panel-line,
+  .fx-panel .scene-dialogue-bar .dialogue-panel,
+  .dealer-npc.is-new-pose .dealer-pose-mood,
+  .fx-achievement .achievement-toast {
+    animation: none !important;
+  }
+}

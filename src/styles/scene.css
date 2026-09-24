@@ -1,0 +1,395 @@
+/*
+ * Prompt 13 — shared game scene (Classic + Jak's House).
+ *
+ * Coordinates are never written here: anchor positions and aspect ratios come
+ * from src/config/scene-layout.ts as custom properties on `.game-scene`.
+ * `.scene-stage` always keeps the table image's intrinsic aspect ratio and
+ * covers `.scene-frame`; on frames taller than the art the stage is wider than
+ * the frame and its sides are cropped (never stretched).
+ */
+
+.table-screen {
+  grid-template-rows: none;
+  align-content: start;
+  gap: .55rem;
+}
+
+.game-scene {
+  --frame-tallest: var(--frame-tallest-phone);
+  /* Room reserved for HUD + controls when fitting the table to the viewport height. */
+  /* HUD + dialogue bar + controls. */
+  --scene-chrome: 21.5rem;
+  --card-w: clamp(48px, min(15.5cqi, 14.5cqh), 96px);
+  --card-overlap: calc(var(--card-w) * -.3);
+  container-type: inline-size;
+  position: relative;
+  z-index: 1;
+  justify-self: center;
+  width: min(100%, var(--scene-max-width), max(18rem, calc((100dvh - var(--scene-chrome)) * var(--table-aspect))));
+  display: grid;
+  gap: .4rem;
+}
+
+@media (min-width: 600px) {
+  .game-scene { --frame-tallest: var(--frame-tallest-tablet); }
+}
+
+/* ---- HUD (top layer) ---- */
+
+.scene-hud {
+  position: relative;
+  z-index: 5;
+}
+
+.scene-hud .table-header {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.scene-hud .back-button {
+  flex: 0 0 auto;
+  padding: .5rem .75rem;
+}
+
+.scene-hud .hud {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+}
+
+.house-hud-pill {
+  border-color: rgba(240,215,122,.5) !important;
+  color: var(--bj-gold-bright, var(--gold)) !important;
+}
+
+/* ---- Frame + table (base layer) ---- */
+
+.scene-frame {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  /* Size container: layers use cqw/cqi of the visible frame. */
+  container-type: size;
+  /* Fill the available height; never shorter than the art (no letterbox), never taller than --frame-tallest. */
+  height: clamp(
+    calc(100cqi / var(--table-aspect)),
+    max(var(--frame-min-height), calc(100dvh - var(--scene-chrome))),
+    calc(100cqi / var(--frame-tallest))
+  );
+  border-radius: clamp(14px, 3cqi, 26px);
+  background: #0f2a1b;
+  box-shadow:
+    0 0 0 1px rgba(214,182,80,.3),
+    0 24px 70px rgba(0,0,0,.5);
+}
+
+.scene-stage {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 100%;
+  aspect-ratio: var(--table-aspect);
+  transform: translateX(-50%);
+}
+
+.scene-stage > .scene-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.scene-table {
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+  pointer-events: none;
+}
+
+.scene-npc { z-index: 1; }
+.scene-cards { z-index: 2; }
+.scene-ui {
+  z-index: 3;
+  /* Empty overlay layer: must not swallow taps meant for the cards beneath. */
+  pointer-events: none;
+}
+
+.scene-ui > * { pointer-events: auto; }
+
+/* ---- Anchors (normalized table coordinates) ---- */
+
+.scene-anchor {
+  position: absolute;
+  left: var(--ax, 50%);
+  top: var(--ay, 50%);
+  transform: translate(-50%, -50%);
+  display: grid;
+  justify-items: center;
+}
+
+/* Spans the part of the stage that is actually visible in the frame. */
+.scene-span {
+  width: 100cqw;
+  padding-inline: clamp(4px, 1.5cqi, 16px);
+}
+
+.anchor-dealer-hand { --ax: var(--anchor-dealer-hand-x); --ay: var(--anchor-dealer-hand-y); }
+
+.anchor-player-hands {
+  left: var(--anchor-player-hands-x);
+  top: auto;
+  bottom: calc(100% - var(--anchor-player-hands-y));
+  transform: translateX(-50%);
+}
+
+/* ---- NPC (Jak) — see dealer.css for the sprite itself ---- */
+
+.anchor-npc {
+  left: var(--anchor-npc-x);
+  top: auto;
+  bottom: calc(100% - var(--anchor-npc-y));
+  height: var(--npc-height);
+  transform: translateX(-50%);
+}
+
+/* ---- Cards (gameplay layer) ---- */
+
+.game-scene .scene-cards .cards {
+  min-height: calc(var(--card-w) / .69);
+  padding-left: 0;
+  justify-content: center;
+}
+
+.game-scene .scene-cards .playing-card {
+  width: var(--card-w);
+  margin-left: var(--card-overlap);
+  border-radius: calc(var(--card-w) * .1);
+}
+
+.game-scene .scene-cards .playing-card:first-child {
+  margin-left: 0;
+}
+
+.game-scene .scene-cards .card-corner b { font-size: max(13px, calc(var(--card-w) * .22)); }
+.game-scene .scene-cards .card-corner i { font-size: max(11px, calc(var(--card-w) * .18)); }
+.game-scene .scene-cards .card-corner-top { top: calc(var(--card-w) * .07); left: calc(var(--card-w) * .07); }
+.game-scene .scene-cards .card-corner-bottom { right: calc(var(--card-w) * .07); bottom: calc(var(--card-w) * .07); }
+.game-scene .scene-cards .card-center-suit { font-size: calc(var(--card-w) * .48); }
+.game-scene .scene-cards .back-monogram { font-size: calc(var(--card-w) * .26); }
+.game-scene .scene-cards .back-wordmark { font-size: max(5px, calc(var(--card-w) * .065)); }
+
+.game-scene .scene-cards .empty-cards,
+.game-scene .scene-cards .empty-hand {
+  width: auto;
+  min-height: 0;
+  padding: .35rem .75rem;
+  border-style: solid;
+  border-color: rgba(242,234,217,.18);
+  border-radius: 999px;
+  background: rgba(0,0,0,.35);
+}
+
+.game-scene .scene-cards .empty-cards span,
+.game-scene .scene-cards .empty-hand > span:last-child {
+  color: rgba(242,234,217,.72);
+  font-size: .6rem;
+}
+
+.game-scene .scene-cards .empty-cards {
+  width: var(--card-w);
+  aspect-ratio: .69;
+  padding: 0;
+  border: 1px dashed rgba(242,234,217,.35);
+  border-radius: calc(var(--card-w) * .1);
+  background: rgba(0,0,0,.18);
+}
+
+.game-scene .scene-cards .empty-cards span {
+  font-size: max(8px, calc(var(--card-w) * .11));
+}
+
+.game-scene .scene-cards .empty-hand {
+  /* Sit over the printed center spot instead of filling the rail. */
+  margin-bottom: calc(var(--card-w) * .7);
+}
+
+.game-scene .scene-cards .player-hands {
+  gap: clamp(2px, 1cqi, 12px);
+  flex-wrap: nowrap;
+  align-items: end;
+}
+
+.game-scene .scene-cards .player-hand {
+  position: relative;
+  gap: .2rem;
+  padding: .25rem .3rem;
+  background-color: transparent;
+}
+
+.game-scene .scene-cards .player-hand.is-active {
+  background: radial-gradient(ellipse at center, rgba(0,0,0,.28), transparent 72%);
+}
+
+.game-scene .scene-cards .hand-meta,
+.game-scene .scene-cards .hand-state {
+  padding: .1rem .5rem;
+  border-radius: 999px;
+  background: rgba(0,0,0,.55);
+  color: #e9e0cc;
+}
+
+/* Result/state tag overlaps the card bottoms to save vertical room. */
+.game-scene .scene-cards .hand-state {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.game-scene .scene-cards .player-hands.is-split {
+  --card-w: clamp(40px, min(11cqi, 11cqh), 80px);
+}
+
+.game-scene .scene-cards .player-hands.is-split .playing-card {
+  width: var(--card-w);
+  margin-left: calc(var(--card-w) * -.35);
+}
+
+.game-scene .scene-cards .player-hands.is-split .playing-card:first-child {
+  margin-left: 0;
+}
+
+.game-scene .scene-cards .player-hands.is-split .cards {
+  min-height: calc(var(--card-w) / .69);
+  padding-left: 0;
+}
+
+.game-scene .scene-cards .player-hands.is-split .player-hand {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 50%;
+}
+
+.game-scene .scene-cards .player-hands.is-split .hand-meta {
+  gap: .1rem .35rem;
+  white-space: nowrap;
+}
+
+/* Wager stays in each hand's aria-label; hide the visual copy when space is tight. */
+@container (max-width: 520px) {
+  .game-scene .scene-cards .player-hands.is-split .hand-wager { display: none; }
+}
+
+@supports selector(:has(*)) {
+  .game-scene .scene-cards .player-hands.is-split:has(.player-hand:nth-child(3)) {
+    --card-w: clamp(38px, min(9cqi, 10cqh), 70px);
+    flex-wrap: wrap;
+  }
+
+  .game-scene .scene-cards .player-hands.is-split:has(.player-hand:nth-child(3)) .player-hand {
+    flex: 0 1 auto;
+    max-width: none;
+  }
+
+  .game-scene .scene-cards .player-hands.is-split .cards:has(.playing-card:nth-child(4)) {
+    padding-left: 0;
+  }
+
+  .game-scene .scene-cards .player-hands.is-split .cards:has(.playing-card:nth-child(4)) .playing-card {
+    margin-left: calc(var(--card-w) * -.5);
+  }
+
+  .game-scene .scene-cards .player-hands.is-split .cards:has(.playing-card:nth-child(4)) .playing-card:first-child {
+    margin-left: 0;
+  }
+}
+
+/* ---- Dialogue / status bar (see dialogue-panel.css) ---- */
+
+.scene-dialogue-bar {
+  position: relative;
+  z-index: 4;
+}
+
+/* Tuck the panel up over the table frame's bottom rail. */
+.scene-dialogue-bar .dialogue-panel {
+  margin-top: calc(-1 * var(--dlg-overlap));
+}
+
+/* ---- Controls directly below ---- */
+
+.table-screen > .game-controls {
+  width: min(100%, 720px);
+  justify-self: center;
+}
+
+.table-screen > .house-mode-banner,
+.table-screen > .house-modifier-grid {
+  width: min(100%, 720px);
+  justify-self: center;
+}
+
+/* ---- Jak's House: modifier visuals only ---- */
+
+.scene-house .scene-frame {
+  box-shadow:
+    0 0 0 1px rgba(240,215,122,.62),
+    0 0 36px rgba(242,193,78,.16),
+    0 24px 70px rgba(0,0,0,.5);
+}
+
+/* ---- Narrow phones ---- */
+
+@media (max-width: 520px) {
+  .scene-hud .hud span { padding: .3rem .42rem; }
+  /* premium.css hides the 2nd pill (the title); the House pill shifts order, so hide by class. */
+  .scene-hud .hud span:nth-child(2) { display: inline; }
+  .scene-hud .hud span.title-pill { display: none; }
+  .scene-hud .back-button { padding: .4rem .55rem; font-size: .8rem; }
+}
+
+@media (max-width: 360px) {
+  .scene-hud .rep-mini-track { display: none; }
+}
+
+/* ---- Short landscape: table left, controls right ---- */
+
+@media (orientation: landscape) and (max-height: 540px) {
+  .table-screen {
+    grid-template-columns: minmax(0, 1.5fr) minmax(290px, 1fr);
+    align-items: start;
+    column-gap: .8rem;
+  }
+
+  .table-screen > .game-scene {
+    --scene-chrome: 5rem;
+    grid-column: 1;
+    grid-row: 1 / span 4;
+  }
+
+  .table-screen > .game-controls,
+  .table-screen > .house-mode-banner,
+  .table-screen > .house-modifier-grid {
+    grid-column: 2;
+    width: 100%;
+  }
+
+  .table-screen > .game-controls .action-bar button {
+    padding-inline: .15rem;
+    overflow-wrap: normal;
+    letter-spacing: .01em;
+  }
+}
+
+/* ---- Accessibility preferences ---- */
+
+@media (prefers-contrast: more) {
+  .scene-frame { box-shadow: 0 0 0 2px var(--cream); }
+  .game-scene .scene-cards .hand-meta,
+  .game-scene .scene-cards .hand-state { background: #000; }
+}
+
+@media (forced-colors: active) {
+  .scene-frame { border: 1px solid CanvasText; }
+}

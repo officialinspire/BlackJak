@@ -6,9 +6,23 @@ BlackJak is a mobile-first blackjack game from OFFICIAL INSPIRE, inspired in per
 
 ## Current status
 
-**BlackJak Demo v0.1.0 release candidate. Prompts 0–11 are implemented, including Classic play, Jak's House, local progression, Daily Hand, audio/haptics, accessibility/mobile QA, offline PWA support, release smoke coverage, and CI validation.**
+**BlackJak Visual Demo v0.2.0.** v0.1.0 delivered the full game: Classic play, Jak's House, local progression, Daily Hand, audio/haptics, accessibility, offline PWA and CI. v0.2.0 dresses it in the illustrated art set:
 
-Current demo features:
+- the **illustrated table** (`blackjak-table.png`) as a shared, responsive game scene for Classic and Jak's House
+- **Jak as a reactive dealer NPC**, with 19 sprite poses driven by dialogue events plus deal, draw and chip gestures
+- **three sprite card decks**: Standard, Jak's Cosmic and Inspire Mono, chosen in Settings, the HUD or the pause menu
+- a **wooden dialogue/status bar** for Jak's lines, the game status, results and REP
+- a **graphical main menu and in-game pause board** built from `menu-bar.png`
+- a game-first table shell: compact HUD, sticky action dock, immediate Deal again, and restrained game feel
+- optimized WebP runtime art (2.9MB, down from 13.8MB), fully precached for offline play
+
+| Desktop table | Pause board | Mobile (Jak's Cosmic deck) | Jak's House (Inspire Mono) |
+|---|---|---|---|
+| ![Classic table on desktop](docs/screenshots/desktop-classic.jpg) | ![Pause board](docs/screenshots/desktop-pause.jpg) | ![Mobile Classic with Jak deck](docs/screenshots/mobile-classic-jak-deck.jpg) | ![Mobile Jak's House with Inspire deck](docs/screenshots/mobile-house-inspire-deck.jpg) |
+
+More in [`docs/screenshots/`](docs/screenshots/). Blackjack rules and odds are unchanged from v0.1.0.
+
+Core game features:
 
 - Vite + TypeScript foundation
 - responsive mobile-first black/gold table UI
@@ -40,7 +54,7 @@ Current demo features:
 - data-driven Jak dealer commentary with 90+ original short reactions across 23 gameplay contexts
 - weighted dialogue selection with recent-line anti-repeat memory
 - reactions for blackjacks, dealer blackjacks, wins/losses, pushes, risky hits, doubles, splits, streaks, busts, refills, and return visits
-- compact JG monogram dealer identity placeholder; no unapproved photo likeness or cloned voice
+- Jak dealer NPC from the project's own illustrated sprite sheet; no photo likeness or cloned voice
 - commentary stays non-blocking and updates as a subtitle/status layer during play
 - persistent REP progression that never changes card odds or dealer behavior
 - REP rewards for wins, natural BlackJak, successful doubles, split sweeps, five-card wins, and survived risky hits
@@ -94,7 +108,7 @@ Current demo features:
 
 See **[BlackJak-Development-Prompts.md](./BlackJak-Development-Prompts.md)**.
 
-Prompt 11 is complete. The demo is at **v0.1.0 release-candidate** status; post-demo expansion work remains intentionally out of scope until this build is stable.
+Prompts 0–11 delivered the v0.1.0 game. The visual-development phase (atlas, scene, Jak NPC, sprite decks, dialogue bar, menu board, shell, game feel and QA) is v0.2.0.
 
 ## Controls
 
@@ -109,7 +123,7 @@ Touch/click controls are always available. Keyboard users can Tab / Shift+Tab th
 
 ## Local progression and saves
 
-BlackJak stores chips, REP, achievements, stats, Daily Hand completion, and feedback settings locally in the browser. There is no account or backend requirement in v0.1.0. Clearing browser/site data removes that local progress.
+BlackJak stores chips, REP, achievements, stats, Daily Hand completion, and feedback settings locally in the browser. There is no account or backend requirement. Clearing browser/site data removes that local progress.
 
 REP is a progression score only. It never changes deck order, odds, dealer behavior, or Classic blackjack payouts.
 
@@ -145,7 +159,7 @@ npm run build
 npm run release:check
 ```
 
-`npm run release:check` is the v0.1.0 release gate and runs the complete test suite, explicit TypeScript validation, and the production PWA build.
+`npm run release:check` is the release gate and runs the complete test suite, explicit TypeScript validation, and the production PWA build.
 
 ## Project structure
 
@@ -331,6 +345,86 @@ The responsive QA layer keeps controls at roughly 44px or larger, applies `touch
 An unfinished Classic or House wager is held in memory and committed only when the round resolves. Refreshing or abandoning an unresolved hand therefore restores the last committed bankroll rather than charging for a round that no longer exists. Malformed JSON, wrong-version storage envelopes, missing values, and blocked browser storage all fall back safely.
 
 
+## Game scene
+
+Classic and Jak's House render through one shared scene component (`src/ui/scene.ts`), stacked bottom to top: the `blackjak-table.png` table, the Jak NPC placeholder, the cards, dialogue/status plus the round result, and then the HUD. Controls stay as ordinary DOM buttons directly below. Anchors are normalized to the table art and come from `src/config/scene-layout.ts` (derived from the measured `TABLE_LAYOUT`). They're emitted as CSS custom properties and consumed by `src/styles/scene.css`, so `render.ts` contains no coordinates.
+
+The table keeps its native aspect ratio. The frame height follows the viewport: on portrait phones the frame is taller than the art, so the table is scaled to cover and its outer decor is cropped at the sides, never stretched. Card size tracks the frame through container query units, so cards stay at 48px or wider on 320px phones and top out at 96px on desktop. On short landscape screens the table sits on the left with the controls on the right. Jak's House only adds its existing modifier visuals (HUD pill, gold rim, gold cards, the Run It Back panel, and the modifier strip below the controls).
+
+### Jak, the dealer NPC
+
+Jak comes from `blackjak-sprite-sheet.png` and stands behind the dealer's cards; the lower part of his viewport fades out behind them. `src/data/dealer-visuals.ts` maps every `DialogueEvent` to a `DealerMood` and each mood to one or more sprite poses. Examples: `player_blackjack` → surprised, `dealer_blackjack` → smug, `player_bust` → shrug, `double_loss` → teasing. Short one-shot gestures (deal → card flick, hit → card toss, double → chips) play before he settles into the dialogue pose. The mapping reads only dialogue events and UI action cues, never rules or round state. Each pose is framed on its measured sunglasses position, so his head stays the same size whether a bust, half-body or full-body sprite is showing. The sprite is `aria-hidden`; his lines stay as text in the dialogue layer. With reduced motion, gestures and idle breathing are turned off.
+
+### Game-first table shell
+
+Tables use a compact, fixed rhythm:
+
+- **HUD:** ☰ Menu, chips, title with REP, and a deck button. The deck button cycles the card theme mid-hand; it's visual only, and the cards stay the same.
+- **Center:** Jak, the illustrated table and the cards.
+- **Below the table:** the wooden dialogue/status bar.
+- **Dock** (`src/ui/table-dock.ts`): one fixed-height strip that changes by phase.
+  - Betting: stake chips, then Deal.
+  - Playing: Hit, Stand, Double, Split.
+  - Resolved: Deal again, which gets focus so Enter or N redeals straight away, plus Run It Back in Jak's House when it's available.
+  - Out of chips: a free practice refill.
+
+Enabled buttons glow and disabled ones fade to grey. On phones the dock is sticky at the bottom. On desktop and tablet, Classic fits with no scrolling from 1280×720 up, and on phones from 320×568. Jak's House rules become one line of modifier pills with a collapsible rules note. Only newly dealt cards play the deal-in animation. Sound, haptics and shortcuts (N, H, S, D, P, Esc) are unchanged. Fictional practice chips only: no purchase, deposit, cash-out, crypto or operator UI, and a test enforces this.
+
+### Game feel
+
+Short, restrained cartoon effects, each 120–500ms (`FX_TIMING` in `src/ui/fx.ts`, emitted as `--fx-*` properties for `src/styles/fx.css`):
+
+- New cards slide in from the shoe, and the dealer's hole card flips over when it's revealed.
+- Stake chips bounce when chosen, and the pressed action button flashes.
+- Blackjack gives the hand a gold pop, a win lifts the cards, and a bust gives a short knock with a red flash (no screen shake).
+- The dialogue panel slides in when you sit down, and each new Jak line fades in. Jak reacts with a quick squash-and-settle and plays his deal, draw and chips gestures.
+- Achievements pop in.
+
+Effects are one-shot cues consumed by the next render, so an ordinary re-render (choosing a stake, say) never replays a bust shake or a dialogue fade. Game state always updates first, and nothing waits on an animation. Sound and haptics are the existing WebAudio and vibration cues. With reduced motion, every effect is off.
+
+A pointer tap that lands within 260ms of the dock changing shape is ignored, so a double-tap on Stand can't hit the Deal again that appears in its place, and a double-tap on Deal can't hit Hit. Keyboard input is never guarded, and repeated taps on the same control (Hit, Hit) are never delayed.
+
+### Main menu and pause board
+
+The main menu and the in-game pause board are both `menu-bar.png`, used as a wooden sign. Real `<button>`s sit over the header plaque and the four planks at hit areas normalized to the art (`src/config/menu-board-layout.ts`). Each hit area covers its whole row band, gap to gap, so rows never overlap. On phones the planks fill the width and the outer posts crop at the screen edges, leaving rows 26px or taller at 320px (WCAG 2.5.8) with no stretching. Tablets and desktop show the whole board. Main menu: Classic BlackJak (the plaque), Jak's House, Daily Hand, Stats, Settings.
+
+At a table, **☰ Menu** or **Esc** hangs the pause sign over the dimmed table. Opening it doesn't re-render or reset anything: the table stays mounted but inert, gameplay shortcuts are ignored, and the round and chips are untouched. Options: Resume (or Esc again), Deck (cycles the card theme), Sound on/off, and Main Menu. Main Menu asks for a second press while a hand is in play; leaving abandons the hand, and no chips are charged. Settings is offered inline rather than by navigating away, because the Settings screen would end the hand. `?debugVisuals=1` outlines every hit area.
+
+### Dialogue / status panel
+
+Jak's lines, the gameplay status, round results and REP notes share one `DialogueStatusPanel` (`src/ui/dialogue-panel.ts`) framed by `dialogue-status-bar.png`. It sits in a bar under the table, tucked over the bottom rail, so the felt stays clear for cards. The frame is a nine-slice (CSS `border-image`): cut lines come from the measured text-panel region, so rivets and stickers stay undistorted and the edges stretch only along the plank grain. The recessed center is cover-cropped from the same sheet rather than squashed. A `clip-path` hides the image's black matte and the stray marks along its top edge. All geometry comes from `src/config/dialogue-panel-layout.ts` as custom properties.
+
+All text is semantic HTML over the art: speaker tab, commentary line, and one compact status/result line. That status line is the only live region, so a result such as "PAID +25 chips +50 REP" is announced once; Jak's commentary is visible but not live, as before. The panel has no focusable parts and never waits, so play is never paused. With reduced motion, the line fade is off; with forced colors, the art is dropped for a plain border.
+
+### Runtime art and offline
+
+The seven original PNG sheets at the repository root stay the untouched source art. `scripts/optimize-assets.py` builds optimized WebP copies in `src/assets/runtime/`:
+
+- The pixel dimensions are identical, so every atlas coordinate still applies.
+- Colour is quality 92, or 95 for the card sheets because of their small corner indices. Alpha is lossless.
+- On the dealer sheet, pixels from neighbouring poses that overlap inside each pose's rect are cleared, so no pose shows slivers of another.
+
+Weight falls from 13.8MB to 2.9MB. A manifest records each source PNG's SHA-256, and `tests/runtime-assets.test.ts` fails if a PNG changes without the WebP being regenerated.
+
+`npm run build` ends with `scripts/verify-dist.mjs`, which fails the build if:
+
+- any file in dist is missing from the service-worker precache, or any referenced asset is missing
+- any of the seven sheets isn't present as WebP
+- a raw source PNG is shipped
+- image weight goes over budget (4.5MB total, 900KB per image)
+
+Browser QA scripts for layout, keyboard, reduced motion, mute, refresh, corrupt storage, offline and PWA update are in `scripts/qa/`.
+
+### Card decks
+
+Cards are drawn from the three deck sheets through a strict `Card {rank, suit}` → sprite mapping in `src/data/card-atlas.ts` (52 faces plus a back per deck). Every face was checked by eye: the corner index (rank and suit) matches its key in all three sheets, and pip counts were counted on every number card. The Inspire deck orders its rows ♠ ♥ ♣ ♦ and prints all suits in black.
+
+**Flagged art:** the Inspire 7♠, 7♥ and 7♣ show six pips (their index correctly reads 7). They are listed in `CARD_ART_ISSUES` and render as the drawn CSS face instead of the misleading sprite. The `?debugVisuals=1` inspector marks them in red. All other cells map directly.
+
+Sprites sit undistorted inside the existing card box, so sizing, overlap, split hands and the deal animation are unchanged. The hidden dealer card shows the deck's own back. Jak's House Gold Card adds a gold tint, ring and "GOLD" tag on top of the themed card; the rule itself is untouched. Accessible names ("K of hearts", "Hidden dealer card", "Gold Card, counts as Ace, …") are unchanged.
+
+Settings → **Card deck** chooses Standard (default), Jak's Cosmic or Inspire Mono. The choice is stored separately under `visual-preferences`, so existing saves load unchanged, and a missing or unknown value falls back to Standard.
+
 ## Visual atlas (art sheets)
 
 The PNG sheets at the repository root (`blackjak-sprite-sheet.png`, `blackjak-table.png`, `dialogue-status-bar.png`, `menu-bar.png`, and the three `blackjak-cards-*.png` decks) are mapped in `src/data/visual-atlas.ts`. Every `SpriteRect` was measured from the actual pixels rather than an assumed grid — ace/court cards are wider, rows sit at different offsets, the Inspire deck orders its rows ♠ ♥ ♣ ♦, and neighbouring dealer poses overlap (their shared borders sit on min-cost cut lines so rects never intersect). `scripts/measure-visual-atlas.py` reproduces the measurements.
@@ -342,19 +436,19 @@ The PNG sheets at the repository root (`blackjak-sprite-sheet.png`, `blackjak-ta
 - **Single-player/local-first demo:** no multiplayer, backend account system, cloud save, or global leaderboard.
 - **Browser-local persistence:** clearing site data removes chips, REP, stats, achievements, Daily completion, and settings.
 - **Classic v1 scope:** no insurance, surrender, side bets, or real-money functionality.
-- **Jak collaboration assets:** the current JG presentation is a placeholder-safe identity treatment; no unapproved photo likeness or cloned voice is included.
+- **Art notes:** the Inspire deck's 7♠, 7♥ and 7♣ are misdrawn in the source sheet (six pips); they render as a drawn fallback face until the art is corrected. Jak's shuffling pose isn't used by any mood yet.
 - **PWA deployment dependency:** GitHub Pages must be enabled once in repository settings before the production URL can deploy.
-- **Automated browser E2E:** v0.1.0 uses deterministic engine/state tests plus GitHub Actions production-build validation; a full cross-browser/device automation lab is a future improvement.
+- **Automated browser E2E:** CI runs the unit/integration suite and the production build gate; the Playwright checks in `scripts/qa/` are run manually (Chromium only).
 
-## Roadmap after v0.1.0
+## Roadmap after v0.2.0
 
-Post-demo work is intentionally deferred until the release candidate is stable. Potential later work includes approved Jak Gold voice/likeness assets, additional dealer rooms, cosmetic card/chip themes, expanded House modifiers, richer Daily analytics, multiplayer/pass-and-play experiments, cloud saves, leaderboards, seasonal events, and deeper achievement content.
+Potential later work includes corrected Inspire sevens, a Daily Hand screen on the illustrated scene, voice assets, additional dealer rooms, cosmetic card/chip themes, expanded House modifiers, richer Daily analytics, multiplayer/pass-and-play experiments, cloud saves, leaderboards, seasonal events, and deeper achievement content.
 
 See **[BlackJak-Development-Prompts.md](./BlackJak-Development-Prompts.md)** for the original staged development roadmap and **[CHANGELOG.md](./CHANGELOG.md)** for release history.
 
 ## Release validation
 
-The v0.1.0 release-candidate pass reviews package scripts/dependencies, PWA configuration, deployment behavior, TODO/scaffold residue, repository assets, TypeScript diagnostics, test output, and production-build output.
+The release pass reviews package scripts/dependencies, PWA configuration, deployment behavior, TODO/scaffold residue, repository assets, TypeScript diagnostics, test output, and production-build output.
 
 A dedicated release-smoke suite covers:
 - fresh profile/default bankroll and zero-chip refill
@@ -378,7 +472,7 @@ BlackJak is an entertainment game using **fictional practice chips and REP only*
 
 - **Design, development, and publishing:** OFFICIAL INSPIRE
 - **Jak Gold collaboration credit:** *Placeholder — replace with approved collaboration / likeness / voice credit before any build using those assets.*
-- The current v0.1.0 build uses original/project-safe interface art, a JG monogram placeholder, browser-synthesized audio, and no unapproved cloned voice or photo likeness.
+- The v0.2.0 build uses the project's illustrated art sheets (table, Jak sprites, card decks, dialogue bar, menu board), browser-synthesized audio, and no photo likeness or cloned voice.
 
 ## OFFICIAL INSPIRE
 

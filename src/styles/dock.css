@@ -1,0 +1,416 @@
+/*
+ * Prompt 18 — game-first shell: compact HUD, table, dialogue bar, and a
+ * fixed-height action dock (sticky on phones). Fictional chips only.
+ */
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Tighter vertical rhythm so the whole table + dock fits a desktop viewport.
+   overflow-x: clip (not hidden) so the page, not .screen, scrolls and the dock can stick. */
+.table-screen {
+  overflow: visible;
+  overflow-x: clip;
+  gap: .4rem;
+  padding-top: max(.5rem, env(safe-area-inset-top));
+  padding-bottom: 0;
+}
+
+.table-screen .game-scene {
+  /* HUD + dialogue bar + dock (the dock is sticky on phones, so less is reserved). */
+  --scene-chrome: 18.5rem;
+}
+
+.house-screen .game-scene {
+  --scene-chrome: 20.5rem;
+}
+
+/* ---- HUD: menu | chips | REP/title | deck ---- */
+
+.table-hud {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+
+.table-hud .hud {
+  flex: 1 1 auto;
+  justify-content: center;
+  flex-wrap: nowrap;
+  gap: .35rem;
+}
+
+.table-hud .hud > span {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  white-space: nowrap;
+}
+
+.table-hud .rep-pill .title-pill {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--bj-gold-bright, var(--gold));
+}
+
+.pause-button,
+.hud-deck {
+  flex: 0 0 auto;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .3rem .6rem;
+  border: 1px solid rgba(212,175,55,.4);
+  border-radius: 10px;
+  color: var(--cream);
+  background: linear-gradient(180deg, #221c12, #111);
+  font-size: .78rem;
+  font-weight: 800;
+}
+
+.hud-deck:hover,
+.pause-button:hover {
+  border-color: var(--gold);
+}
+
+.hud-deck-back {
+  display: block;
+  width: 18px;
+}
+
+.hud-deck-back .playing-card {
+  width: 18px;
+  margin: 0;
+  animation: none;
+}
+
+/* ---- Dock ---- */
+
+.table-screen > .table-dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
+  width: min(100%, 860px);
+  justify-self: center;
+  display: grid;
+  gap: .25rem;
+  padding: .45rem .5rem max(.35rem, env(safe-area-inset-bottom));
+  border: 1px solid rgba(212,175,55,.24);
+  border-bottom: 0;
+  border-radius: 16px 16px 0 0;
+  background: linear-gradient(180deg, rgba(24,20,13,.96), rgba(9,9,9,.98));
+  box-shadow: 0 -10px 30px rgba(0,0,0,.45);
+  backdrop-filter: blur(6px);
+}
+
+.dock-row {
+  /* Same height in every phase so the table never jumps. */
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+.dock-readout {
+  flex: 0 0 auto;
+  display: grid;
+  justify-items: center;
+  min-width: 3.4rem;
+  line-height: 1.05;
+}
+
+.dock-readout small {
+  color: var(--muted);
+  font-size: .55rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+
+.dock-readout b {
+  color: var(--bj-gold-bright, var(--gold));
+  font-size: 1.05rem;
+}
+
+.dock-stakes {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+  min-width: 0;
+}
+
+.table-dock .dock-chip {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  padding: 0;
+  font-size: .66rem;
+}
+
+.dock-actions {
+  flex: 1 1 auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: .35rem;
+  min-width: 0;
+}
+
+.table-dock.phase-playing .dock-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.table-dock button.dock-action,
+.table-dock .dock-primary,
+.table-dock .dock-secondary {
+  position: relative;
+  min-height: 52px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: .3rem .7rem;
+  border-radius: 12px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  transition: transform .08s ease, box-shadow .15s ease, opacity .15s ease, filter .15s ease;
+}
+
+.table-dock .dock-primary {
+  min-width: 8.5rem;
+  font-size: .95rem;
+  text-transform: uppercase;
+}
+
+.table-dock .dock-secondary {
+  min-width: 7.5rem;
+  font-size: .72rem;
+  white-space: nowrap;
+}
+
+.table-dock .dock-secondary small {
+  font-size: .55rem;
+  font-weight: 700;
+  opacity: .85;
+}
+
+.table-dock kbd {
+  font: 700 .52rem/1 ui-monospace, monospace;
+  opacity: .6;
+}
+
+/* The primary stays gold on hover/focus (the legacy hover rule darkened it under dark text). */
+.table-dock .dock-primary:not(:disabled):hover,
+.table-dock .dock-primary:not(:disabled):focus-visible {
+  color: #0b0905;
+  background: linear-gradient(180deg, #f0d470, #b88f22);
+  border-color: #f7df7d;
+}
+
+.table-dock button.dock-action strong {
+  font-size: clamp(.64rem, 3.1vw, .86rem);
+  letter-spacing: .03em;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  white-space: nowrap;
+}
+
+.table-dock button.dock-action {
+  padding-inline: .2rem;
+}
+
+/* Enabled vs disabled must read instantly. */
+.table-dock .is-ready:not(:disabled) {
+  border-color: rgba(240,215,122,.75);
+  box-shadow: 0 0 0 1px rgba(240,215,122,.25), 0 6px 18px rgba(0,0,0,.35), 0 0 16px rgba(214,182,80,.18);
+}
+
+.table-dock button:disabled {
+  opacity: .32;
+  filter: grayscale(1);
+  box-shadow: none;
+}
+
+.table-dock button:not(:disabled):active {
+  transform: translateY(1px) scale(.98);
+}
+
+.table-dock .deal-button.is-ready:not(:disabled) {
+  animation: dock-ready-pulse 2.4s ease-in-out infinite;
+}
+
+.dock-note {
+  margin: 0;
+  color: #7f776a;
+  font-size: .6rem;
+  letter-spacing: .06em;
+  text-align: center;
+}
+
+.dock-error {
+  margin: 0;
+  font-size: .72rem;
+}
+
+@keyframes dock-ready-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(240,215,122,.25), 0 6px 18px rgba(0,0,0,.35), 0 0 10px rgba(214,182,80,.15); }
+  50% { box-shadow: 0 0 0 1px rgba(240,215,122,.45), 0 6px 18px rgba(0,0,0,.35), 0 0 22px rgba(214,182,80,.35); }
+}
+
+/* ---- Cards: only new cards animate (deal-in timing lives in fx.css) ---- */
+
+.game-scene .playing-card.is-settled {
+  animation: none;
+}
+
+/* ---- Jak's House compact strip ---- */
+
+.house-strip {
+  width: min(100%, 860px);
+  justify-self: center;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: .25rem .5rem;
+}
+
+.house-modifier-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: .3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.house-modifier-pill {
+  display: inline-flex;
+  gap: .35rem;
+  padding: .22rem .55rem;
+  border: 1px solid rgba(240,215,122,.28);
+  border-radius: 999px;
+  background: rgba(0,0,0,.35);
+  color: var(--muted);
+  font-size: .62rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  white-space: nowrap;
+}
+
+.house-modifier-pill strong { color: var(--cream); }
+.house-modifier-pill.is-active { border-color: #f2c14e; box-shadow: 0 0 12px rgba(242,193,78,.3); }
+.house-modifier-pill.is-active strong { color: #f2c14e; }
+
+.house-rules {
+  color: var(--muted);
+  font-size: .66rem;
+}
+
+.house-rules summary {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--bj-gold-bright, var(--gold));
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.house-rules[open] {
+  flex-basis: 100%;
+  padding: .4rem .6rem;
+  border: 1px solid rgba(212,175,55,.2);
+  border-radius: 10px;
+  background: rgba(0,0,0,.35);
+}
+
+.house-rules p,
+.house-rules ul { margin: .25rem 0 0; }
+
+/* Toasts float at the top on tables so they never cover the dock. */
+.table-screen .achievement-toast {
+  top: max(.5rem, env(safe-area-inset-top));
+  bottom: auto;
+}
+
+/* ---- Narrow phones ---- */
+
+@media (max-width: 520px) {
+  .table-hud .hud-label { display: none; }
+  .table-hud .hud > span { padding: .28rem .42rem; font-size: .58rem; }
+  .pause-button, .hud-deck { padding: .3rem .5rem; min-width: 40px; justify-content: center; }
+
+  /* Two rows in the betting phases: chips, then the primary action. */
+  .table-dock:not(.phase-playing) .dock-row {
+    flex-wrap: wrap;
+    row-gap: .35rem;
+  }
+  .table-dock:not(.phase-playing) .dock-stakes { flex-basis: 100%; justify-content: space-between; }
+  .table-dock:not(.phase-playing) .dock-actions { flex-basis: 100%; }
+  .table-dock .dock-primary { flex: 1 1 auto; }
+  .table-dock.phase-playing .dock-row { min-height: 104px; }
+  .table-dock.phase-playing .dock-wager { display: none; }
+  .table-dock.phase-playing .dock-actions { flex-basis: 100%; }
+  .table-dock button.dock-action { min-height: 64px; }
+  .table-dock kbd { display: none; }
+  .dock-readout { min-width: 2.8rem; }
+}
+
+@media (max-width: 600px) {
+  /* One scrollable line of modifier pills + the rules toggle. */
+  .house-strip {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-inline: .1rem;
+  }
+  .house-strip::-webkit-scrollbar { display: none; }
+  .house-modifier-pills { flex-wrap: nowrap; }
+  .house-modifier-pill { font-size: .56rem; padding: .2rem .45rem; }
+  .house-rules summary { white-space: nowrap; font-size: .56rem; }
+  .house-rules[open] { position: fixed; left: .5rem; right: .5rem; bottom: 9rem; z-index: 40; }
+}
+
+@media (max-width: 360px) {
+  .table-dock .dock-chip { width: 40px; height: 40px; min-width: 40px; }
+  .table-hud .rep-pill .rep-mini-track { display: none; }
+}
+
+@media (orientation: landscape) and (max-height: 540px) {
+  .table-screen .game-scene { --scene-chrome: 5rem; }
+
+  .table-screen > .table-dock,
+  .table-screen > .house-strip {
+    grid-column: 2;
+    position: static;
+    border-radius: 16px;
+    border-bottom: 1px solid rgba(212,175,55,.24);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .table-dock .deal-button.is-ready:not(:disabled) { animation: none; }
+  .table-dock button { transition: none; }
+}
+
+@media (forced-colors: active) {
+  .table-dock button:disabled { opacity: 1; color: GrayText; border-color: GrayText; }
+  .table-dock .is-ready:not(:disabled) { border: 2px solid ButtonText; }
+}

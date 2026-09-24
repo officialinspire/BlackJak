@@ -1,0 +1,193 @@
+/*
+ * Prompt 16 — DialogueStatusPanel (dialogue-status-bar.png).
+ *
+ * Geometry comes from src/config/dialogue-panel-layout.ts via custom
+ * properties: --dlg-slice-* (nine-slice cut lines), --dlg-matte-* (black matte
+ * to clip away), --dlg-radius, and the --dlg-scale-* px-per-source-px range.
+ * Nothing here is an image coordinate.
+ */
+
+.dialogue-panel {
+  /* Rendered px per source px, fluid with the scene width. */
+  --dlg-unit: clamp(var(--dlg-scale-min), var(--dlg-scale-fluid), var(--dlg-scale-max));
+  --dlg-inset-top: calc(var(--dlg-matte-top) * var(--dlg-unit));
+  --dlg-inset-right: calc(var(--dlg-matte-right) * var(--dlg-unit));
+  --dlg-inset-bottom: calc(var(--dlg-matte-bottom) * var(--dlg-unit));
+  --dlg-inset-left: calc(var(--dlg-matte-left) * var(--dlg-unit));
+
+  position: relative;
+  isolation: isolate;
+  box-sizing: border-box;
+  width: min(100%, var(--dlg-max-width));
+  margin-inline: auto;
+  display: grid;
+  align-content: center;
+  gap: .18rem;
+  min-height: calc((var(--dlg-slice-top) + var(--dlg-slice-bottom)) * var(--dlg-unit) + 2.6rem);
+  padding: .3rem clamp(.35rem, 2cqi, 1rem) .25rem;
+  border-style: solid;
+  border-width:
+    calc(var(--dlg-slice-top) * var(--dlg-unit))
+    calc(var(--dlg-slice-right) * var(--dlg-unit))
+    calc(var(--dlg-slice-bottom) * var(--dlg-unit))
+    calc(var(--dlg-slice-left) * var(--dlg-unit));
+  border-color: transparent;
+  border-image-source: var(--dlg-frame-url);
+  border-image-slice: var(--dlg-slice-top) var(--dlg-slice-right) var(--dlg-slice-bottom) var(--dlg-slice-left);
+  border-image-repeat: stretch;
+  /* Hide the matte (and its stray top-edge marks) that sits outside the wood. */
+  clip-path: inset(
+    var(--dlg-inset-top) var(--dlg-inset-right) var(--dlg-inset-bottom) var(--dlg-inset-left)
+    round calc(var(--dlg-radius) * var(--dlg-unit))
+  );
+  filter: drop-shadow(0 10px 18px rgba(0,0,0,.45));
+  color: #f6ecd6;
+  text-align: center;
+}
+
+/* Recessed center wood: cover-cropped from the same sheet, never squashed. */
+.dialogue-panel-wood {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+}
+
+.dialogue-panel-wood .atlas-sprite {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+}
+
+.dialogue-panel-wood::after {
+  /* Darken the grain slightly so light text keeps contrast. */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(20,10,4,.42), rgba(20,10,4,.3));
+}
+
+/* Speaker tab sits on the top plank. */
+.dialogue-panel-speaker {
+  position: absolute;
+  top: calc(-1 * var(--dlg-slice-top) * var(--dlg-unit) + var(--dlg-inset-top));
+  left: 0;
+  display: flex;
+  align-items: baseline;
+  gap: .35rem;
+  margin: 0;
+  padding: .05rem .5rem .1rem;
+  border-radius: 0 0 8px 8px;
+  background: rgba(12,7,3,.82);
+  box-shadow: 0 2px 6px rgba(0,0,0,.35);
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.dialogue-panel-speaker b {
+  color: var(--bj-gold-bright, var(--gold));
+  font-family: Georgia, serif;
+  font-size: max(10px, .72rem);
+  letter-spacing: .14em;
+}
+
+.dialogue-panel-speaker span {
+  color: #cdbf9f;
+  font-size: max(8px, .5rem);
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+
+.dialogue-panel-line {
+  position: relative;
+  margin: 0;
+  padding-inline: 1rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(12px, 3.2cqi, 1.02rem);
+  font-style: italic;
+  line-height: 1.28;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  text-shadow: 0 1px 2px rgba(0,0,0,.7);
+  animation: dlg-line-in .22s ease-out both;
+}
+
+.dialogue-panel-quote {
+  position: absolute;
+  left: 0;
+  top: -.15em;
+  color: rgba(240,215,122,.55);
+  font-size: 1.5em;
+  line-height: 1;
+}
+
+.dialogue-panel-status {
+  justify-self: center;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: .1rem .4rem;
+  max-width: 100%;
+  margin: 0;
+  padding: .1rem .6rem;
+  border-radius: 999px;
+  background: rgba(8,5,2,.62);
+  color: #efe6d2;
+  font-size: max(11px, .72rem);
+  font-weight: 800;
+  letter-spacing: .04em;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.dialogue-panel-status strong {
+  color: var(--bj-cream, var(--cream));
+  font-family: Georgia, serif;
+  font-size: 1.15em;
+  letter-spacing: .02em;
+}
+
+.dialogue-panel-tag {
+  padding: 0 .4rem;
+  border: 1px solid rgba(240,215,122,.5);
+  border-radius: 999px;
+  color: var(--bj-gold-bright, var(--gold));
+  font-size: .9em;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+/* Result tones: colour the status and give the frame a soft glow. */
+.dialogue-panel.tone-blackjack .dialogue-panel-status strong,
+.dialogue-panel.tone-win .dialogue-panel-status strong { color: var(--bj-gold-bright, var(--gold)); }
+.dialogue-panel.tone-loss .dialogue-panel-status strong { color: #ff9d8f; }
+.dialogue-panel.tone-blackjack { filter: drop-shadow(0 10px 18px rgba(0,0,0,.45)) drop-shadow(0 0 14px rgba(242,193,78,.45)); }
+.dialogue-panel.tone-win { filter: drop-shadow(0 10px 18px rgba(0,0,0,.45)) drop-shadow(0 0 10px rgba(242,193,78,.3)); }
+.dialogue-panel.tone-loss { filter: drop-shadow(0 10px 18px rgba(0,0,0,.45)) drop-shadow(0 0 10px rgba(212,80,70,.3)); }
+
+.dialogue-panel.is-house .dialogue-panel-speaker { box-shadow: 0 2px 6px rgba(0,0,0,.35), 0 0 0 1px rgba(240,215,122,.55); }
+
+@keyframes dlg-line-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialogue-panel-line { animation: none !important; }
+}
+
+@media (prefers-contrast: more) {
+  .dialogue-panel-wood::after { background: rgba(0,0,0,.7); }
+  .dialogue-panel-status { background: #000; }
+}
+
+@media (forced-colors: active) {
+  .dialogue-panel {
+    border: 2px solid CanvasText;
+    border-image: none;
+    clip-path: none;
+    filter: none;
+  }
+  .dialogue-panel-wood { display: none; }
+}

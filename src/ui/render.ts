@@ -40,8 +40,19 @@ import { loadFeedbackPreferences, saveFeedbackPreferences } from '../storage/pre
 import { loadProfile, saveProfile } from '../storage/profile';
 import type { AppScreen } from '../types/app';
 import type { DailyOutcome, PlayerProfile } from '../types/profile';
-import type { FeedbackPreferences } from '../types/preferences';
-import { cardMarkup } from './card';
+import type { FeedbackPreferences, VisualPreferences } from '../types/preferences';
+import { cardMarkup, setActiveCardTheme } from './card';
+import { CARD_THEMES } from '../data/card-atlas';
+import { CARD_THEME_IDS, type CardThemeId } from '../data/visual-atlas';
+import { loadVisualPreferences, saveVisualPreferences } from '../storage/visual-preferences';
+import { gameSceneMarkup } from './scene';
+import { ACTION_SHORTCUTS, dockPhaseFor, tableDockMarkup, type DockPhase } from './table-dock';
+import { FxQueue, fxClassNames, fxStyleVars, shouldIgnoreActivation, type FxCue } from './fx';
+import { menuBoardMarkup } from './menu-board';
+import { escapeIntent, isTableScreen, pauseMenuMarkup } from './pause-menu';
+import { dialoguePanelMarkup, type PanelStatus } from './dialogue-panel';
+import { dealerMarkup } from './dealer';
+import type { DealerAction } from '../data/dealer-visuals';
 
 interface AppModel {
   screen: AppScreen;
@@ -59,19 +70,22 @@ interface AppModel {
   houseLastBonusRep: number;
   houseTokenAwarded: boolean;
   preferences: FeedbackPreferences;
+  visual: VisualPreferences;
   dailyDateKey: string;
   dailyRound: RoundState | null;
   dailyShareStatus: string | null;
+  /** One-shot Jak gesture for the next render (visual only). */
+  dealerCue: DealerAction | null;
+  /** In-game pause board is open over the table (the round is untouched). */
+  pauseMenuOpen: boolean;
+  /** "Main Menu" was pressed once while a hand is in play; the next press leaves. */
+  pauseConfirmLeave: boolean;
+  /** Increments per dealt round; keys card animations to a single round. */
+  roundSerial: number;
 }
 
 type RoundTone = 'idle' | 'playing' | 'blackjack' | 'win' | 'loss' | 'push' | 'mixed';
 
-const ACTION_SHORTCUTS: Record<PlayerAction, string> = {
-  hit: 'H',
-  stand: 'S',
-  double: 'D',
-  split: 'P',
-};
 
 const FOCUS_ATTRIBUTES = [
   'data-action',
@@ -79,6 +93,10 @@ const FOCUS_ATTRIBUTES = [
   'data-stake',
   'data-setting-toggle',
   'data-setting-volume',
+  'data-card-theme',
+  'data-pause-action',
+  'data-pause',
+  'data-deck-cycle',
   'data-screen',
 ] as const;
 
@@ -94,6 +112,8 @@ let globalKeyboardBound = false;
 
 const initialProfile = loadProfile();
 const initialPreferences = loadFeedbackPreferences();
+const initialVisual = loadVisualPreferences();
+setActiveCardTheme(initialVisual.cardTheme);
 const initialDateKey = localDateKey();
 const initialDialogue = selectDialogue(initialProfile.stats.totalHands > 0 ? 'return_player' : 'game_start');
 
@@ -113,10 +133,41 @@ const model: AppModel = {
   houseLastBonusRep: 0,
   houseTokenAwarded: false,
   preferences: initialPreferences,
+  visual: initialVisual,
   dailyDateKey: initialDateKey,
   dailyRound: null,
   dailyShareStatus: null,
+  dealerCue: null,
+  pauseMenuOpen: false,
+  pauseConfirmLeave: false,
+  roundSerial: 0,
 };
+
+/** Cards already on screen in the previous render: only new cards play the deal-in. */
+let renderedCardKeys = new Set<string>();
+let pendingCardKeys = new Set<string>();
+
+const fxQueue = new FxQueue();
+/** Cues for the render in progress (one-shot; empty for plain re-renders). */
+let currentFx: ReadonlySet<FxCue> = new Set();
+/** When the dock last changed phase: pointer taps just after are stale double-taps. */
+let controlsChangedAt = -Infinity;
+let lastDockPhase: DockPhase | null = null;
+
+function cueFx(...cues: FxCue[]): void {
+  fxQueue.cue(...cues);
+}
+
+/** Card key already shown face-down in the previous render (so a reveal flips). */
+function wasRenderedHidden(key: string): boolean {
+  return renderedCardKeys.has(`${model.roundSerial}:${key}`);
+}
+
+function cardIsNew(key: string): boolean {
+  const scoped = `${model.roundSerial}:${key}`;
+  pendingCardKeys.add(scoped);
+  return !renderedCardKeys.has(scoped);
+}
 
 const app = (): HTMLElement => {
   const root = document.querySelector<HTMLElement>('#app');
@@ -181,10 +232,17 @@ function clickShortcut(selector: string): boolean {
 function handleGlobalKeyboard(event: KeyboardEvent): void {
   if (event.defaultPrevented || event.repeat || event.ctrlKey || event.metaKey || event.altKey || isEditableTarget(event.target)) return;
 
-  if (event.key === 'Escape' && model.screen !== 'menu') {
-    if (clickShortcut('.back-button[data-screen="menu"]')) event.preventDefault();
+  if (event.key === 'Escape') {
+    const intent = escapeIntent(model.screen, model.pauseMenuOpen);
+    if (intent === 'open-pause') openPauseMenu();
+    else if (intent === 'close-pause') closePauseMenu();
+    else if (intent === 'back') clickShortcut('.back-button[data-screen="menu"]');
+    if (intent !== 'none') event.preventDefault();
     return;
   }
+
+  // The table is inert behind the pause board: no gameplay shortcuts while paused.
+  if (model.pauseMenuOpen) return;
 
   const key = event.key.toUpperCase();
   const action = (Object.entries(ACTION_SHORTCUTS).find(([, shortcut]) => shortcut === key)?.[0] ?? null) as PlayerAction | null;
@@ -212,15 +270,34 @@ function bindGlobalKeyboardOnce(): void {
   globalKeyboardBound = true;
 }
 
-const button = (label: string, screen: AppScreen): string =>
-  `<button class="menu-button" data-screen="${screen}">${label}</button>`;
-
 const formatChips = (value: number): string =>
   new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(value);
 
 function persistProfile(profile: PlayerProfile): void {
   model.profile = profile;
   saveProfile(profile);
+}
+
+function setCardTheme(theme: CardThemeId): void {
+  model.visual = { ...model.visual, cardTheme: theme };
+  saveVisualPreferences(model.visual);
+  setActiveCardTheme(theme);
+}
+
+function deckThemeSettingMarkup(): string {
+  const preview = (theme: CardThemeId): string =>
+    `<span class="deck-theme-preview" aria-hidden="true">${cardMarkup({ rank: 'A', suit: 'spades' }, false, 0, 'standard', theme)}${cardMarkup({ rank: 'K', suit: 'hearts' }, true, 0, 'standard', theme)}</span>`;
+  return `
+    <div class="setting-row deck-theme-setting">
+      <span><strong>Card deck</strong><small>Visual only. Every deck plays exactly the same.</small></span>
+      <div class="deck-theme-options" role="group" aria-label="Card deck theme">
+        ${CARD_THEME_IDS.map((theme) => `
+          <button type="button" class="deck-theme-option" data-card-theme="${theme}" aria-pressed="${model.visual.cardTheme === theme}">
+            ${preview(theme)}
+            <span>${CARD_THEMES[theme].label}</span>
+          </button>`).join('')}
+      </div>
+    </div>`;
 }
 
 function persistPreferences(preferences: FeedbackPreferences): void {
@@ -256,6 +333,7 @@ function say(event: DialogueEvent): void {
   const next = selectDialogue(event, model.dialogueMemory);
   model.commentary = next.selection;
   model.dialogueMemory = next.memory;
+  cueFx('line');
 }
 
 function normalizedStake(): number {
@@ -318,13 +396,18 @@ function menuMarkup(): string {
         <p class="tagline">${APP_TAGLINE}</p>
         <p class="brand-note">Private table. Fictional chips. Questionable judgment.</p>
       </section>
-      <nav class="menu-grid" aria-label="BlackJak modes">
-        ${button('Classic BlackJak · Standard', 'classic')}
-        ${button("Jak's House · Arcade", 'house')}
-        ${button('Daily Hand · Challenge', 'daily')}
-        ${button('Stats', 'stats')}
-        ${button('Settings', 'settings')}
-      </nav>
+      ${menuBoardMarkup({
+        as: 'nav',
+        label: 'BlackJak modes',
+        className: 'main-menu-board',
+        items: [
+          { slot: 'header', label: 'Classic BlackJak', detail: 'Standard rules · 3:2', attributes: 'data-screen="classic"' },
+          { slot: 'row1', label: "Jak's House", detail: 'Arcade', attributes: 'data-screen="house"' },
+          { slot: 'row2', label: 'Daily Hand', detail: 'Challenge', attributes: 'data-screen="daily"' },
+          { slot: 'row3', label: 'Stats', attributes: 'data-screen="stats"' },
+          { slot: 'row4', label: 'Settings', attributes: 'data-screen="settings"' },
+        ],
+      })}
       <div class="menu-progression" aria-label="BlackJak progression">
         <span>${title.current.name}</span>
         <b>${model.profile.rep} REP</b>
@@ -350,6 +433,7 @@ function settingsMarkup(): string {
         <p class="eyebrow">TABLE SETUP</p>
         <h1>Settings</h1>
         <div class="settings-list">
+          ${deckThemeSettingMarkup()}
           <div class="setting-row"><span><strong>Motion</strong><small>Animations follow your device's reduced-motion preference.</small></span><b>System</b></div>
           ${toggle('master', 'Master feedback', 'Master switch for synthesized sound and haptic feedback.')}
           ${toggle('sfx', 'Sound effects', 'Cards, chips, buttons, results, and achievement stings.')}
@@ -473,74 +557,43 @@ function playerHandsMarkup(round: RoundState | null, house: HouseState | null = 
             <strong>${evaluation.total}</strong>
             <span class="hand-wager">${formatChips(hand.wager)} chips</span>
           </div>
-          <div class="cards">${hand.cards.map((card, cardIndex) => cardMarkup(card, false, cardIndex + index * 2, house && isGoldCard(house, hand.id, cardIndex) ? 'gold' : 'standard')).join('')}</div>
+          <div class="cards">${hand.cards.map((card, cardIndex) => {
+            const fresh = cardIsNew(`p:${index}:${cardIndex}:${card.rank}${card.suit}`);
+            return cardMarkup(card, false, fresh ? cardIndex + index * 2 : 0, house && isGoldCard(house, hand.id, cardIndex) ? 'gold' : 'standard', undefined, fresh);
+          }).join('')}</div>
           <span class="hand-state">${handResultLabel(round, hand)}</span>
         </section>`;
     }).join('')}
   </div>`;
 }
 
-function resultBannerMarkup(round: RoundState | null): string {
-  if (!round || round.phase !== 'resolved') return '';
-  const tone = roundTone(round);
-  const net = round.results.reduce((sum, result) => sum + result.net, 0);
-  const netLabel = net === 0 ? '±0' : `${net > 0 ? '+' : ''}${formatChips(net)}`;
-  const titleMap: Record<Exclude<RoundTone, 'idle' | 'playing'>, string> = {
-    blackjack: 'BLACKJAK',
-    win: 'PAID',
-    loss: 'BUSTED',
-    push: 'PUSH',
-    mixed: 'SPLIT DECISION',
-  };
-  const detail = round.results.length > 1
-    ? round.results.map((result, index) => `H${index + 1} ${result.outcome.toUpperCase()}`).join(' · ')
-    : round.results[0]?.outcome.toUpperCase() ?? '';
-  const repLine = model.lastRepEarned > 0 ? `+${model.lastRepEarned} REP` : '';
+const RESULT_TITLES: Record<Exclude<RoundTone, 'idle' | 'playing'>, string> = {
+  blackjack: 'BLACKJAK',
+  win: 'PAID',
+  loss: 'BUSTED',
+  push: 'PUSH',
+  mixed: 'SPLIT DECISION',
+};
 
-  return `
-    <div class="result-banner result-${tone}" role="group" aria-label="Round result: ${titleMap[tone as Exclude<RoundTone, 'idle' | 'playing'>]}, ${netLabel} chips${repLine ? `, ${repLine}` : ''}">
-      <span>ROUND RESULT</span>
-      <strong>${titleMap[tone as Exclude<RoundTone, 'idle' | 'playing'>]}</strong>
-      <b>${netLabel} chips</b>
-      <small>${detail}</small>
-      ${repLine ? `<em>${repLine}</em>` : ''}
-    </div>`;
-}
-
-function bettingControlsMarkup(): string {
-  if (model.profile.chips <= 0) {
-    return `
-      <div class="betting-panel broke-panel">
-        <p>You're out of practice chips.</p>
-        <button class="primary-action" data-action="refill">Refill Practice Chips</button>
-        <span>No purchase required. This simply restores the practice stack.</span>
-      </div>`;
+/** Status/result line for the dialogue panel, derived from existing round + reward state. */
+function panelStatus(view: TableView, house: boolean): PanelStatus {
+  const { round, tone } = view;
+  if (!round || round.phase !== 'resolved' || tone === 'idle' || tone === 'playing') {
+    return { tone, text: statusText(round) };
   }
 
-  const selected = normalizedStake();
-  const maxValue = Math.min(model.profile.chips, MAX_STAKE);
-  return `
-    <div class="betting-panel" aria-label="Choose a fictional chip stake">
-      <div class="betting-heading"><span>STAKE</span><strong>${formatChips(selected)} CHIPS</strong></div>
-      <div class="stake-row">
-        ${STAKE_OPTIONS.map((stake) => `
-          <button class="stake-button ${selected === stake ? 'is-selected' : ''}" data-stake="${stake}" aria-pressed="${selected === stake}" ${stake > model.profile.chips ? 'disabled' : ''}>${stake}</button>`).join('')}
-        <button class="stake-button ${selected === maxValue ? 'is-selected' : ''}" data-stake="max" aria-pressed="${selected === maxValue}">MAX</button>
-      </div>
-      <button class="primary-action deal-button" data-action="deal" aria-keyshortcuts="N">${model.round?.phase === 'resolved' ? 'Deal Again' : 'Deal Hand'}</button>
-    </div>`;
-}
-
-function houseBettingControlsMarkup(): string {
-  const replay = model.house.replayAvailable && model.house.currentStake
-    ? `
-      <div class="run-it-back-panel">
-        <div><span>RUN IT BACK</span><strong>FREE REDEAL · ${formatChips(model.house.currentStake)} CHIP BASE STAKE</strong></div>
-        <button class="house-special-action" data-action="run-it-back">Use Token (${model.house.runItBackTokens})</button>
-      </div>`
+  const net = round.results.reduce((sum, result) => sum + result.net, 0);
+  const netLabel = net === 0 ? '±0 chips' : `${net > 0 ? '+' : ''}${formatChips(net)} chips`;
+  const detail = round.results.length > 1
+    ? ` · ${round.results.map((result, index) => `H${index + 1} ${result.outcome.toUpperCase()}`).join(' · ')}`
     : '';
+  const tags = [
+    model.lastRepEarned > 0 ? `+${model.lastRepEarned} REP` : '',
+    house && model.houseLastBonusRep > 0 ? `HOT HAND +${model.houseLastBonusRep} REP` : '',
+    house && model.houseTokenAwarded ? 'RUN IT BACK TOKEN EARNED' : '',
+  ].filter(Boolean);
 
-  return `${replay}${bettingControlsMarkup()}`;
+  return { tone, title: RESULT_TITLES[tone], text: `${netLabel}${detail}`, tags };
 }
 
 function houseModifierStripMarkup(): string {
@@ -549,148 +602,160 @@ function houseModifierStripMarkup(): string {
   const goldActive = Boolean(model.round && model.house.goldRound);
 
   const statusById: Record<string, string> = {
-    'gold-card': goldActive ? 'ACTIVE THIS HAND' : `IN ${nextGoldIn} PAID HAND${nextGoldIn === 1 ? '' : 'S'}`,
+    'gold-card': goldActive ? 'ACTIVE' : `IN ${nextGoldIn}`,
     'run-it-back': `${model.house.runItBackTokens} TOKEN${model.house.runItBackTokens === 1 ? '' : 'S'}`,
-    'hot-hand': `NEXT WIN ×${nextHotMultiplier.toFixed(2)} REP`,
+    'hot-hand': `NEXT ×${nextHotMultiplier.toFixed(2)} REP`,
   };
 
   return `
-    <div class="house-modifier-grid" aria-label="Jak's House active modifier rules">
-      ${HOUSE_MODIFIERS.map((modifier) => `
-        <article class="house-modifier ${modifier.id === 'gold-card' && goldActive ? 'is-active' : ''}">
-          <span>${modifier.name}</span>
-          <strong>${statusById[modifier.id]}</strong>
-          <p>${modifier.shortDescription}</p>
-        </article>`).join('')}
-    </div>`;
+    <section class="house-strip" aria-labelledby="house-mode-title">
+      <h1 id="house-mode-title" class="visually-hidden">Jak's House</h1>
+      <ul class="house-modifier-pills" aria-label="Jak's House active modifier rules">
+        ${HOUSE_MODIFIERS.map((modifier) => `
+          <li class="house-modifier-pill${modifier.id === 'gold-card' && goldActive ? ' is-active' : ''}"><span>${modifier.name}</span><strong>${statusById[modifier.id]}</strong></li>`).join('')}
+      </ul>
+      <details class="house-rules">
+        <summary>Arcade rules · not standard blackjack</summary>
+        <p>Blackjack-inspired arcade play. House modifiers can change a hand, but Classic BlackJak remains standard and separate.</p>
+        <ul>${HOUSE_MODIFIERS.map((modifier) => `<li><b>${modifier.name}.</b> ${modifier.shortDescription}</li>`).join('')}</ul>
+      </details>
+    </section>`;
 }
 
-function actionControlsMarkup(round: RoundState): string {
-  const activeHand = getActiveHand(round);
-  const valid = allowedActions(activeHand, model.profile.chips);
-  return `
-    <div class="action-bar" aria-label="Blackjack actions">
-      ${(['hit', 'stand', 'double', 'split'] as PlayerAction[])
-        .map((action) => `<button data-action="${action}" aria-label="${action.toUpperCase()}" aria-keyshortcuts="${ACTION_SHORTCUTS[action]}" ${valid.includes(action) ? '' : 'disabled'}>${action.toUpperCase()}</button>`)
-        .join('')}
-    </div>`;
+function tableDockFor(view: TableView, house: boolean): string {
+  const { round } = view;
+  const phase = dockPhaseFor(round?.phase ?? null, model.profile.chips);
+  const activeHand = round && round.phase === 'player-turn' ? getActiveHand(round) : null;
+  return tableDockMarkup({
+    phase,
+    stakeOptions: STAKE_OPTIONS,
+    selectedStake: normalizedStake(),
+    chips: model.profile.chips,
+    maxStake: MAX_STAKE,
+    allowed: activeHand ? allowedActions(activeHand, model.profile.chips) : [],
+    wager: activeHand ? `${formatChips(activeHand.wager)} chips` : undefined,
+    handLabel: round && round.hands.length > 1 ? `HAND ${round.activeHandIndex + 1}/${round.hands.length}` : 'IN PLAY',
+    runItBack: house && model.house.replayAvailable && model.house.currentStake
+      ? { tokens: model.house.runItBackTokens, stake: `${formatChips(model.house.currentStake)} chips` }
+      : null,
+    error: model.error,
+    house,
+    formatChips,
+    fx: currentFx,
+  });
 }
 
-function classicMarkup(): string {
+interface TableView {
+  readonly round: RoundState | null;
+  readonly revealDealer: boolean;
+  readonly dealerTotal: string | number;
+  readonly showActions: boolean;
+  readonly tone: RoundTone;
+}
+
+function tableView(): TableView {
   const round = model.round;
   const dealerCards = round?.dealer ?? [];
   const revealDealer = round?.phase === 'resolved';
-  const dealerTotal = dealerCards.length ? (revealDealer ? evaluateHand(dealerCards).total : '?') : '—';
-  const showActions = round?.phase === 'player-turn';
-  const tone = roundTone(round);
+  return {
+    round,
+    revealDealer,
+    dealerTotal: dealerCards.length ? (revealDealer ? evaluateHand(dealerCards).total : '?') : '—',
+    showActions: round?.phase === 'player-turn',
+    tone: roundTone(round),
+  };
+}
+
+function sceneHudMarkup(modePill = ''): string {
   const progression = titleProgressForRep(model.profile.rep);
+  const theme = model.visual.cardTheme;
+  return `
+    <header class="table-header table-hud">
+      <button type="button" class="back-button pause-button" data-pause="open" aria-haspopup="dialog" aria-expanded="${model.pauseMenuOpen}" aria-keyshortcuts="Escape"><span aria-hidden="true">☰</span> <span class="hud-label">Menu</span></button>
+      <div class="hud" aria-label="Player resources and progression">
+        ${modePill}
+        <span class="hud-chips">CHIPS <strong>${formatChips(model.profile.chips)}</strong></span>
+        <span class="rep-pill"><span class="title-pill">${progression.current.name}</span> <strong>${model.profile.rep}</strong> REP<i class="rep-mini-track" aria-hidden="true"><i style="width:${progression.percent}%"></i></i></span>
+      </div>
+      <button type="button" class="hud-deck" data-deck-cycle aria-label="Card deck: ${CARD_THEMES[theme].label}. Change deck">
+        <span class="hud-deck-back" aria-hidden="true">${cardMarkup({ rank: 'A', suit: 'spades' }, true, 0, 'standard', theme, false)}</span>
+        <span class="hud-label">${CARD_THEMES[theme].label}</span>
+      </button>
+    </header>`;
+}
+
+function dealerNpcMarkup(house: boolean): string {
+  return dealerMarkup({ event: model.commentary.event, seed: model.commentary.text, action: model.dealerCue, house });
+}
+
+function dealerHandMarkup(view: TableView): string {
+  const dealerCards = view.round?.dealer ?? [];
+  return `
+    <div class="dealer-hand-row">
+      <div class="cards dealer-cards" aria-label="Dealer cards">${dealerCards.map((card, index) => {
+        const hidden = index === 1 && !view.revealDealer;
+        const fresh = cardIsNew(`d:${index}:${hidden ? 'hidden' : `${card.rank}${card.suit}`}`);
+        // The hole card that was face-down last render flips over instead of re-dealing.
+        const reveal = fresh && !hidden && wasRenderedHidden(`d:${index}:hidden`);
+        return cardMarkup(card, hidden, fresh ? index : 0, 'standard', undefined, reveal ? 'flip' : fresh);
+      }).join('')}</div>
+      ${dealerCards.length ? `<strong class="dealer-total" aria-label="${view.revealDealer ? `Dealer total ${view.dealerTotal}` : 'Dealer total hidden'}">${view.dealerTotal}</strong>` : ''}
+    </div>`;
+}
+
+function sceneDialogueMarkup(view: TableView, house: boolean): string {
+  return dialoguePanelMarkup({
+    speaker: 'JAK',
+    context: house ? "HOUSE RULES ACTIVE" : 'HOUSE DEALER',
+    line: model.commentary.text,
+    event: model.commentary.event,
+    status: panelStatus(view, house),
+    house,
+  });
+}
+
+function classicMarkup(): string {
+  const view = tableView();
+  const { round } = view;
 
   return `
-    <main id="app-main" tabindex="-1" class="screen table-screen round-${tone}">
+    <main id="app-main" tabindex="-1" class="screen table-screen round-${view.tone} ${fxClassNames(currentFx)}" style="${fxStyleVars()}">
       <div class="ambient-lamp ambient-lamp-table" aria-hidden="true"></div>
-      <header class="table-header">
-        <button class="back-button" data-screen="menu" aria-keyshortcuts="Escape">← Menu</button>
-        <div class="hud" aria-label="Player resources and progression">
-          <span>CHIPS <strong>${formatChips(model.profile.chips)}</strong></span>
-          <span class="title-pill">${progression.current.name}</span>
-          <span class="rep-pill">REP <strong>${model.profile.rep}</strong><i class="rep-mini-track" aria-hidden="true"><i style="width:${progression.percent}%"></i></i></span>
-        </div>
-      </header>
+      ${gameSceneMarkup({
+        mode: 'classic',
+        label: 'Classic BlackJak table',
+        hud: sceneHudMarkup(),
+        npc: dealerNpcMarkup(false),
+        dealerHand: dealerHandMarkup(view),
+        playerHands: playerHandsMarkup(round),
+        dialogue: sceneDialogueMarkup(view, false),
+      })}
 
-      <section class="table" aria-label="Classic BlackJak table">
-        <div class="hand-zone dealer-zone">
-          <div class="dealer-identity-row">
-            <span class="dealer-avatar" aria-hidden="true">JG</span>
-            <span class="dealer-name"><b>JAK</b><small>HOUSE DEALER</small></span>
-            <strong class="dealer-total" aria-label="${revealDealer ? `Dealer total ${dealerTotal}` : 'Dealer total hidden'}">${dealerTotal}</strong>
-          </div>
-          <div class="cards dealer-cards">${dealerCards.length ? dealerCards.map((card, index) => cardMarkup(card, index === 1 && !revealDealer, index)).join('') : '<div class="empty-cards" aria-hidden="true"><span>DEALER</span></div>'}</div>
-          <div class="dealer-commentary" aria-label="Dealer commentary" data-event="${model.commentary.event}">
-            <span class="dealer-quote-mark" aria-hidden="true">“</span>
-            <p>${model.commentary.text}</p>
-          </div>
-        </div>
-
-        <div class="table-mark" aria-hidden="true">BLACK<span>JAK</span></div>
-
-        <div class="hand-zone player-zone">
-          ${playerHandsMarkup(round)}
-        </div>
-        ${resultBannerMarkup(round)}
-      </section>
-
-      <section class="game-controls" aria-label="Classic BlackJak controls">
-        <p class="status-line" role="status" aria-live="polite" aria-atomic="true">${statusText(round)}</p>
-        ${model.error ? `<p class="error-line" role="alert">${model.error}</p>` : ''}
-        ${showActions && round ? actionControlsMarkup(round) : bettingControlsMarkup()}
-        <p class="practice-note">Practice chips have no monetary value.</p>
-      </section>
+      <h1 class="visually-hidden">Classic BlackJak</h1>
+      ${tableDockFor(view, false)}
       ${achievementToastMarkup()}
     </main>`;
 }
 
 function houseMarkup(): string {
-  const round = model.round;
-  const dealerCards = round?.dealer ?? [];
-  const revealDealer = round?.phase === 'resolved';
-  const dealerTotal = dealerCards.length ? (revealDealer ? evaluateHand(dealerCards).total : '?') : '—';
-  const showActions = round?.phase === 'player-turn';
-  const tone = roundTone(round);
-  const progression = titleProgressForRep(model.profile.rep);
+  const view = tableView();
+  const { round } = view;
 
   return `
-    <main id="app-main" tabindex="-1" class="screen table-screen house-screen round-${tone}">
+    <main id="app-main" tabindex="-1" class="screen table-screen house-screen round-${view.tone} ${fxClassNames(currentFx)}" style="${fxStyleVars()}">
       <div class="ambient-lamp ambient-lamp-table house-lamp" aria-hidden="true"></div>
-      <header class="table-header">
-        <button class="back-button" data-screen="menu" aria-keyshortcuts="Escape">← Menu</button>
-        <div class="hud" aria-label="Player resources and progression">
-          <span>CHIPS <strong>${formatChips(model.profile.chips)}</strong></span>
-          <span class="title-pill">${progression.current.name}</span>
-          <span class="rep-pill">REP <strong>${model.profile.rep}</strong><i class="rep-mini-track" aria-hidden="true"><i style="width:${progression.percent}%"></i></i></span>
-        </div>
-      </header>
-
-      <section class="house-mode-banner" aria-labelledby="house-mode-title">
-        <div>
-          <span class="house-kicker">ARCADE RULES · NOT STANDARD BLACKJACK</span>
-          <h1 id="house-mode-title">JAK'S HOUSE</h1>
-          <p>Blackjack-inspired arcade play. House modifiers can change a hand, but Classic BlackJak remains standard and separate.</p>
-        </div>
-        <b>HOUSE HAND ${model.house.roundNumber || '—'}</b>
-      </section>
+      ${gameSceneMarkup({
+        mode: 'house',
+        label: "Jak's House arcade blackjack table",
+        hud: sceneHudMarkup(`<span class="house-hud-pill">HOUSE <strong>H${model.house.roundNumber || '—'}</strong></span>`),
+        npc: dealerNpcMarkup(true),
+        dealerHand: dealerHandMarkup(view),
+        playerHands: playerHandsMarkup(round, model.house),
+        dialogue: sceneDialogueMarkup(view, true),
+      })}
 
       ${houseModifierStripMarkup()}
-
-      <section class="table house-table" aria-label="Jak's House arcade blackjack table">
-        <div class="hand-zone dealer-zone">
-          <div class="dealer-identity-row">
-            <span class="dealer-avatar house-avatar" aria-hidden="true">JG</span>
-            <span class="dealer-name"><b>JAK</b><small>HOUSE RULES ACTIVE</small></span>
-            <strong class="dealer-total" aria-label="${revealDealer ? `Dealer total ${dealerTotal}` : 'Dealer total hidden'}">${dealerTotal}</strong>
-          </div>
-          <div class="cards dealer-cards">${dealerCards.length ? dealerCards.map((card, index) => cardMarkup(card, index === 1 && !revealDealer, index)).join('') : '<div class="empty-cards" aria-hidden="true"><span>DEALER</span></div>'}</div>
-          <div class="dealer-commentary" aria-label="Dealer commentary" data-event="${model.commentary.event}">
-            <span class="dealer-quote-mark" aria-hidden="true">“</span>
-            <p>${model.commentary.text}</p>
-          </div>
-        </div>
-
-        <div class="table-mark house-table-mark" aria-hidden="true">JAK'S<span>HOUSE</span></div>
-
-        <div class="hand-zone player-zone">
-          ${playerHandsMarkup(round, model.house)}
-        </div>
-        ${resultBannerMarkup(round)}
-      </section>
-
-      <section class="game-controls house-controls" aria-label="Jak's House controls">
-        <p class="status-line" role="status" aria-live="polite" aria-atomic="true">${statusText(round)}</p>
-        ${model.houseLastBonusRep > 0 ? `<p class="house-bonus-line">HOT HAND BONUS +${model.houseLastBonusRep} REP</p>` : ''}
-        ${model.houseTokenAwarded ? '<p class="house-token-line">RUN IT BACK TOKEN EARNED</p>' : ''}
-        ${model.error ? `<p class="error-line" role="alert">${model.error}</p>` : ''}
-        ${showActions && round ? actionControlsMarkup(round) : houseBettingControlsMarkup()}
-        <p class="practice-note">Jak's House uses fictional practice chips and arcade modifiers. No monetary value.</p>
-      </section>
+      ${tableDockFor(view, true)}
       ${achievementToastMarkup()}
     </main>`;
 }
@@ -722,6 +787,7 @@ function settleIfResolved(): void {
   persistProfile(progression.profile);
   model.lastRepEarned = progression.repEarned;
   model.achievementToasts = [...model.achievementToasts, ...progression.unlocked];
+  cueFx('result', ...(progression.unlocked.length ? ['achievement' as const] : []));
   say(resolutionDialogueEvent(model.round));
   playRoundFeedback(model.round, progression.unlocked.length);
 }
@@ -741,6 +807,7 @@ function settleHouseIfResolved(): void {
   model.houseTokenAwarded = houseResolution.tokenAwarded;
   model.lastRepEarned = progression.repEarned + houseResolution.hotHandBonusRep;
   model.achievementToasts = [...model.achievementToasts, ...progression.unlocked];
+  cueFx('result', ...(progression.unlocked.length ? ['achievement' as const] : []));
   say(resolutionDialogueEvent(model.round));
   playRoundFeedback(model.round, progression.unlocked.length);
 }
@@ -759,6 +826,7 @@ function dealRound(): void {
     if (again.unlocked.length > 0) {
       persistProfile(again.profile);
       model.achievementToasts = again.unlocked;
+      cueFx('achievement');
     }
   }
 
@@ -768,6 +836,9 @@ function dealRound(): void {
 
   try {
     model.round = startRound(stake);
+    model.roundSerial += 1;
+    cueFx('deal');
+    model.dealerCue = 'deal';
     feedback('deal', 'deal');
     if (model.round.phase === 'resolved') {
       settleIfResolved();
@@ -796,6 +867,7 @@ function dealHouseRound(): void {
     if (again.unlocked.length > 0) {
       persistProfile(again.profile);
       model.achievementToasts = again.unlocked;
+      cueFx('achievement');
     }
   }
 
@@ -808,6 +880,9 @@ function dealHouseRound(): void {
     const started = startHouseRound(stake, model.house);
     model.house = started.house;
     model.round = started.round;
+    model.roundSerial += 1;
+    cueFx('deal');
+    model.dealerCue = 'deal';
     feedback('deal', 'deal');
 
     if (model.round.phase === 'resolved') {
@@ -836,6 +911,9 @@ function runHouseReplay(): void {
     const replay = replayHouseRound(model.house);
     model.house = replay.house;
     model.round = replay.round;
+    model.roundSerial += 1;
+    cueFx('deal');
+    model.dealerCue = 'deal';
     feedback('deal', 'deal');
 
     if (model.round.phase === 'resolved') {
@@ -848,6 +926,14 @@ function runHouseReplay(): void {
     model.houseCheckpoint = null;
     throw error;
   }
+}
+
+/** Visual gesture for a player action; stand has no gesture. */
+function dealerCueForAction(action: PlayerAction): DealerAction | null {
+  if (action === 'hit') return 'draw';
+  if (action === 'double') return 'chips';
+  if (action === 'split') return 'deal';
+  return null;
 }
 
 function takePlayerAction(action: PlayerAction): void {
@@ -877,6 +963,8 @@ function takePlayerAction(action: PlayerAction): void {
   try {
     const updatedRound = performAction(model.round, action, before.chips);
     model.round = updatedRound;
+    model.dealerCue = dealerCueForAction(action);
+    cueFx(`action:${action}`);
 
     if (action === 'hit') {
       const updatedHand = updatedRound.hands.find((candidate) => candidate.id === activeHandId);
@@ -895,6 +983,7 @@ function takePlayerAction(action: PlayerAction): void {
         const updated = evaluateHand(updatedHand.cards);
         if (updated.isBust) {
           say('player_bust');
+          cueFx('bust');
         } else if (startingTotal >= 17 && startingTotal <= 20) {
           say(`hit_${startingTotal}` as DialogueEvent);
         } else if (startingTotal >= 16) {
@@ -935,6 +1024,8 @@ function takeHouseAction(action: PlayerAction): void {
   try {
     const updatedRound = performAction(model.round, action, before.chips);
     model.round = updatedRound;
+    model.dealerCue = dealerCueForAction(action);
+    cueFx(`action:${action}`);
 
     if (action === 'hit') {
       const updatedHand = updatedRound.hands.find((candidate) => candidate.id === activeHandId);
@@ -953,6 +1044,7 @@ function takeHouseAction(action: PlayerAction): void {
         const updated = evaluateHand(updatedHand.cards);
         if (updated.isBust) {
           say('player_bust');
+          cueFx('bust');
         } else if (startingTotal >= 17 && startingTotal <= 20) {
           say(`hit_${startingTotal}` as DialogueEvent);
         } else if (startingTotal >= 16) {
@@ -1102,7 +1194,134 @@ async function shareDailyResult(): Promise<void> {
   render();
 }
 
-function render(): void {
+function goToScreen(screen: AppScreen): void {
+  model.pauseMenuOpen = false;
+  model.pauseConfirmLeave = false;
+  if (screen === 'menu' && isTableScreen(model.screen) && model.round?.phase !== 'resolved') {
+    // Abandoning an unfinished hand: the reserved stake was never saved, so nothing is charged.
+    model.profile = loadProfile();
+    model.selectedStake = model.profile.chips > 0 ? Math.min(model.selectedStake || 25, model.profile.chips) : 0;
+    if (model.screen === 'house' && model.houseCheckpoint) {
+      model.house = model.houseCheckpoint;
+      model.houseCheckpoint = null;
+    }
+  }
+  if ((screen === 'classic' || screen === 'house') && screen !== model.screen) {
+    model.round = null;
+    model.roundProgress = emptyRoundProgressionContext();
+    model.achievementToasts = [];
+    model.lastRepEarned = 0;
+    model.houseLastBonusRep = 0;
+    model.houseTokenAwarded = false;
+    say(model.profile.stats.totalHands > 0 ? 'return_player' : 'game_start');
+    cueFx('panel');
+  }
+  if (screen === 'daily' && screen !== model.screen) {
+    prepareDailyRound();
+    if (model.dailyRound) feedback('deal', 'deal');
+  }
+  model.screen = screen;
+  model.error = null;
+  feedbackEngine.syncAmbience(model.preferences, true);
+  render();
+}
+
+const handInProgress = (): boolean => Boolean(model.round && model.round.phase !== 'resolved');
+
+function pauseOverlayMarkup(): string {
+  const progression = titleProgressForRep(model.profile.rep);
+  return pauseMenuMarkup({
+    modeLabel: model.screen === 'house' ? "Jak's House" : 'Classic',
+    chips: formatChips(model.profile.chips),
+    rep: model.profile.rep,
+    title: progression.current.name,
+    handInProgress: handInProgress(),
+    confirmLeave: model.pauseConfirmLeave,
+    deckLabel: CARD_THEMES[model.visual.cardTheme].label,
+    soundOn: model.preferences.master,
+  });
+}
+
+/**
+ * Mounts (or refreshes) the pause board beside the table without re-rendering
+ * the table, so cards don't replay their deal animation and the round is untouched.
+ */
+function mountPauseOverlay(focusAction: string | null = 'resume'): void {
+  const root = app();
+  root.querySelector('.pause-overlay')?.remove();
+  const main = root.querySelector<HTMLElement>('#app-main');
+  if (!model.pauseMenuOpen || !isTableScreen(model.screen)) {
+    if (main) main.inert = false;
+    return;
+  }
+  root.insertAdjacentHTML('beforeend', pauseOverlayMarkup());
+  if (main) main.inert = true;
+  root.querySelector('[data-pause="open"]')?.setAttribute('aria-expanded', 'true');
+  bindPauseEvents();
+  if (focusAction) root.querySelector<HTMLElement>(`.pause-overlay [data-pause-action="${focusAction}"].menu-board-item`)?.focus({ preventScroll: true });
+}
+
+function openPauseMenu(): void {
+  if (!isTableScreen(model.screen) || model.pauseMenuOpen) return;
+  model.pauseMenuOpen = true;
+  model.pauseConfirmLeave = false;
+  mountPauseOverlay('resume');
+}
+
+function closePauseMenu(): void {
+  if (!model.pauseMenuOpen) return;
+  model.pauseMenuOpen = false;
+  model.pauseConfirmLeave = false;
+  mountPauseOverlay(null);
+  const toggle = app().querySelector<HTMLElement>('[data-pause="open"]');
+  toggle?.setAttribute('aria-expanded', 'false');
+  toggle?.focus({ preventScroll: true });
+}
+
+function bindPauseEvents(): void {
+  app().querySelectorAll<HTMLElement>('.pause-overlay [data-pause-action]').forEach((element) => {
+    element.addEventListener('click', () => {
+      if (!element.isConnected) return;
+      feedbackEngine.activate();
+      const action = element.dataset.pauseAction;
+      if (action === 'resume') {
+        feedback('button', 'tap');
+        closePauseMenu();
+      } else if (action === 'deck') {
+        const index = CARD_THEME_IDS.indexOf(model.visual.cardTheme);
+        setCardTheme(CARD_THEME_IDS[(index + 1) % CARD_THEME_IDS.length]);
+        feedback('button', 'tap');
+        // Cards change, so the table re-renders; static mode skips deal animations.
+        render({ staticTable: true });
+      } else if (action === 'sound') {
+        persistPreferences({ ...model.preferences, master: !model.preferences.master });
+        feedback('button', 'tap');
+        mountPauseOverlay('sound');
+      } else if (action === 'menu') {
+        feedback('button', 'tap');
+        if (handInProgress() && !model.pauseConfirmLeave) {
+          model.pauseConfirmLeave = true;
+          mountPauseOverlay('menu');
+        } else {
+          goToScreen('menu');
+        }
+      }
+    });
+  });
+}
+
+interface RenderOptions {
+  /** Re-render without replaying card deal / dealer entrance animations. */
+  readonly staticTable?: boolean;
+}
+
+/** Pointer tap (detail > 0) landing right after the controls changed shape. */
+function isStaleTap(event: MouseEvent): boolean {
+  return shouldIgnoreActivation({ now: event.timeStamp, controlsChangedAt, pointer: event.detail > 0 });
+}
+
+function render(options: RenderOptions = {}): void {
+  currentFx = fxQueue.consume();
   const previousScreen = lastRenderedScreen;
   const activeBeforeRender = document.activeElement;
   const hadInteractiveFocus = activeBeforeRender instanceof HTMLElement && activeBeforeRender !== document.body;
@@ -1129,7 +1348,19 @@ function render(): void {
       break;
   }
 
+  // Dealer gestures are one-shot: later re-renders show the dialogue pose only.
+  model.dealerCue = null;
+  app().querySelector('#app-main')?.classList.toggle('is-static-render', Boolean(options.staticTable));
+  renderedCardKeys = pendingCardKeys;
+  pendingCardKeys = new Set<string>();
+  const dockPhase = (app().querySelector('.table-dock')?.className.match(/phase-(\w+)/)?.[1] ?? null) as DockPhase | null;
+  if (dockPhase !== lastDockPhase) {
+    controlsChangedAt = performance.now();
+    lastDockPhase = dockPhase;
+  }
+  currentFx = new Set();
   bindEvents();
+  if (model.pauseMenuOpen) mountPauseOverlay(null);
   const screenChanged = previousScreen !== null && previousScreen !== model.screen;
   lastRenderedScreen = model.screen;
   focusAfterRender(focusKey, screenChanged, hadInteractiveFocus);
@@ -1143,43 +1374,40 @@ function bindEvents(): void {
       if (!screen) return;
       feedbackEngine.activate();
       feedback('button', 'tap');
-      if (screen === 'menu' && (model.screen === 'classic' || model.screen === 'house') && model.round?.phase !== 'resolved') {
-        model.profile = loadProfile();
-        model.selectedStake = model.profile.chips > 0 ? Math.min(model.selectedStake || 25, model.profile.chips) : 0;
-        if (model.screen === 'house' && model.houseCheckpoint) {
-          model.house = model.houseCheckpoint;
-          model.houseCheckpoint = null;
-        }
-      }
-      if ((screen === 'classic' || screen === 'house') && screen !== model.screen) {
-        model.round = null;
-        model.roundProgress = emptyRoundProgressionContext();
-        model.achievementToasts = [];
-        model.lastRepEarned = 0;
-        model.houseLastBonusRep = 0;
-        model.houseTokenAwarded = false;
-        say(model.profile.stats.totalHands > 0 ? 'return_player' : 'game_start');
-      }
-      if (screen === 'daily' && screen !== model.screen) {
-        prepareDailyRound();
-        if (model.dailyRound) feedback('deal', 'deal');
-      }
-      model.screen = screen;
-      model.error = null;
-      feedbackEngine.syncAmbience(model.preferences, true);
-      render();
+      goToScreen(screen);
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-deck-cycle]').forEach((element) => {
+    element.addEventListener('click', () => {
+      if (!element.isConnected) return;
+      feedbackEngine.activate();
+      const index = CARD_THEME_IDS.indexOf(model.visual.cardTheme);
+      setCardTheme(CARD_THEME_IDS[(index + 1) % CARD_THEME_IDS.length]);
+      feedback('button', 'tap');
+      render({ staticTable: true });
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-pause="open"]').forEach((element) => {
+    element.addEventListener('click', () => {
+      if (!element.isConnected) return;
+      feedbackEngine.activate();
+      feedback('button', 'tap');
+      openPauseMenu();
     });
   });
 
   document.querySelectorAll<HTMLButtonElement>('[data-stake]').forEach((element) => {
-    element.addEventListener('click', () => {
-      if (!element.isConnected) return;
+    element.addEventListener('click', (event) => {
+      if (!element.isConnected || isStaleTap(event)) return;
       feedbackEngine.activate();
       const stake = element.dataset.stake;
       const next = stake === 'max' ? Math.min(model.profile.chips, MAX_STAKE) : Number(stake);
       if (Number.isFinite(next) && next > 0 && next <= model.profile.chips) {
         model.selectedStake = next;
         model.error = null;
+        cueFx('stake', `stake:${stake}`);
         feedback('chip', 'tap');
         render();
       }
@@ -1194,6 +1422,18 @@ function bindEvents(): void {
       if (!key) return;
       const next = { ...model.preferences, [key]: !model.preferences[key] };
       persistPreferences(next);
+      feedback('button', 'tap');
+      render();
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-card-theme]').forEach((element) => {
+    element.addEventListener('click', () => {
+      if (!element.isConnected) return;
+      feedbackEngine.activate();
+      const theme = element.dataset.cardTheme;
+      if (!theme || !(CARD_THEME_IDS as readonly string[]).includes(theme)) return;
+      setCardTheme(theme as CardThemeId);
       feedback('button', 'tap');
       render();
     });
@@ -1224,8 +1464,8 @@ function bindEvents(): void {
   });
 
   document.querySelectorAll<HTMLButtonElement>('[data-action]').forEach((element) => {
-    element.addEventListener('click', () => {
-      if (!element.isConnected) return;
+    element.addEventListener('click', (event) => {
+      if (!element.isConnected || isStaleTap(event)) return;
       feedbackEngine.activate();
       const action = element.dataset.action;
       model.error = null;
