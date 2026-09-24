@@ -1,0 +1,117 @@
+/* Debug-only: loaded with the ?debugVisuals=1 inspector chunk. */
+#visual-atlas-inspector {
+  position: fixed;
+  inset: 12px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  overflow: auto;
+  color: #f4ecd8;
+  font: 13px/1.4 system-ui, sans-serif;
+  background: rgb(14 14 20 / 96%);
+  border: 1px solid #5b4a2c;
+  border-radius: 10px;
+  box-shadow: 0 12px 48px rgb(0 0 0 / 60%);
+}
+
+#visual-atlas-inspector .vai-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#visual-atlas-inspector h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+#visual-atlas-inspector .vai-status {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+#visual-atlas-inspector .vai-status.is-ok { background: #1f5130; }
+#visual-atlas-inspector .vai-status.is-bad { background: #7a1f1f; }
+
+#visual-atlas-inspector .vai-close {
+  margin-left: auto;
+  min-width: 36px;
+  min-height: 36px;
+  font-size: 20px;
+  color: inherit;
+  background: #2a2a34;
+  border: 1px solid #444;
+  border-radius: 6px;
+}
+
+#visual-atlas-inspector .vai-issues {
+  margin: 0;
+  color: #ff9c9c;
+}
+
+#visual-atlas-inspector .vai-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+#visual-atlas-inspector .vai-tab {
+  padding: 6px 10px;
+  color: inherit;
+  background: #22222c;
+  border: 1px solid #444;
+  border-radius: 6px;
+}
+
+#visual-atlas-inspector .vai-tab[aria-pressed='true'] {
+  background: #5b4a2c;
+  border-color: #c9a45c;
+}
+
+#visual-atlas-inspector .vai-meta { margin: 0; opacity: 0.85; }
+
+#visual-atlas-inspector .vai-sheet {
+  width: 100%;
+  max-height: 70vh;
+  background:
+    repeating-conic-gradient(#2b2b36 0% 25%, #1b1b24 0% 50%) 0 0 / 24px 24px;
+}
+
+#visual-atlas-inspector .vai-rect {
+  fill: transparent;
+  stroke: #39ff88;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  cursor: pointer;
+}
+
+#visual-atlas-inspector .vai-rect.vai-kind-layout { stroke: #4fc3ff; stroke-dasharray: 6 4; }
+#visual-atlas-inspector .vai-rect:hover { fill: rgb(57 255 136 / 12%); }
+#visual-atlas-inspector .vai-rect.is-active { stroke: #ff3df2; stroke-width: 3; fill: rgb(255 61 242 / 15%); }
+
+#visual-atlas-inspector .vai-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+#visual-atlas-inspector .vai-crop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  color: inherit;
+  background:
+    repeating-conic-gradient(#2b2b36 0% 25%, #1b1b24 0% 50%) 0 0 / 16px 16px;
+  border: 1px solid #333;
+  border-radius: 6px;
+}
+
+#visual-atlas-inspector .vai-crop .atlas-sprite { width: 100%; max-height: 140px; }
+#visual-atlas-inspector .vai-crop.is-active { border-color: #ff3df2; }
+#visual-atlas-inspector .vai-crop code { font-size: 10px; opacity: 0.75; }
+#visual-atlas-inspector .vai-crop-label { font-size: 11px; text-align: center; }
