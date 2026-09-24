@@ -2,6 +2,11 @@
 
 All notable changes to BlackJak are documented here.
 
+## [0.4.2] — 2026-09-24 — Gold House pills
+
+### Changed
+- The Jak's House modifier pills (Gold Card, Run It Back, Hot Hand) are gold chips with dark text, matching the Run It Back button. The live modifier, such as Gold Card when it's ready, gets a brighter face and a glow.
+
 ## [0.4.1] — 2026-09-24 — Run It Back visibility
 
 ### Fixed
