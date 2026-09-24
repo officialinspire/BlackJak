@@ -56,7 +56,6 @@ export function dealerMarkup(input: DealerRenderInput): string {
         ${visual.actionPose ? poseMarkup(visual.actionPose, 'action') : ''}
         ${poseMarkup(visual.pose, 'mood')}
       </div>
-      <p class="dealer-nameplate"><b>JAK</b><small>${input.house ? 'HOUSE RULES ACTIVE' : 'HOUSE DEALER'}</small></p>
     </div>`;
 }
 

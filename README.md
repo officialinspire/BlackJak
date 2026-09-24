@@ -341,6 +341,12 @@ The table keeps its native aspect ratio. The frame height follows the viewport: 
 
 Jak comes from `blackjak-sprite-sheet.png` and stands behind the dealer's cards; the lower part of his viewport fades out behind them. `src/data/dealer-visuals.ts` maps every `DialogueEvent` to a `DealerMood` and each mood to one or more sprite poses. Examples: `player_blackjack` → surprised, `dealer_blackjack` → smug, `player_bust` → shrug, `double_loss` → teasing. Short one-shot gestures (deal → card flick, hit → card toss, double → chips) play before he settles into the dialogue pose. The mapping reads only dialogue events and UI action cues, never rules or round state. Each pose is framed on its measured sunglasses position, so his head stays the same size whether a bust, half-body or full-body sprite is showing. The sprite is `aria-hidden`; his lines stay as text in the dialogue layer. With reduced motion, gestures and idle breathing are turned off.
 
+### Dialogue / status panel
+
+Jak's lines, the gameplay status, round results and REP notes share one `DialogueStatusPanel` (`src/ui/dialogue-panel.ts`) framed by `dialogue-status-bar.png`. It sits in a bar under the table, tucked over the bottom rail, so the felt stays clear for cards. The frame is a nine-slice (CSS `border-image`): cut lines come from the measured text-panel region, so rivets and stickers stay undistorted and the edges stretch only along the plank grain. The recessed center is cover-cropped from the same sheet rather than squashed. A `clip-path` hides the image's black matte and the stray marks along its top edge. All geometry comes from `src/config/dialogue-panel-layout.ts` as custom properties.
+
+All text is semantic HTML over the art: speaker tab, commentary line, and one compact status/result line. That status line is the only live region, so a result such as "PAID +25 chips +50 REP" is announced once; Jak's commentary is visible but not live, as before. The panel has no focusable parts and never waits, so play is never paused. With reduced motion, the line fade is off; with forced colors, the art is dropped for a plain border.
+
 ### Card decks
 
 Cards are drawn from the three deck sheets through a strict `Card {rank, suit}` → sprite mapping in `src/data/card-atlas.ts` (52 faces plus a back per deck). Every face was checked by eye: the corner index (rank and suit) matches its key in all three sheets, and pip counts were counted on every number card. The Inspire deck orders its rows ♠ ♥ ♣ ♦ and prints all suits in black.

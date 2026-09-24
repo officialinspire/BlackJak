@@ -97,7 +97,6 @@ describe('dealer markup', () => {
     expect(markup).not.toContain('Okay. That one had style.');
     expect(markup).toContain('data-dealer-mood="surprised"');
     expect(markup).toContain('data-dealer-pose="bust-shocked"');
-    expect(markup).toContain('HOUSE DEALER');
   });
 
   it('plays a one-shot action pose before the dialogue pose', () => {
@@ -106,7 +105,7 @@ describe('dealer markup', () => {
     expect(markup).toContain(`--dealer-action-ms:${DEALER_ACTION_MS.deal}ms`);
     expect(markup.indexOf('dealer-pose-action')).toBeLessThan(markup.indexOf('dealer-pose-mood'));
     expect(markup).toContain('data-pose="deal-flick"');
-    expect(markup).toContain('HOUSE RULES ACTIVE');
+    expect(markup).toContain('is-house');
 
     const settled = dealerMarkup({ event: 'idle', seed: 'x', action: null, house: true });
     expect(settled).not.toContain('dealer-pose-action');

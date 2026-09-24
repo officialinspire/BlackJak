@@ -8,8 +8,10 @@ import { sceneStyleVars } from '../config/scene-layout';
  *   1. table   – blackjak-table.png, fixed aspect, cover-cropped on narrow frames
  *   2. npc     – Jak dealer placeholder (future sprite slot), anchored on the table
  *   3. cards   – dealer + player hands, anchored to table positions
- *   4. ui      – dialogue/status + round result, spans the visible frame
+ *   4. ui      – optional overlay inside the frame
  *   5. hud     – compact player resources above the table
+ * The dialogue/status panel sits in a bar directly under the frame, tucked
+ * over its bottom rail, so the felt stays clear for cards.
  * Controls stay ordinary DOM buttons rendered by the caller below the scene.
  */
 
@@ -24,8 +26,9 @@ export interface GameSceneSlots {
   readonly npc: string;
   readonly dealerHand: string;
   readonly playerHands: string;
+  /** Dialogue/status panel rendered in the bar under the table frame. */
   readonly dialogue: string;
-  /** Optional overlay in the UI layer (round result banner). */
+  /** Optional overlay in the frame's UI layer. */
   readonly overlay?: string;
 }
 
@@ -41,11 +44,9 @@ export function gameSceneMarkup(slots: GameSceneSlots): string {
             <div class="scene-anchor anchor-dealer-hand">${slots.dealerHand}</div>
             <div class="scene-anchor scene-span anchor-player-hands">${slots.playerHands}</div>
           </div>
-          <div class="scene-layer scene-ui">
-            <div class="scene-anchor scene-span anchor-dialogue">${slots.dialogue}</div>
-            ${slots.overlay ?? ''}
-          </div>
+          <div class="scene-layer scene-ui">${slots.overlay ?? ''}</div>
         </div>
       </div>
+      <div class="scene-layer scene-dialogue-bar">${slots.dialogue}</div>
     </section>`;
 }

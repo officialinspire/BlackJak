@@ -55,14 +55,14 @@ describe('scene layout constants', () => {
     expect(SCENE_ANCHORS.dealerHand.y).toBeGreaterThan((chipTray.rect.y + chipTray.rect.height) / h);
     expect(SCENE_ANCHORS.dealerHand.y).toBeLessThan((title.rect.y + title.rect.height) / h);
 
-    const order: SceneAnchorId[] = ['dealerHand', 'dialogue', 'playerHands'];
+    const order: SceneAnchorId[] = ['dealerHand', 'playerHands'];
     const ys = order.map((id) => SCENE_ANCHORS[id].y);
     expect([...ys].sort((a, b) => a - b)).toEqual(ys);
 
     // Jak's viewport starts at the table's top edge and ends behind the dealer's cards.
     expect(SCENE_ANCHORS.npc.align).toBe('bottom');
     expect(SCENE_ANCHORS.npc.y).toBeGreaterThan(SCENE_ANCHORS.dealerHand.y);
-    expect(SCENE_ANCHORS.npc.y).toBeLessThan(SCENE_ANCHORS.dialogue.y);
+    expect(SCENE_ANCHORS.npc.y).toBeLessThan(SCENE_ANCHORS.playerHands.y);
     expect(SCENE_ANCHORS.npc.y - SCENE_NPC_HEIGHT).toBeGreaterThanOrEqual(-0.01);
   });
 
@@ -95,6 +95,9 @@ describe('game scene component', () => {
     expect(at('scene-table')).toBeLessThan(at('scene-npc'));
     expect(at('scene-npc')).toBeLessThan(at('scene-cards'));
     expect(at('scene-cards')).toBeLessThan(at('scene-ui'));
+    // Dialogue/status bar follows the table frame.
+    expect(at('scene-ui')).toBeLessThan(at('scene-dialogue-bar'));
+    expect(at('scene-dialogue-bar')).toBeLessThan(at('id="dialogue-slot"'));
     for (const id of ['hud', 'npc', 'dealer', 'player', 'dialogue', 'overlay']) expect(markup).toContain(`id="${id}-slot"`);
   });
 

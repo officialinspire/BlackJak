@@ -32,6 +32,8 @@ export interface AtlasSpriteOptions {
   readonly height?: string;
   /** Override the sheet URL (tests, previews). */
   readonly url?: string;
+  /** 'contain' (default) letterboxes the whole rect; 'cover' crops it to fill the box without distortion. */
+  readonly fit?: 'contain' | 'cover';
 }
 
 const escapeAttr = (value: string): string =>
@@ -51,7 +53,7 @@ export function atlasSpriteMarkup(sheetId: AtlasSheetId, rect: SpriteRect, optio
     options.height ? `height:${options.height}` : '',
   ].filter(Boolean).join(';');
 
-  return `<svg class="atlas-sprite${options.className ? ` ${escapeAttr(options.className)}` : ''}" ${a11y} xmlns="http://www.w3.org/2000/svg" viewBox="${atlasViewBox(rect)}" preserveAspectRatio="xMidYMid meet" data-atlas-sheet="${sheetId}" style="${style}"><svg x="${rect.x}" y="${rect.y}" width="${rect.width}" height="${rect.height}" viewBox="${atlasViewBox(rect)}" overflow="hidden"><image href="${href}" x="0" y="0" width="${sheet.width}" height="${sheet.height}" preserveAspectRatio="none"/></svg></svg>`;
+  return `<svg class="atlas-sprite${options.className ? ` ${escapeAttr(options.className)}` : ''}" ${a11y} xmlns="http://www.w3.org/2000/svg" viewBox="${atlasViewBox(rect)}" preserveAspectRatio="xMidYMid ${options.fit === 'cover' ? 'slice' : 'meet'}" data-atlas-sheet="${sheetId}" style="${style}"><svg x="${rect.x}" y="${rect.y}" width="${rect.width}" height="${rect.height}" viewBox="${atlasViewBox(rect)}" overflow="hidden"><image href="${href}" x="0" y="0" width="${sheet.width}" height="${sheet.height}" preserveAspectRatio="none"/></svg></svg>`;
 }
 
 export function dealerSpriteMarkup(id: DealerSpriteId, options: AtlasSpriteOptions = {}): string {

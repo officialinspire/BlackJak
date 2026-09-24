@@ -17,7 +17,8 @@
 .game-scene {
   --frame-tallest: var(--frame-tallest-phone);
   /* Room reserved for HUD + controls when fitting the table to the viewport height. */
-  --scene-chrome: 16.5rem;
+  /* HUD + dialogue bar + controls. */
+  --scene-chrome: 21.5rem;
   --card-w: clamp(48px, min(15.5cqi, 14.5cqh), 96px);
   --card-overlap: calc(var(--card-w) * -.3);
   container-type: inline-size;
@@ -126,7 +127,6 @@
 }
 
 .anchor-dealer-hand { --ax: var(--anchor-dealer-hand-x); --ay: var(--anchor-dealer-hand-y); }
-.anchor-dialogue { --ax: var(--anchor-dialogue-x); --ay: var(--anchor-dialogue-y); }
 
 .anchor-player-hands {
   left: var(--anchor-player-hands-x);
@@ -299,36 +299,16 @@
   }
 }
 
-/* ---- Dialogue / status (UI layer) ---- */
+/* ---- Dialogue / status bar (see dialogue-panel.css) ---- */
 
-.scene-dialogue {
-  width: min(100%, 30rem);
-  display: grid;
-  justify-items: center;
-  gap: .2rem;
+.scene-dialogue-bar {
+  position: relative;
+  z-index: 4;
 }
 
-.scene-dialogue .dealer-commentary {
-  width: 100%;
-  border-color: rgba(214,182,80,.26);
-  border-radius: 14px;
-  background: rgba(6,6,6,.78);
-}
-
-.scene-dialogue .dealer-commentary p {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  overflow: hidden;
-}
-
-.scene-dialogue .status-line {
-  min-height: 0;
-  padding: .12rem .6rem;
-  border-radius: 999px;
-  background: rgba(0,0,0,.6);
-  font-size: max(11px, .7rem);
+/* Tuck the panel up over the table frame's bottom rail. */
+.scene-dialogue-bar .dialogue-panel {
+  margin-top: calc(-1 * var(--dlg-overlap));
 }
 
 /* ---- Controls directly below ---- */
@@ -361,7 +341,6 @@
   .scene-hud .hud span:nth-child(2) { display: inline; }
   .scene-hud .hud span.title-pill { display: none; }
   .scene-hud .back-button { padding: .4rem .55rem; font-size: .8rem; }
-  .scene-dialogue .dealer-commentary p { -webkit-line-clamp: 2; line-clamp: 2; }
 }
 
 @media (max-width: 360px) {
@@ -401,14 +380,10 @@
 
 @media (prefers-contrast: more) {
   .scene-frame { box-shadow: 0 0 0 2px var(--cream); }
-  .scene-dialogue .dealer-commentary,
-  .scene-dialogue .status-line,
   .game-scene .scene-cards .hand-meta,
   .game-scene .scene-cards .hand-state { background: #000; }
 }
 
 @media (forced-colors: active) {
   .scene-frame { border: 1px solid CanvasText; }
-  .scene-dialogue .dealer-commentary,
-  .dealer-nameplate { forced-color-adjust: auto; border: 1px solid CanvasText; }
 }

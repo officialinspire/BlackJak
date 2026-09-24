@@ -46,6 +46,7 @@ import { CARD_THEMES } from '../data/card-atlas';
 import { CARD_THEME_IDS, type CardThemeId } from '../data/visual-atlas';
 import { loadVisualPreferences, saveVisualPreferences } from '../storage/visual-preferences';
 import { gameSceneMarkup } from './scene';
+import { dialoguePanelMarkup, type PanelStatus } from './dialogue-panel';
 import { dealerMarkup } from './dealer';
 import type { DealerAction } from '../data/dealer-visuals';
 
@@ -517,31 +518,33 @@ function playerHandsMarkup(round: RoundState | null, house: HouseState | null = 
   </div>`;
 }
 
-function resultBannerMarkup(round: RoundState | null): string {
-  if (!round || round.phase !== 'resolved') return '';
-  const tone = roundTone(round);
-  const net = round.results.reduce((sum, result) => sum + result.net, 0);
-  const netLabel = net === 0 ? '±0' : `${net > 0 ? '+' : ''}${formatChips(net)}`;
-  const titleMap: Record<Exclude<RoundTone, 'idle' | 'playing'>, string> = {
-    blackjack: 'BLACKJAK',
-    win: 'PAID',
-    loss: 'BUSTED',
-    push: 'PUSH',
-    mixed: 'SPLIT DECISION',
-  };
-  const detail = round.results.length > 1
-    ? round.results.map((result, index) => `H${index + 1} ${result.outcome.toUpperCase()}`).join(' · ')
-    : round.results[0]?.outcome.toUpperCase() ?? '';
-  const repLine = model.lastRepEarned > 0 ? `+${model.lastRepEarned} REP` : '';
+const RESULT_TITLES: Record<Exclude<RoundTone, 'idle' | 'playing'>, string> = {
+  blackjack: 'BLACKJAK',
+  win: 'PAID',
+  loss: 'BUSTED',
+  push: 'PUSH',
+  mixed: 'SPLIT DECISION',
+};
 
-  return `
-    <div class="result-banner result-${tone}" role="group" aria-label="Round result: ${titleMap[tone as Exclude<RoundTone, 'idle' | 'playing'>]}, ${netLabel} chips${repLine ? `, ${repLine}` : ''}">
-      <span>ROUND RESULT</span>
-      <strong>${titleMap[tone as Exclude<RoundTone, 'idle' | 'playing'>]}</strong>
-      <b>${netLabel} chips</b>
-      <small>${detail}</small>
-      ${repLine ? `<em>${repLine}</em>` : ''}
-    </div>`;
+/** Status/result line for the dialogue panel, derived from existing round + reward state. */
+function panelStatus(view: TableView, house: boolean): PanelStatus {
+  const { round, tone } = view;
+  if (!round || round.phase !== 'resolved' || tone === 'idle' || tone === 'playing') {
+    return { tone, text: statusText(round) };
+  }
+
+  const net = round.results.reduce((sum, result) => sum + result.net, 0);
+  const netLabel = net === 0 ? '±0 chips' : `${net > 0 ? '+' : ''}${formatChips(net)} chips`;
+  const detail = round.results.length > 1
+    ? ` · ${round.results.map((result, index) => `H${index + 1} ${result.outcome.toUpperCase()}`).join(' · ')}`
+    : '';
+  const tags = [
+    model.lastRepEarned > 0 ? `+${model.lastRepEarned} REP` : '',
+    house && model.houseLastBonusRep > 0 ? `HOT HAND +${model.houseLastBonusRep} REP` : '',
+    house && model.houseTokenAwarded ? 'RUN IT BACK TOKEN EARNED' : '',
+  ].filter(Boolean);
+
+  return { tone, title: RESULT_TITLES[tone], text: `${netLabel}${detail}`, tags };
 }
 
 function bettingControlsMarkup(): string {
@@ -661,15 +664,15 @@ function dealerHandMarkup(view: TableView): string {
     </div>`;
 }
 
-function sceneDialogueMarkup(view: TableView): string {
-  return `
-    <div class="scene-dialogue">
-      <div class="dealer-commentary" aria-label="Dealer commentary" data-event="${model.commentary.event}">
-        <span class="dealer-quote-mark" aria-hidden="true">“</span>
-        <p>${model.commentary.text}</p>
-      </div>
-      <p class="status-line" role="status" aria-live="polite" aria-atomic="true">${statusText(view.round)}</p>
-    </div>`;
+function sceneDialogueMarkup(view: TableView, house: boolean): string {
+  return dialoguePanelMarkup({
+    speaker: 'JAK',
+    context: house ? "HOUSE RULES ACTIVE" : 'HOUSE DEALER',
+    line: model.commentary.text,
+    event: model.commentary.event,
+    status: panelStatus(view, house),
+    house,
+  });
 }
 
 function classicMarkup(): string {
@@ -686,8 +689,7 @@ function classicMarkup(): string {
         npc: dealerNpcMarkup(false),
         dealerHand: dealerHandMarkup(view),
         playerHands: playerHandsMarkup(round),
-        dialogue: sceneDialogueMarkup(view),
-        overlay: resultBannerMarkup(round),
+        dialogue: sceneDialogueMarkup(view, false),
       })}
 
       <section class="game-controls" aria-label="Classic BlackJak controls">
@@ -713,13 +715,10 @@ function houseMarkup(): string {
         npc: dealerNpcMarkup(true),
         dealerHand: dealerHandMarkup(view),
         playerHands: playerHandsMarkup(round, model.house),
-        dialogue: sceneDialogueMarkup(view),
-        overlay: resultBannerMarkup(round),
+        dialogue: sceneDialogueMarkup(view, true),
       })}
 
       <section class="game-controls house-controls" aria-label="Jak's House controls">
-        ${model.houseLastBonusRep > 0 ? `<p class="house-bonus-line">HOT HAND BONUS +${model.houseLastBonusRep} REP</p>` : ''}
-        ${model.houseTokenAwarded ? '<p class="house-token-line">RUN IT BACK TOKEN EARNED</p>' : ''}
         ${model.error ? `<p class="error-line" role="alert">${model.error}</p>` : ''}
         ${view.showActions && round ? actionControlsMarkup(round) : houseBettingControlsMarkup()}
         <p class="practice-note">Jak's House uses fictional practice chips and arcade modifiers. No monetary value.</p>

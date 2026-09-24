@@ -15,11 +15,14 @@ All notable changes to BlackJak are documented here.
 - Sprite-sheet card faces and backs for three decks (Standard, Jak's Cosmic, Inspire Mono) via a strict 52-card mapping in `src/data/card-atlas.ts`. Every cell was verified by eye.
 - Persistent Card deck preference in Settings (defaults to Standard; missing or corrupted values fall back safely).
 - The Gold Card now decorates the themed card with a gold tint, ring and tag.
+- `DialogueStatusPanel`: a nine-slice `dialogue-status-bar.png` frame for Jak's dialogue, status, round results and REP/House notes, in a bar under the table (`src/ui/dialogue-panel.ts`, `src/config/dialogue-panel-layout.ts`, `src/styles/dialogue-panel.css`).
 
 ### Known art issues
 - In the Inspire deck, 7♠, 7♥ and 7♣ show six pips. They're flagged in `CARD_ART_ISSUES` and render as the drawn face until the art is fixed.
 
 ### Changed
+- Round results, REP, Hot Hand bonus and Run It Back token notes moved from the center-of-table banner and the controls into the panel's single live status line. The table's height floor dropped from 345px to 270px, because the felt no longer hosts dialogue.
+- Jak's name and dealer context moved from the NPC nameplate to the panel's speaker tab.
 - The dealer total now sits beside the dealer's cards. Dealer cards are slightly smaller on tall frames so Jak's face stays visible, and the empty dealer placeholder is gone.
 
 ### Fixed

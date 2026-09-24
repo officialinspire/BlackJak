@@ -33,8 +33,8 @@ export const SCENE_TALLEST_FRAME_ASPECT = {
   tablet: 1,
 } as const;
 
-/** Frame height floor so cards and dialogue never crowd on short phones. */
-export const SCENE_MIN_FRAME_HEIGHT_PX = 345;
+/** Frame height floor so dealer and player cards never crowd on short phones. */
+export const SCENE_MIN_FRAME_HEIGHT_PX = 270;
 
 /** Height of Jak's viewport as a share of the table height (it starts at the top edge). */
 export const SCENE_NPC_HEIGHT = 0.37;
@@ -56,15 +56,12 @@ export interface SceneAnchor {
 const spots = TABLE_LAYOUT.playerSpots;
 const centerSpot = spots[2].rect;
 const titleCenter = centerY(TABLE_LAYOUT.title.rect);
-const outerSpotTop = spots[0].rect.y;
 
 export const SCENE_ANCHORS = {
   /** Jak NPC: centered behind the chip tray; the viewport's bottom edge sits behind the dealer's cards. */
   npc: { x: nx(centerX(TABLE_LAYOUT.chipTray.rect)), y: ny(titleCenter + 70), align: 'bottom' },
   /** Dealer hand: on the BLACKJAK title, low enough that Jak's face stays clear above it. */
   dealerHand: { x: 0.5, y: ny(titleCenter), align: 'center' },
-  /** Dialogue/status: over the rules arc, between the title and the outer spots. */
-  dialogue: { x: 0.5, y: ny((bottomOf(TABLE_LAYOUT.title.rect) + outerSpotTop) / 2 + 50), align: 'center' },
   /** Player hands: bottom edge just below the center betting spot. */
   playerHands: { x: nx(centerX(centerSpot)), y: ny(bottomOf(centerSpot) + 40), align: 'bottom' },
 } as const satisfies Record<string, SceneAnchor>;
