@@ -106,3 +106,12 @@ describe('quick card feedback', () => {
     expect(cardMarkup({ rank: '9', suit: 'clubs' }, true, 0, 'standard', undefined, false)).toContain('is-settled');
   });
 });
+
+describe('Run It Back visibility', () => {
+  it('gives the House button a gold face so its dark text never sits on the dark base', async () => {
+    const buttonsCss = (await import('../src/styles/buttons.css?raw')).default;
+    const rule = buttonsCss.slice(buttonsCss.indexOf('.table-dock .dock-secondary.house-special-action,'));
+    expect(rule).toMatch(/background:[\s\S]*#eec35a/);
+    expect(rule).toContain('color: #1a1204');
+  });
+});

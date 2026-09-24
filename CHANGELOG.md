@@ -2,6 +2,11 @@
 
 All notable changes to BlackJak are documented here.
 
+## [0.4.1] — 2026-09-24 — Run It Back visibility
+
+### Fixed
+- Jak's House **Run It Back** button was dark text on a dark face after the v0.3.1 button polish, so it looked brown or transparent. It now has its own amber-gold face with dark text, a press lip and a glow, distinct from the brighter gold Deal button.
+
 ## [0.4.0] — 2026-09-24 — Jak's voice, cardistry, haptics
 
 Blackjack rules, odds and payouts are unchanged.
