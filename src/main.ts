@@ -15,6 +15,7 @@ import './styles/dock.css';
 import './styles/fx.css';
 import './styles/startup.css';
 import './styles/game-footer.css';
+import './styles/buttons.css';
 import { registerPWA } from './pwa/register';
 import { initializeUI } from './ui/render';
 import { feedbackEngine } from './feedback/feedback';

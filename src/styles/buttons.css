@@ -1,0 +1,415 @@
+/*
+ * Button polish layer (imported last). One tactile language for every control:
+ * a bevelled face, a dark "lip" underneath that the button presses into, a soft
+ * inner highlight, and a gold focus ring. Table actions get a colour accent so
+ * Hit / Stand / Double / Split read at a glance.
+ */
+
+:root {
+  --btn-face-top: #2c2518;
+  --btn-face-bottom: #141109;
+  --btn-edge: rgba(226, 192, 96, .55);
+  --btn-lip: #050403;
+  --btn-highlight: rgba(255, 244, 214, .10);
+  --btn-focus: #f3d97c;
+}
+
+/* ---- Shared tactile base ---- */
+
+.table-dock button.dock-action,
+.daily-action-bar button.daily-action,
+.table-dock .dock-secondary,
+.back-button,
+.pause-button,
+.hud-deck,
+.menu-button {
+  border: 1px solid var(--btn-edge);
+  background:
+    linear-gradient(180deg, var(--btn-highlight), transparent 42%),
+    linear-gradient(180deg, var(--btn-face-top), var(--btn-face-bottom));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 240, 200, .14),
+    inset 0 -2px 0 rgba(0, 0, 0, .35),
+    0 3px 0 var(--btn-lip),
+    0 6px 14px rgba(0, 0, 0, .45);
+  transition: transform .08s ease, box-shadow .12s ease, filter .15s ease, border-color .15s ease, opacity .15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.table-dock button.dock-action:not(:disabled):active,
+.daily-action-bar button.daily-action:not(:disabled):active,
+.table-dock .dock-secondary:not(:disabled):active,
+.back-button:active,
+.pause-button:active,
+.hud-deck:active,
+.menu-button:not(:disabled):active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 240, 200, .08),
+    inset 0 2px 6px rgba(0, 0, 0, .45),
+    0 1px 0 var(--btn-lip),
+    0 2px 6px rgba(0, 0, 0, .4);
+}
+
+@media (hover: hover) {
+  .table-dock button.dock-action:not(:disabled):hover,
+  .daily-action-bar button.daily-action:not(:disabled):hover,
+  .table-dock .dock-secondary:not(:disabled):hover,
+  .back-button:hover,
+  .pause-button:hover,
+  .hud-deck:hover {
+    filter: brightness(1.12);
+    border-color: var(--btn-focus);
+  }
+}
+
+/* A crisp gold ring instead of the thick cream outline. */
+.table-dock button:focus-visible,
+.daily-action-bar button:focus-visible,
+.back-button:focus-visible,
+.pause-button:focus-visible,
+.hud-deck:focus-visible,
+.setting-toggle:focus-visible,
+.deck-theme-option:focus-visible,
+.stake-button:focus-visible {
+  outline: 2px solid var(--btn-focus);
+  outline-offset: 3px;
+}
+
+/* ---- Table actions: colour-coded accent bar + glow ---- */
+
+.table-dock button.dock-action,
+.daily-action-bar button.daily-action {
+  --accent: #e2c060;
+  overflow: hidden;
+  border-radius: 14px;
+  color: #fbf3de;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, .6);
+}
+
+.table-dock button.dock-action::before,
+.daily-action-bar button.daily-action::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+  opacity: .9;
+}
+
+.table-dock button.dock-action-hit,
+.daily-action-bar button.daily-action-hit { --accent: #46d39a; }
+.table-dock button.dock-action-stand,
+.daily-action-bar button.daily-action-stand { --accent: #ff6f61; }
+.table-dock button.dock-action-double,
+.daily-action-bar button.daily-action-double { --accent: #f2c14e; }
+.table-dock button.dock-action-split,
+.daily-action-bar button.daily-action-split { --accent: #7eb2ff; }
+
+.table-dock button.dock-action.is-ready:not(:disabled),
+.daily-action-bar button.daily-action.is-ready:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--btn-edge));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 240, 200, .14),
+    inset 0 -2px 0 rgba(0, 0, 0, .35),
+    0 3px 0 var(--btn-lip),
+    0 6px 16px rgba(0, 0, 0, .45),
+    0 0 18px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.table-dock button.dock-action strong,
+.daily-action-bar button.daily-action strong {
+  font-size: clamp(.72rem, 3.4vw, .92rem);
+  letter-spacing: .08em;
+}
+
+.table-dock button.dock-action:disabled,
+.daily-action-bar button.daily-action:disabled {
+  opacity: .38;
+  filter: grayscale(.85);
+  box-shadow: inset 0 1px 0 rgba(255, 240, 200, .05), 0 1px 0 var(--btn-lip);
+  transform: translateY(2px);
+}
+
+.table-dock button.dock-action:disabled::before,
+.daily-action-bar button.daily-action:disabled::before {
+  opacity: .25;
+  box-shadow: none;
+}
+
+/* ---- Primary (Deal / Deal again / Refill): minted gold ---- */
+
+.table-dock .dock-primary,
+.table-dock .dock-primary:not(:disabled):hover,
+.table-dock .dock-primary:not(:disabled):focus-visible {
+  border: 1px solid #fbe690;
+  border-radius: 14px;
+  color: #1a1204;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .45), rgba(255, 255, 255, 0) 45%),
+    linear-gradient(180deg, #f4d774 0%, #d6ad3c 55%, #a97d1c 100%);
+  text-shadow: 0 1px 0 rgba(255, 238, 170, .6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .6),
+    inset 0 -2px 0 rgba(120, 82, 10, .55),
+    0 3px 0 #5e420b,
+    0 8px 18px rgba(0, 0, 0, .45),
+    0 0 18px rgba(242, 193, 78, .25);
+}
+
+.table-dock .dock-primary strong {
+  font-size: 1rem;
+  letter-spacing: .14em;
+}
+
+.table-dock .dock-primary:not(:disabled):active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .45),
+    inset 0 2px 6px rgba(120, 82, 10, .45),
+    0 1px 0 #5e420b,
+    0 3px 8px rgba(0, 0, 0, .4);
+}
+
+.table-dock .deal-button.is-ready:not(:disabled) {
+  animation: btn-primary-breathe 2.6s ease-in-out infinite;
+}
+
+@keyframes btn-primary-breathe {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.08); }
+}
+
+/* ---- Settings: switch toggles + gold volume sliders ---- */
+
+.settings-panel .setting-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .4rem 1rem;
+}
+
+.settings-panel .setting-row > button,
+.settings-panel .setting-row > b {
+  margin-left: 0;
+  justify-self: end;
+}
+
+.settings-panel .deck-theme-setting,
+.settings-panel .volume-setting {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.setting-toggle {
+  position: relative;
+  min-width: 64px;
+  min-height: 44px;
+  padding: 0 .7rem 0 2.35rem;
+  border: 1px solid rgba(214, 182, 80, .3);
+  border-radius: 999px;
+  color: var(--bj-muted, #a89f8c);
+  background: linear-gradient(180deg, #0b0906, #1b1710);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, .6);
+  font-size: .62rem;
+  font-weight: 900;
+  letter-spacing: .1em;
+  text-align: right;
+  transition: background .2s ease, color .2s ease, border-color .2s ease, padding .2s ease;
+}
+
+.setting-toggle::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #cfc6b2, #8e8672);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .5);
+  transform: translateY(-50%);
+  transition: left .2s ease, background .2s ease;
+}
+
+.setting-toggle.is-on {
+  padding: 0 2.35rem 0 .7rem;
+  color: #1a1204;
+  border-color: #fbe690;
+  background: linear-gradient(180deg, #f4d774, #b98d25);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 0 12px rgba(242, 193, 78, .25);
+  text-align: left;
+}
+
+.setting-toggle.is-on::before {
+  left: calc(100% - 32px);
+  background: linear-gradient(180deg, #fffaf0, #e9dcb8);
+}
+
+.volume-setting label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 3rem;
+  align-items: center;
+  gap: .75rem;
+  width: 100%;
+  margin-left: 0;
+}
+
+.volume-setting label > span {
+  order: 2;
+  justify-self: end;
+  min-width: 3rem;
+  padding: .2rem .4rem;
+  border: 1px solid rgba(214, 182, 80, .3);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, .35);
+  color: var(--bj-gold-bright, #f0d77a);
+  font-size: .7rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.volume-setting input[type="range"] {
+  --fill: 65%;
+  order: 1;
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.volume-setting input[type="range"]::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f2c14e var(--fill), #2a241a var(--fill));
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .6);
+}
+
+.volume-setting input[type="range"]::-moz-range-track {
+  height: 8px;
+  border-radius: 999px;
+  background: #2a241a;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .6);
+}
+
+.volume-setting input[type="range"]::-moz-range-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: #f2c14e;
+}
+
+.volume-setting input[type="range"]::-webkit-slider-thumb {
+  width: 26px;
+  height: 26px;
+  margin-top: -9px;
+  border: 2px solid #fbe690;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff6d6, #d6ad3c 60%, #8f6812);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .6);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.volume-setting input[type="range"]::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #fbe690;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff6d6, #d6ad3c 60%, #8f6812);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .6);
+}
+
+/* ---- Deck picker: clearer selected state ---- */
+
+.deck-theme-option {
+  position: relative;
+  transition: transform .1s ease, border-color .15s ease, box-shadow .15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.deck-theme-option:active {
+  transform: scale(.97);
+}
+
+.deck-theme-option[aria-pressed='true']::after {
+  content: '✓';
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: #1a1204;
+  background: linear-gradient(180deg, #f4d774, #b98d25);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .5);
+  font-size: .72rem;
+  font-weight: 900;
+}
+
+/* ---- HUD deck button: always say what it does ---- */
+
+.hud-deck .hud-deck-hint {
+  font-size: .56rem;
+  letter-spacing: .1em;
+  color: var(--bj-gold-bright, #f0d77a);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .table-dock button,
+  .back-button,
+  .pause-button,
+  .hud-deck,
+  .setting-toggle,
+  .setting-toggle::before,
+  .deck-theme-option {
+    transition: none;
+  }
+
+  .table-dock .deal-button.is-ready:not(:disabled) {
+    animation: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .table-dock button.dock-action::before,
+.daily-action-bar button.daily-action::before { display: none; }
+  .setting-toggle::before { background: ButtonText; }
+  .setting-toggle.is-on { border: 2px solid Highlight; }
+}
+
+/* Phones hide the deck name; the hint keeps the control self-explanatory. */
+@media (min-width: 521px) {
+  .hud-deck .hud-deck-hint { display: none; }
+}
+
+.daily-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  width: 100%;
+}
+
+/* Daily's header shows the deck name, so the phone hint would repeat it. */
+.daily-topbar .hud-deck-hint { display: none; }
+
+.daily-action-bar button.daily-action {
+  position: relative;
+  min-height: 52px;
+  padding-inline: .2rem;
+  border-radius: 14px;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+
+.daily-action-bar button.daily-action strong {
+  font-size: clamp(.66rem, 3.1vw, .9rem);
+  letter-spacing: .04em;
+}

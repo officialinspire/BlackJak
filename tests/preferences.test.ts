@@ -34,6 +34,7 @@ describe('feedback preferences', () => {
       sfx: true,
       haptics: false,
       volume: 0.4,
+      musicVolume: 0.2,
     });
 
     expect(loadFeedbackPreferences()).toMatchObject({
@@ -41,6 +42,7 @@ describe('feedback preferences', () => {
       music: false,
       haptics: false,
       volume: 0.4,
+      musicVolume: 0.2,
     });
   });
 
@@ -59,7 +61,8 @@ describe('feedback preferences', () => {
 
     storage.set('feedback-preferences', { master: true, sfx: false, haptics: true, volume: 0.3 });
 
-    expect(loadFeedbackPreferences()).toMatchObject({ music: true, sfx: false, volume: 0.3 });
+    // Older saves had one shared volume: music starts at the level the player chose.
+    expect(loadFeedbackPreferences()).toMatchObject({ music: true, sfx: false, volume: 0.3, musicVolume: 0.3 });
   });
 
   it('clamps stored volume to the supported 0–1 range', () => {
@@ -75,7 +78,7 @@ describe('feedback preferences', () => {
       },
     });
 
-    saveFeedbackPreferences({ ...defaultFeedbackPreferences(), volume: 2 });
-    expect(loadFeedbackPreferences().volume).toBe(1);
+    saveFeedbackPreferences({ ...defaultFeedbackPreferences(), volume: 2, musicVolume: -1 });
+    expect(loadFeedbackPreferences()).toMatchObject({ volume: 1, musicVolume: 0 });
   });
 });

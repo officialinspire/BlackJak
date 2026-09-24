@@ -6,7 +6,7 @@ BlackJak is a mobile-first blackjack game from OFFICIAL INSPIRE, inspired in per
 
 ## Current status
 
-**BlackJak v0.3.0** adds the INSPIRE startup intro, menu/gameplay music with crossfades, event-driven table SFX, phone-to-desktop layout hardening, and a PWA that precaches the game but runtime-caches its large media. v0.2.1 added security hardening: a production CSP, escaped runtime text, patched tooling and lockfile-based CI. v0.1.0 delivered the full game: Classic play, Jak's House, local progression, Daily Hand, audio/haptics, accessibility, offline PWA and CI. v0.2.0 dresses it in the illustrated art set:
+**BlackJak v0.3.x** (v0.3.1: working music volume on iOS, separate music/effects sliders, a deck switch on every screen, polished buttons) adds the INSPIRE startup intro, menu/gameplay music with crossfades, event-driven table SFX, phone-to-desktop layout hardening, and a PWA that precaches the game but runtime-caches its large media. v0.2.1 added security hardening: a production CSP, escaped runtime text, patched tooling and lockfile-based CI. v0.1.0 delivered the full game: Classic play, Jak's House, local progression, Daily Hand, audio/haptics, accessibility, offline PWA and CI. v0.2.0 dresses it in the illustrated art set:
 
 - the **illustrated table** (`blackjak-table.png`) as a shared, responsive game scene for Classic and Jak's House
 - **Jak as a reactive dealer NPC**, with 19 sprite poses driven by dialogue events plus deal, draw and chip gestures
@@ -238,7 +238,9 @@ Settings persist locally, and missing or corrupt values fall back to defaults:
 - Music
 - SFX
 - Haptics
-- Volume
+- Music volume and Effects volume (separate sliders)
+
+Music is routed through a Web Audio gain node, so the music slider and crossfades work on iOS Safari too (it ignores `audio.volume`). Like the SFX, music follows the iPhone's silent switch.
 
 Haptics use `navigator.vibrate()` defensively and never block gameplay when unsupported. Reduced-motion behavior remains independent of audio/haptic settings.
 
@@ -454,7 +456,6 @@ The PNG sheets at the repository root (`blackjak-sprite-sheet.png`, `blackjak-ta
 - **Classic v1 scope:** no insurance, surrender, side bets, or real-money functionality.
 - **Art notes:** the Inspire deck's 7♠, 7♥ and 7♣ are misdrawn in the source sheet (six pips); they render as a drawn fallback face until the art is corrected. Jak's shuffling pose isn't used by any mood yet.
 - **Media caching:** the core PWA is precached; the intro video and two music tracks are runtime-cached after first play, so installs/updates never block on ~5.7MB of media. If media is unavailable, the intro is skipped and gameplay still starts.
-- **iOS music volume:** iOS Safari ignores `HTMLMediaElement.volume`, so on iPhone/iPad the Volume slider affects SFX but not music, and a music crossfade is a short overlap then a cut. The music toggles work everywhere.
 - **Intro codec:** the intro is H.264 MP4. Chromium builds without proprietary codecs (such as Playwright's) can't play it, and skip straight to the menu.
 - **Automated browser E2E:** CI now runs Chromium device/integration QA across startup, menu, Classic, Jak's House, Daily, responsive layouts, input stress, refresh recovery, PWA update, reduced motion, mute, and offline core play.
 
