@@ -1,6 +1,7 @@
 import { ACHIEVEMENTS, type AchievementDefinition } from '../data/progression';
 import type { AchievementId } from '../types/profile';
 import { escapeHtml } from '../util/html';
+import { badgeMarkup, badgeSvg } from './achievement-badges';
 
 /** Which achievements the Stats-screen logbook is showing. */
 export type AchievementFilter = 'all' | 'unlocked' | 'locked';
@@ -37,7 +38,7 @@ function entryMarkup(achievement: AchievementDefinition, unlocked: boolean): str
   const number = String(ACHIEVEMENTS.indexOf(achievement) + 1).padStart(2, '0');
   return `
     <li class="achievement-entry ${unlocked ? 'is-unlocked' : 'is-locked'}" data-achievement-id="${achievement.id}">
-      <span class="achievement-mark" aria-hidden="true">${unlocked ? '◆' : '◇'}</span>
+      ${badgeMarkup(achievement.id, unlocked)}
       <div class="achievement-entry-copy">
         <strong>${escapeHtml(achievement.name)}</strong>
         <p>${escapeHtml(achievement.description)}</p>
@@ -61,9 +62,23 @@ function groupMarkup(kind: 'unlocked' | 'locked', entries: AchievementDefinition
     </section>`;
 }
 
+/**
+ * All nine badges at a glance, earned ones lit and the rest as silhouettes.
+ * Decorative: each entry below carries the badge's accessible name.
+ */
+function badgeShelfMarkup(unlockedSet: ReadonlySet<AchievementId>): string {
+  return `
+      <div class="badge-shelf" aria-hidden="true">${ACHIEVEMENTS.map((achievement) => {
+        const earned = unlockedSet.has(achievement.id);
+        return `<span class="badge-shelf-slot ${earned ? 'is-earned' : 'is-locked'}" data-badge="${achievement.id}">${badgeSvg(achievement.id)}</span>`;
+      }).join('')}
+      </div>`;
+}
+
 /** The browsable achievement logbook on the Stats screen. */
 export function achievementLogMarkup(unlockedIds: Iterable<AchievementId>, filter: AchievementFilter): string {
-  const log = achievementLogbook(unlockedIds);
+  const unlockedSet = new Set(unlockedIds);
+  const log = achievementLogbook(unlockedSet);
   const counts: Record<AchievementFilter, number> = {
     all: log.total,
     unlocked: log.unlocked.length,
@@ -88,6 +103,7 @@ export function achievementLogMarkup(unlockedIds: Iterable<AchievementId>, filte
           <span style="width: ${log.percent}%"></span>
         </div>
       </div>
+      ${badgeShelfMarkup(unlockedSet)}
       <div class="achievement-filters" role="group" aria-label="Filter achievements">${chips}
       </div>
       ${groups}

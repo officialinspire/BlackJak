@@ -271,8 +271,8 @@
 .achievement-entry {
   min-width: 0;
   display: grid;
-  grid-template-columns: auto minmax(0,1fr) auto;
-  gap: .55rem;
+  grid-template-columns: 44px minmax(0,1fr) auto;
+  gap: .6rem;
   align-items: center;
   padding: .55rem .7rem;
   border: 1px solid rgba(214,182,80,.12);
@@ -320,9 +320,81 @@
   letter-spacing: .11em;
 }
 
-.achievement-mark {
-  color: #565149;
-  font-size: 1rem;
+/* Achievement badges: shared chip frame, per-achievement glyph. Earned badges use
+   the table's dark wood, felt, cream, and gold; locked ones flatten to one tone. */
+
+.achievement-badge,
+.badge-shelf-slot,
+.toast-icon {
+  --badge-rim: #5a3a22;
+  --badge-notch: var(--bj-gold);
+  --badge-face: #17140f;
+  --badge-inlay: rgba(240,215,122,.45);
+  --badge-cream: var(--bj-cream);
+  --badge-gold: var(--bj-gold-bright);
+  --badge-ink: #1a1407;
+  display: block;
+  flex: none;
+}
+
+.achievement-badge {
+  width: 44px;
+  height: 44px;
+}
+
+.badge-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.badge-rim { fill: var(--badge-rim); stroke: rgba(0,0,0,.55); stroke-width: 1; }
+.badge-notches { fill: none; stroke: var(--badge-notch); stroke-width: 2.4; stroke-dasharray: 3.2 5.8; }
+.badge-face { fill: var(--badge-face); }
+.badge-inlay { fill: none; stroke: var(--badge-inlay); stroke-width: .7; }
+.badge-cream { fill: var(--badge-cream); }
+.badge-gold { fill: var(--badge-gold); }
+.badge-ink { fill: var(--badge-ink); }
+.badge-cut { stroke: var(--badge-face); stroke-width: .9; }
+.badge-line { fill: none; stroke: var(--badge-cream); stroke-width: 2.6; stroke-linecap: round; }
+
+.achievement-badge.is-earned .badge-svg,
+.badge-shelf-slot.is-earned .badge-svg {
+  filter: drop-shadow(0 0 5px rgba(240,215,122,.28)) drop-shadow(0 2px 2px rgba(0,0,0,.5));
+}
+
+.achievement-badge.is-locked,
+.badge-shelf-slot.is-locked {
+  --badge-rim: #1f1b16;
+  --badge-notch: #2c2720;
+  --badge-face: #13110e;
+  --badge-inlay: transparent;
+  --badge-cream: #37322a;
+  --badge-gold: #37322a;
+  --badge-ink: #13110e;
+  opacity: .8;
+}
+
+.badge-shelf {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0,1fr));
+  gap: .3rem;
+  margin: 0 0 .7rem;
+  padding: .5rem;
+  border: 1px solid rgba(214,182,80,.14);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(90,58,34,.28), rgba(40,26,15,.28)),
+    rgba(0,0,0,.25);
+  box-shadow: inset 0 -2px 0 rgba(0,0,0,.35);
+}
+
+.badge-shelf-slot {
+  width: 100%;
+  max-width: 40px;
+  aspect-ratio: 1;
+  justify-self: center;
 }
 
 .achievement-entry.is-unlocked {
@@ -332,7 +404,6 @@
     rgba(0,0,0,.2);
 }
 
-.achievement-entry.is-unlocked .achievement-mark,
 .achievement-entry.is-unlocked .achievement-entry-meta b {
   color: var(--bj-gold-bright);
 }
@@ -389,15 +460,9 @@
 }
 
 .toast-icon {
-  width: 31px;
-  height: 31px;
-  display: grid;
-  place-content: center;
-  border: 1px solid rgba(240,215,122,.4);
-  border-radius: 50%;
-  color: var(--bj-gold-bright);
-  background: rgba(214,182,80,.05);
-  font-size: .75rem;
+  width: 34px;
+  height: 34px;
+  filter: drop-shadow(0 0 6px rgba(240,215,122,.3));
 }
 
 .achievement-toast > div {
@@ -444,7 +509,7 @@
 
 @media (max-width: 520px) {
   .achievement-entry {
-    grid-template-columns: auto minmax(0,1fr);
+    grid-template-columns: 44px minmax(0,1fr);
   }
 
   .achievement-entry-meta {
@@ -468,6 +533,22 @@
 }
 
 @media (max-width: 350px) {
+  .achievement-entry {
+    grid-template-columns: 38px minmax(0,1fr);
+    gap: .5rem;
+    padding: .5rem .55rem;
+  }
+
+  .achievement-badge {
+    width: 38px;
+    height: 38px;
+  }
+
+  .badge-shelf {
+    grid-template-columns: repeat(5, minmax(0,1fr));
+    justify-items: center;
+  }
+
   .menu-progression {
     padding-inline: .55rem;
   }

@@ -140,7 +140,7 @@ describe('Stats screen wiring', () => {
 
   it('keeps filter targets touch-sized and entries single-column on phones', () => {
     expect(progressionCss).toMatch(/\.achievement-filter\s*{[^}]*min-height:\s*44px/s);
-    expect(progressionCss).toMatch(/@media \(max-width: 520px\)\s*{\s*\.achievement-entry\s*{[^}]*grid-template-columns:\s*auto minmax\(0,1fr\)/s);
+    expect(progressionCss).toMatch(/@media \(max-width: 520px\)\s*{\s*\.achievement-entry\s*{[^}]*grid-template-columns:\s*44px minmax\(0,1fr\)/s);
     expect(progressionCss).not.toContain('.achievement-grid');
   });
 });

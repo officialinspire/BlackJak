@@ -53,6 +53,7 @@ import { escapeHtml } from '../util/html';
 import { ACTION_SHORTCUTS, dockPhaseFor, tableDockMarkup, type DockPhase } from './table-dock';
 import { FxQueue, controlsStateKey, fxClassNames, fxStyleVars, shouldIgnoreActivation, type FxCue } from './fx';
 import { menuBoardMarkup } from './menu-board';
+import { badgeSvg } from './achievement-badges';
 import { achievementLogMarkup, isAchievementFilter, type AchievementFilter } from './achievement-log';
 import { escapeIntent, isTableScreen, pauseMenuMarkup } from './pause-menu';
 import { dialoguePanelMarkup, type PanelStatus } from './dialogue-panel';
@@ -547,7 +548,7 @@ function achievementToastMarkup(): string {
   const extra = model.achievementToasts.length - 1;
   return `
     <div class="achievement-toast" role="status" aria-live="polite" aria-atomic="true">
-      <span class="toast-icon" aria-hidden="true">◆</span>
+      <span class="toast-icon" aria-hidden="true">${badgeSvg(achievement.id)}</span>
       <div><small>ACHIEVEMENT UNLOCKED</small><strong>${achievement.name}</strong><p>${achievement.description}</p></div>
       ${extra > 0 ? `<b>+${extra} MORE</b>` : ''}
     </div>`;
