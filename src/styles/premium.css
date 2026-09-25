@@ -11,6 +11,15 @@
   --bj-lacquer: #080808;
   --bj-muted: #a39a89;
   --bj-danger: #d4655c;
+  /* Shared UI polish tokens: one focus ring, border weights, radii, and label type. */
+  --bj-muted-dim: #8e8676;
+  --bj-line: rgba(214,182,80,.22);
+  --bj-line-strong: rgba(240,215,122,.5);
+  --bj-focus: #f3d97c;
+  --bj-radius-sm: 10px;
+  --bj-radius: 14px;
+  --bj-label-size: .6rem;
+  --bj-label-track: .14em;
 }
 
 body {
@@ -189,6 +198,7 @@ body {
 
 .stat-card {
   border-color: rgba(214,182,80,.16);
+  border-radius: var(--bj-radius-sm);
   background: linear-gradient(145deg, rgba(214,182,80,.035), rgba(0,0,0,.26));
 }
 
@@ -229,17 +239,24 @@ body {
   line-height: 1.35;
 }
 
+/* Read-only status (System / On / Locked): a quiet chip, distinct from the toggles. */
 .setting-row b {
   flex: 0 0 auto;
-  color: var(--bj-gold);
-  font-size: .61rem;
-  letter-spacing: .08em;
+  padding: .32rem .6rem;
+  border: 1px solid var(--bj-line);
+  border-radius: 999px;
+  color: var(--bj-gold-bright);
+  background: rgba(0,0,0,.32);
+  font-size: var(--bj-label-size);
+  line-height: 1;
+  letter-spacing: .1em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .panel-footnote {
   margin-top: 1rem !important;
-  color: #776f62 !important;
+  color: var(--bj-muted-dim) !important;
   font-size: .69rem !important;
 }
 
@@ -488,7 +505,7 @@ body {
 
 .result-banner > span:first-child {
   color: var(--bj-muted);
-  font-size: .46rem;
+  font-size: .52rem;
   font-weight: 900;
   letter-spacing: .2em;
 }
@@ -508,7 +525,7 @@ body {
 
 .result-banner small {
   color: var(--bj-muted);
-  font-size: .5rem;
+  font-size: .56rem;
   letter-spacing: .09em;
 }
 

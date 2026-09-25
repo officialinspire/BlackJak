@@ -63,17 +63,21 @@
   }
 }
 
-/* A crisp gold ring instead of the thick cream outline. */
-.table-dock button:focus-visible,
-.daily-action-bar button:focus-visible,
-.back-button:focus-visible,
-.pause-button:focus-visible,
-.hud-deck:focus-visible,
-.setting-toggle:focus-visible,
-.deck-theme-option:focus-visible,
-.stake-button:focus-visible {
-  outline: 2px solid var(--btn-focus);
-  outline-offset: 3px;
+/* Focus: the global gold ring (qa.css, --bj-focus) covers every control. */
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* Gold call-to-action buttons outside the dock (Daily: Play / Share). */
+.primary-action:not(:disabled):active {
+  transform: translateY(1px);
+  filter: brightness(.94);
+}
+
+.primary-action:disabled {
+  opacity: .5;
+  filter: grayscale(.6);
 }
 
 /* ---- Table actions: colour-coded accent bar + glow ---- */
@@ -126,8 +130,8 @@
 
 .table-dock button.dock-action:disabled,
 .daily-action-bar button.daily-action:disabled {
-  opacity: .38;
-  filter: grayscale(.85);
+  opacity: .5;
+  filter: grayscale(.8);
   box-shadow: inset 0 1px 0 rgba(255, 240, 200, .05), 0 1px 0 var(--btn-lip);
   transform: translateY(2px);
 }

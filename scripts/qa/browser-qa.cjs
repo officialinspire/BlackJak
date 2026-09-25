@@ -60,6 +60,11 @@ async function layoutMetrics(p) {
     const intersects = (a, b) => Boolean(a && b && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top);
     const dock = rect('.table-dock');
     const footer = rect('.game-footer-compact');
+    // Table screens clip horizontal overflow, so a pushed-out control never shows as page overflow.
+    const clippedControls = [...document.querySelectorAll('.table-hud button, .table-dock button')]
+      .map((e) => ({ e, r: e.getBoundingClientRect() }))
+      .filter(({ r }) => r.width > 0 && (r.left < -1 || r.right > innerWidth + 1))
+      .map(({ e }) => e.dataset.action ?? e.dataset.stake ?? e.className.split(' ')[0]);
     const scene = rect('.game-scene');
     return {
       ov: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -67,6 +72,7 @@ async function layoutMetrics(p) {
       dockInView: !dock || (dock.left >= -1 && dock.right <= innerWidth + 1 && dock.bottom <= innerHeight + 1),
       sceneInWidth: !scene || (scene.left >= -1 && scene.right <= innerWidth + 1),
       footerDockOverlap: intersects(footer, dock),
+      clippedControls,
       footer: visible('.game-footer'),
       cards: document.querySelectorAll('.playing-card').length,
       jak: visible('.dealer-window'),
@@ -127,7 +133,12 @@ async function layoutMetrics(p) {
         await p.click(`[data-screen="${screen}"]`);
         await p.waitForTimeout(180);
       }
-      if (screen === 'classic' || screen === 'house') await dealPlaying(p);
+      if (screen === 'classic' || screen === 'house') {
+        // Betting dock (stake chips + Deal) must fit too, not just the playing dock.
+        const betting = await layoutMetrics(p);
+        check(`controls in view ${screen} betting ${w}x${h}`, betting.clippedControls.length === 0, JSON.stringify(betting.clippedControls));
+        await dealPlaying(p);
+      }
       await p.waitForTimeout(180);
 
       const m = await layoutMetrics(p);
@@ -142,7 +153,7 @@ async function layoutMetrics(p) {
         });
         check(`dialogue bar clear of the sticky dock ${screen} ${w}x${h}`, clear);
       }
-      check(`layout ${screen} ${w}x${h}`, m.ov === 0 && m.brokenImg === 0 && m.dockInView && m.sceneInWidth && !m.footerDockOverlap && m.footer, JSON.stringify(m));
+      check(`layout ${screen} ${w}x${h}`, m.ov === 0 && m.brokenImg === 0 && m.dockInView && m.sceneInWidth && !m.footerDockOverlap && m.footer && m.clippedControls.length === 0, JSON.stringify(m));
 
       if (screen === 'classic' || screen === 'house') {
         await p.keyboard.press('Escape');
@@ -412,6 +423,40 @@ async function layoutMetrics(p) {
     const boot = !!(await p.$('.menu-board'));
     await p.click('[data-screen="classic"]'); const ok = await dealPlaying(p);
     check('corrupt storage: boots to menu, defaults, playable', boot && ok && p.errs.length === 0 && await p.$eval('[data-deck-cycle]', (e) => e.getAttribute('aria-label').includes('Standard')), p.errs.join(';'));
+    await ctx.close();
+  }
+
+  // ---- Blocked storage: leaving a table must not reset the session's progress ----
+  {
+    const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
+    await ctx.addInitScript(() => {
+      Object.defineProperty(window, 'localStorage', { get() { throw new DOMException('blocked', 'SecurityError'); } });
+    });
+    const p = await ctx.newPage(); p.errs = [];
+    p.on('pageerror', (e) => p.errs.push(String(e)));
+    await gotoGame(p);
+    const rep = () => p.$eval('.menu-progression b', (e) => e.textContent);
+    await p.click('[data-screen="classic"]');
+    // Play until a win earns REP (losses earn none).
+    const hudRep = () => p.$eval('.rep-pill strong', (e) => e.textContent);
+    for (let k = 0; k < 60 && await hudRep() === '0'; k++) {
+      if (await p.$('[data-action="refill"]')) await p.click('[data-action="refill"]');
+      await p.keyboard.press('n'); await p.waitForTimeout(70);
+      while (await phase(p) === 'playing') { await p.keyboard.press('s'); await p.waitForTimeout(70); }
+    }
+    await p.keyboard.press('Escape'); await p.waitForTimeout(650);
+    await p.click('.pause-overlay [data-pause-action="menu"].menu-board-item'); await p.waitForTimeout(150);
+    const earned = await rep();
+    // Open a table and leave without dealing, then abandon a hand mid-play.
+    await p.click('[data-screen="house"]'); await p.waitForTimeout(150);
+    await p.keyboard.press('Escape'); await p.waitForTimeout(650);
+    await p.click('.pause-overlay [data-pause-action="menu"].menu-board-item'); await p.waitForTimeout(150);
+    const afterEmptyVisit = await rep();
+    await p.click('[data-screen="classic"]'); await dealPlaying(p);
+    await p.keyboard.press('Escape'); await p.waitForTimeout(650);
+    for (let i = 0; i < 2; i++) { await p.click('.pause-overlay [data-pause-action="menu"].menu-board-item'); await p.waitForTimeout(400); }
+    const afterAbandon = await rep();
+    check('blocked storage: leaving a table keeps session REP', earned !== '0 REP' && afterEmptyVisit === earned && afterAbandon === earned && p.errs.length === 0, `${earned} → ${afterEmptyVisit} → ${afterAbandon} ${p.errs.join(';')}`);
     await ctx.close();
   }
 

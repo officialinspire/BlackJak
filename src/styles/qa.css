@@ -63,7 +63,7 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 [role="button"]:focus-visible {
-  outline: 3px solid var(--cream);
+  outline: 2px solid var(--bj-focus, var(--cream));
   outline-offset: 3px;
 }
 
@@ -285,8 +285,6 @@ input:focus-visible,
 
 /* Prompt 5 — device matrix hardening (phone / tablet / desktop / landscape). */
 
-.pause-button,
-.hud-deck,
 .setting-toggle,
 .house-rules summary {
   min-height: 44px;

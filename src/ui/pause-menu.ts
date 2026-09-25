@@ -1,4 +1,5 @@
 import type { AppScreen } from '../types/app';
+import { shouldIgnoreActivation } from './fx';
 import { menuBoardMarkup } from './menu-board';
 
 /*
@@ -18,6 +19,26 @@ export type EscapeIntent = 'open-pause' | 'close-pause' | 'back' | 'none';
 export function escapeIntent(screen: AppScreen, pauseOpen: boolean): EscapeIntent {
   if (isTableScreen(screen)) return pauseOpen ? 'close-pause' : 'open-pause';
   return screen === 'menu' ? 'none' : 'back';
+}
+
+export type LeaveDecision = 'confirm' | 'leave' | 'ignore';
+
+/**
+ * What a "Main Menu" press on the pause board does. With a hand in play the
+ * first press only arms "Leave hand?"; a pointer tap landing within the input
+ * guard of arming is the same double-tap and is ignored, so it can't abandon
+ * the hand without a deliberate second press.
+ */
+export function pauseLeaveDecision(input: {
+  readonly handInProgress: boolean;
+  readonly confirmArmed: boolean;
+  readonly armedAt: number;
+  readonly now: number;
+  readonly pointer: boolean;
+}): LeaveDecision {
+  if (!input.handInProgress) return 'leave';
+  if (!input.confirmArmed) return 'confirm';
+  return shouldIgnoreActivation({ now: input.now, controlsChangedAt: input.armedAt, pointer: input.pointer }) ? 'ignore' : 'leave';
 }
 
 export interface PauseMenuInput {
@@ -49,7 +70,7 @@ export function pauseMenuMarkup(input: PauseMenuInput): string {
             {
               slot: 'header',
               html: `<h2 id="pause-title" class="pause-title">Table paused</h2>
-                <p id="pause-summary" class="pause-summary">${input.modeLabel} · <b>${input.chips}</b> chips · <b>${input.rep}</b> REP · ${input.title}</p>`,
+                <p id="pause-summary" class="pause-summary">${input.modeLabel} · <b>${input.chips}</b> chips · <b>${input.rep.toLocaleString('en-US')}</b> REP · ${input.title}</p>`,
             },
             { slot: 'row1', label: 'Resume', detail: 'Esc', attributes: 'data-pause-action="resume" aria-keyshortcuts="Escape"' },
             { slot: 'row2', label: `Deck: ${input.deckLabel}`, detail: 'Change', attributes: 'data-pause-action="deck"' },

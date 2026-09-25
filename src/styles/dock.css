@@ -66,7 +66,7 @@
 .pause-button,
 .hud-deck {
   flex: 0 0 auto;
-  min-height: 40px;
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   gap: .35rem;
@@ -356,13 +356,6 @@
   .table-hud .hud > span { padding: .28rem .42rem; font-size: .58rem; }
   .pause-button, .hud-deck { padding: .3rem .5rem; min-width: 40px; justify-content: center; }
 
-  /* Two rows in the betting phases: chips, then the primary action. */
-  .table-dock:not(.phase-playing) .dock-row {
-    flex-wrap: wrap;
-    row-gap: .35rem;
-  }
-  .table-dock:not(.phase-playing) .dock-stakes { flex-basis: 100%; justify-content: space-between; }
-  .table-dock:not(.phase-playing) .dock-actions { flex-basis: 100%; }
   .table-dock .dock-primary { flex: 1 1 auto; }
   .table-dock.phase-playing .dock-row { min-height: 104px; }
   .table-dock.phase-playing .dock-wager { display: none; }
@@ -370,6 +363,19 @@
   .table-dock button.dock-action { min-height: 64px; }
   .table-dock kbd { display: none; }
   .dock-readout { min-width: 2.8rem; }
+}
+
+/* Two rows in the betting phases: chips, then the primary action. Phones and
+   short landscape (where the dock sits in a narrow side column) both need it,
+   or Deal is pushed off-screen. */
+@media (max-width: 520px), (orientation: landscape) and (max-height: 540px) {
+  .table-dock:not(.phase-playing) .dock-row {
+    flex-wrap: wrap;
+    row-gap: .35rem;
+  }
+  /* Wrap as a last resort rather than clip MAX off the edge. */
+  .table-dock:not(.phase-playing) .dock-stakes { flex-basis: 100%; flex-wrap: wrap; row-gap: .3rem; justify-content: space-between; }
+  .table-dock:not(.phase-playing) .dock-actions { flex-basis: 100%; }
 }
 
 @media (max-width: 600px) {
@@ -393,8 +399,17 @@
   .table-hud .rep-pill .rep-mini-track { display: none; }
 }
 
+/* Narrow phones and the short-landscape table column: wrap the HUD pills
+   rather than push Deck off-screen (Jak's House adds a pill). */
+@media (max-width: 360px), (orientation: landscape) and (max-height: 540px) {
+  .table-hud .hud { flex-wrap: wrap; row-gap: .25rem; }
+}
+
 @media (orientation: landscape) and (max-height: 540px) {
   .table-screen .game-scene { --scene-chrome: 5rem; }
+  /* The side column is ~290px on small phones: compact chips keep one stake row. */
+  .table-dock .dock-chip { width: 40px; height: 40px; min-width: 40px; }
+  .table-dock .dock-readout { min-width: 2.8rem; }
 
   .table-screen > .table-dock,
   .table-screen > .house-strip {

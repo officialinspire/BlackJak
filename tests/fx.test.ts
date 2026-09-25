@@ -115,10 +115,15 @@ describe('stale-input guard', () => {
     expect(shouldIgnoreActivation({ now: 1000 + 10, controlsChangedAt: 1000, pointer: true })).toBe(true);
   });
 
+  it('ignores a tap queued before the controls changed (stamped earlier than the slow re-render)', () => {
+    // Regression: the second tap of a Refill double-tap in Jak's House dealt a hand.
+    expect(shouldIgnoreActivation({ now: 900, controlsChangedAt: 1000, pointer: true })).toBe(true);
+    expect(shouldIgnoreActivation({ now: 900, controlsChangedAt: 1000, pointer: false })).toBe(false);
+  });
+
   it('never delays deliberate input', () => {
     expect(shouldIgnoreActivation({ now: 1000 + INPUT_GUARD_MS, controlsChangedAt: 1000, pointer: true })).toBe(false);
     expect(shouldIgnoreActivation({ now: 1010, controlsChangedAt: 1000, pointer: false })).toBe(false);
-    expect(shouldIgnoreActivation({ now: 900, controlsChangedAt: 1000, pointer: true })).toBe(false);
     expect(shouldIgnoreActivation({ now: 5, controlsChangedAt: -Infinity, pointer: true })).toBe(false);
   });
 
