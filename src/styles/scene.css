@@ -398,6 +398,8 @@
     --scene-chrome: 5rem;
     grid-column: 1;
     grid-row: 1 / span 4;
+    /* Shrink to the column; otherwise the HUD's width pushes the scene over the dock. */
+    min-width: 0;
   }
 
   .table-screen > .game-controls,

@@ -108,6 +108,8 @@ export function shouldIgnoreActivation(input: {
   readonly pointer: boolean;
 }): boolean {
   if (!input.pointer) return false;
+  // A tap stamped before the change (queued while a slow render ran) was aimed
+  // at the old controls, so it is stale too; negative elapsed counts.
   const elapsed = input.now - input.controlsChangedAt;
-  return elapsed >= 0 && elapsed < INPUT_GUARD_MS;
+  return elapsed < INPUT_GUARD_MS;
 }

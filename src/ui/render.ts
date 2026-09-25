@@ -13,6 +13,7 @@ import {
   createHouseState,
   dailyShareText,
   dailyStateForDate,
+  effectiveStake,
   emptyRoundProgressionContext,
   evaluateHand,
   getActiveHand,
@@ -55,7 +56,7 @@ import { FxQueue, controlsStateKey, fxClassNames, fxStyleVars, shouldIgnoreActiv
 import { menuBoardMarkup } from './menu-board';
 import { badgeSvg } from './achievement-badges';
 import { achievementLogMarkup, isAchievementFilter, type AchievementFilter } from './achievement-log';
-import { escapeIntent, isTableScreen, pauseMenuMarkup } from './pause-menu';
+import { escapeIntent, isTableScreen, pauseLeaveDecision, pauseMenuMarkup } from './pause-menu';
 import { dialoguePanelMarkup, type PanelStatus } from './dialogue-panel';
 import { dealerMarkup } from './dealer';
 import type { DealerAction } from '../data/dealer-visuals';
@@ -88,6 +89,14 @@ interface AppModel {
   pauseMenuOpen: boolean;
   /** "Main Menu" was pressed once while a hand is in play; the next press leaves. */
   pauseConfirmLeave: boolean;
+  /** When that confirmation was armed (event time), to ignore the same double-tap. */
+  pauseConfirmArmedAt: number;
+  /**
+   * The profile as it was before the hand in play reserved its stake. Leaving
+   * mid-hand restores it from memory, never from storage, so the session's
+   * progress survives when storage is unavailable.
+   */
+  handCheckpoint: PlayerProfile | null;
   /** Increments per dealt round; keys card animations to a single round. */
   roundSerial: number;
   /** Stats-screen logbook filter; kept for the session so re-renders don't reset it. */
@@ -151,6 +160,8 @@ const model: AppModel = {
   dealerCue: null,
   pauseMenuOpen: false,
   pauseConfirmLeave: false,
+  pauseConfirmArmedAt: -Infinity,
+  handCheckpoint: null,
   roundSerial: 0,
   achievementFilter: 'all',
 };
@@ -229,6 +240,8 @@ function focusAfterRender(key: FocusKey | null, screenChanged: boolean, hadInter
     document.querySelector<HTMLElement>('.action-bar button:not(:disabled)') ??
     document.querySelector<HTMLElement>('[data-action="deal"]:not(:disabled)') ??
     document.querySelector<HTMLElement>('[data-action="start-daily"]:not(:disabled)') ??
+    // A finished Daily Hand: land on Share, not "← Menu" (Enter there would leave the screen).
+    document.querySelector<HTMLElement>('[data-action="share-daily"]:not(:disabled)') ??
     document.querySelector<HTMLElement>('[data-stake].is-selected:not(:disabled)') ??
     document.querySelector<HTMLElement>('.back-button');
 
@@ -290,6 +303,8 @@ function bindGlobalKeyboardOnce(): void {
 
 const formatChips = (value: number): string =>
   new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(value);
+/** REP and stat counts use the same grouping as chips ("12,500 REP", not "12500 REP"). */
+const formatCount = formatChips;
 
 function persistProfile(profile: PlayerProfile): void {
   model.profile = profile;
@@ -366,13 +381,9 @@ function say(event: DialogueEvent): void {
   cueFx('line');
 }
 
+/** The stake the next deal uses. Pure: rendering mid-hand (chips reserved) must not rewrite the pick. */
 function normalizedStake(): number {
-  if (model.profile.chips <= 0) return 0;
-  if (model.selectedStake > 0 && model.selectedStake <= model.profile.chips) return model.selectedStake;
-
-  const affordablePreset = [...STAKE_OPTIONS].reverse().find((stake) => stake <= model.profile.chips);
-  model.selectedStake = affordablePreset ?? Math.min(model.profile.chips, MAX_STAKE);
-  return model.selectedStake;
+  return effectiveStake(model.selectedStake, model.profile.chips);
 }
 
 function roundTone(round: RoundState | null): RoundTone {
@@ -440,7 +451,7 @@ function menuMarkup(): string {
       })}
       <div class="menu-progression" aria-label="BlackJak progression">
         <span>${title.current.name}</span>
-        <b>${model.profile.rep} REP</b>
+        <b>${formatCount(model.profile.rep)} REP</b>
       </div>
       <div class="menu-bankroll" aria-label="Saved Classic BlackJak bankroll">Practice chips <strong>${formatChips(model.profile.chips)}</strong></div>
       <p class="fine-print">Fictional practice chips only. No purchases, cash-out, or real-money wagering.</p>
@@ -504,12 +515,12 @@ function statsMarkup(): string {
           <div class="title-lockup">
             <span>CURRENT TITLE</span>
             <strong>${title.current.name}</strong>
-            <b>${model.profile.rep} REP</b>
+            <b>${formatCount(model.profile.rep)} REP</b>
           </div>
           <div class="rep-track" aria-label="${title.next ? `${Math.round(title.percent)} percent toward ${title.next.name}` : 'Maximum title reached'}">
             <span style="width: ${title.percent}%"></span>
           </div>
-          <small>${title.next ? `${title.next.minRep - model.profile.rep} REP to ${title.next.name}` : 'Top title unlocked.'}</small>
+          <small>${title.next ? `${formatCount(title.next.minRep - model.profile.rep)} REP to ${title.next.name}` : 'Top title unlocked.'}</small>
         </div>
         <div class="stats-grid">
           ${statCard('Practice chips', formatChips(model.profile.chips))}
@@ -539,7 +550,7 @@ function statsMarkup(): string {
 }
 
 function statCard(label: string, value: string | number): string {
-  return `<div class="stat-card"><span>${label}</span><strong>${value}</strong></div>`;
+  return `<div class="stat-card"><span>${label}</span><strong>${typeof value === 'number' ? formatCount(value) : value}</strong></div>`;
 }
 
 function achievementToastMarkup(): string {
@@ -619,8 +630,8 @@ function panelStatus(view: TableView, house: boolean): PanelStatus {
     ? ` · ${round.results.map((result, index) => `H${index + 1} ${result.outcome.toUpperCase()}`).join(' · ')}`
     : '';
   const tags = [
-    model.lastRepEarned > 0 ? `+${model.lastRepEarned} REP` : '',
-    house && model.houseLastBonusRep > 0 ? `HOT HAND +${model.houseLastBonusRep} REP` : '',
+    model.lastRepEarned > 0 ? `+${formatCount(model.lastRepEarned)} REP` : '',
+    house && model.houseLastBonusRep > 0 ? `HOT HAND +${formatCount(model.houseLastBonusRep)} REP` : '',
     house && model.houseTokenAwarded ? 'RUN IT BACK TOKEN EARNED' : '',
   ].filter(Boolean);
 
@@ -705,7 +716,7 @@ function sceneHudMarkup(modePill = ''): string {
       <div class="hud" aria-label="Player resources and progression">
         ${modePill}
         <span class="hud-chips">CHIPS <strong>${formatChips(model.profile.chips)}</strong></span>
-        <span class="rep-pill"><span class="title-pill">${progression.current.name}</span> <strong>${model.profile.rep}</strong> REP<i class="rep-mini-track" aria-hidden="true"><i style="width:${progression.percent}%"></i></i></span>
+        <span class="rep-pill"><span class="title-pill">${progression.current.name}</span> <strong>${formatCount(model.profile.rep)}</strong> REP<i class="rep-mini-track" aria-hidden="true"><i style="width:${progression.percent}%"></i></i></span>
       </div>
       ${deckCycleButtonMarkup()}
     </header>`;
@@ -853,6 +864,7 @@ function settleIfResolved(): void {
   const settled = settleResults(model.profile, model.round.results);
   const progression = applyProgression(settled, model.round, model.roundProgress);
   persistProfile(progression.profile);
+  model.handCheckpoint = null;
   model.lastRepEarned = progression.repEarned;
   model.achievementToasts = [...model.achievementToasts, ...progression.unlocked];
   cueFx('result', ...(progression.unlocked.length ? ['achievement' as const] : []));
@@ -869,6 +881,7 @@ function settleHouseIfResolved(): void {
   const withHouseBonus = applyRepBonus(progression.profile, houseResolution.hotHandBonusRep);
 
   persistProfile(withHouseBonus);
+  model.handCheckpoint = null;
   model.house = houseResolution.house;
   model.houseCheckpoint = null;
   model.houseLastBonusRep = houseResolution.hotHandBonusRep;
@@ -899,6 +912,7 @@ function dealRound(): void {
   }
 
   const before = model.profile;
+  model.handCheckpoint = before;
   const reserved = reserveStake(before, stake);
   model.profile = reserved;
 
@@ -915,6 +929,7 @@ function dealRound(): void {
     }
   } catch (error) {
     persistProfile(before);
+    model.handCheckpoint = null;
     throw error;
   }
 }
@@ -942,6 +957,7 @@ function dealHouseRound(): void {
   const beforeProfile = model.profile;
   const beforeHouse = model.house;
   model.houseCheckpoint = beforeHouse;
+  model.handCheckpoint = beforeProfile;
   model.profile = reserveStake(beforeProfile, stake);
 
   try {
@@ -962,6 +978,7 @@ function dealHouseRound(): void {
     persistProfile(beforeProfile);
     model.house = beforeHouse;
     model.houseCheckpoint = null;
+    model.handCheckpoint = null;
     throw error;
   }
 }
@@ -975,6 +992,7 @@ function runHouseReplay(): void {
 
   const beforeHouse = model.house;
   model.houseCheckpoint = beforeHouse;
+  model.handCheckpoint = model.profile;
   try {
     const replay = replayHouseRound(model.house);
     model.house = replay.house;
@@ -992,6 +1010,7 @@ function runHouseReplay(): void {
   } catch (error) {
     model.house = beforeHouse;
     model.houseCheckpoint = null;
+    model.handCheckpoint = null;
     throw error;
   }
 }
@@ -1241,7 +1260,7 @@ function dailyMarkup(): string {
           </div>` : ''}
         ${round ? `
           <div class="daily-live">
-            <p class="status-line" role="status" aria-live="polite" aria-atomic="true">${round.phase === 'resolved' ? `RESULT: ${dailyOutcome(round).toUpperCase()}${model.lastRepEarned ? ` · +${model.lastRepEarned} REP` : ''}` : `Your move · ${evaluateHand(getActiveHand(round).cards).total}`}</p>
+            <p class="status-line" role="status" aria-live="polite" aria-atomic="true">${round.phase === 'resolved' ? `RESULT: ${dailyOutcome(round).toUpperCase()}${model.lastRepEarned ? ` · +${formatCount(model.lastRepEarned)} REP` : ''}` : `Your move · ${evaluateHand(getActiveHand(round).cards).total}`}</p>
             ${round.phase === 'player-turn' ? dailyControlsMarkup(round) : '<button class="primary-action" data-action="share-daily">Share Result</button>'}
           </div>` : ''}
         ${!completed && !round ? '<button class="primary-action" data-action="start-daily">Play Today\'s Hand</button>' : ''}
@@ -1280,10 +1299,11 @@ async function shareDailyResult(): Promise<void> {
 function goToScreen(screen: AppScreen): void {
   model.pauseMenuOpen = false;
   model.pauseConfirmLeave = false;
-  if (screen === 'menu' && isTableScreen(model.screen) && model.round?.phase !== 'resolved') {
-    // Abandoning an unfinished hand: the reserved stake was never saved, so nothing is charged.
-    model.profile = loadProfile();
-    model.selectedStake = model.profile.chips > 0 ? Math.min(model.selectedStake || 25, model.profile.chips) : 0;
+  if (screen === 'menu' && isTableScreen(model.screen) && handInProgress()) {
+    // Abandoning an unfinished hand: restore the pre-deal profile from memory, so the
+    // reserved stake is never charged and progress survives unavailable storage.
+    if (model.handCheckpoint) model.profile = model.handCheckpoint;
+    model.handCheckpoint = null;
     if (model.screen === 'house' && model.houseCheckpoint) {
       model.house = model.houseCheckpoint;
       model.houseCheckpoint = null;
@@ -1362,7 +1382,7 @@ function closePauseMenu(): void {
 
 function bindPauseEvents(): void {
   app().querySelectorAll<HTMLElement>('.pause-overlay [data-pause-action]').forEach((element) => {
-    element.addEventListener('click', () => {
+    element.addEventListener('click', (event) => {
       if (!element.isConnected) return;
       feedbackEngine.activate();
       const action = element.dataset.pauseAction;
@@ -1380,9 +1400,18 @@ function bindPauseEvents(): void {
         feedback('button', 'tap');
         mountPauseOverlay('sound');
       } else if (action === 'menu') {
+        const decision = pauseLeaveDecision({
+          handInProgress: handInProgress(),
+          confirmArmed: model.pauseConfirmLeave,
+          armedAt: model.pauseConfirmArmedAt,
+          now: event.timeStamp,
+          pointer: event.detail > 0,
+        });
+        if (decision === 'ignore') return;
         feedback('button', 'tap');
-        if (handInProgress() && !model.pauseConfirmLeave) {
+        if (decision === 'confirm') {
           model.pauseConfirmLeave = true;
+          model.pauseConfirmArmedAt = event.timeStamp;
           mountPauseOverlay('menu');
         } else {
           goToScreen('menu');
