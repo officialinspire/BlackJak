@@ -2,7 +2,7 @@ import { APP_NAME, APP_TAGLINE, MAX_STAKE, STAKE_OPTIONS } from '../config/const
 import { feedbackEngine, haptic, type FeedbackCue, type HapticCue } from '../feedback/feedback';
 import { gameSfxSequence, SfxEventGate, type GameSfxEvent } from '../feedback/game-sfx';
 import { HOUSE_MODIFIERS } from '../data/house';
-import { ACHIEVEMENTS, titleProgressForRep, type AchievementDefinition } from '../data/progression';
+import { titleProgressForRep, type AchievementDefinition } from '../data/progression';
 import {
   allowedActions,
   applyProgression,
@@ -53,6 +53,7 @@ import { escapeHtml } from '../util/html';
 import { ACTION_SHORTCUTS, dockPhaseFor, tableDockMarkup, type DockPhase } from './table-dock';
 import { FxQueue, controlsStateKey, fxClassNames, fxStyleVars, shouldIgnoreActivation, type FxCue } from './fx';
 import { menuBoardMarkup } from './menu-board';
+import { achievementLogMarkup, isAchievementFilter, type AchievementFilter } from './achievement-log';
 import { escapeIntent, isTableScreen, pauseMenuMarkup } from './pause-menu';
 import { dialoguePanelMarkup, type PanelStatus } from './dialogue-panel';
 import { dealerMarkup } from './dealer';
@@ -88,6 +89,8 @@ interface AppModel {
   pauseConfirmLeave: boolean;
   /** Increments per dealt round; keys card animations to a single round. */
   roundSerial: number;
+  /** Stats-screen logbook filter; kept for the session so re-renders don't reset it. */
+  achievementFilter: AchievementFilter;
 }
 
 type RoundTone = 'idle' | 'playing' | 'blackjack' | 'win' | 'loss' | 'push' | 'mixed';
@@ -103,6 +106,7 @@ const FOCUS_ATTRIBUTES = [
   'data-pause-action',
   'data-pause',
   'data-deck-cycle',
+  'data-achievement-filter',
   'data-screen',
 ] as const;
 
@@ -147,6 +151,7 @@ const model: AppModel = {
   pauseMenuOpen: false,
   pauseConfirmLeave: false,
   roundSerial: 0,
+  achievementFilter: 'all',
 };
 
 const cardMotion = new CardMotionPlanner();
@@ -487,7 +492,6 @@ function settingsMarkup(): string {
 function statsMarkup(): string {
   const stats = model.profile.stats;
   const title = titleProgressForRep(model.profile.rep);
-  const unlocked = new Set(model.profile.progression.unlockedAchievements);
   const winRate = stats.totalHands > 0 ? Math.round((stats.wins / stats.totalHands) * 100) : 0;
   return `
     <main id="app-main" tabindex="-1" class="screen panel-screen">
@@ -526,12 +530,7 @@ function statsMarkup(): string {
           ${statCard('Risky hits 16+', stats.riskyHits)}
           ${statCard('Five-card wins', stats.fiveCardWins)}
         </div>
-        <div class="achievement-section">
-          <div class="section-heading"><span>ACHIEVEMENTS</span><b>${unlocked.size}/${ACHIEVEMENTS.length}</b></div>
-          <div class="achievement-grid">
-            ${ACHIEVEMENTS.map((achievement) => achievementCardMarkup(achievement, unlocked.has(achievement.id))).join('')}
-          </div>
-        </div>
+        ${achievementLogMarkup(model.profile.progression.unlockedAchievements, model.achievementFilter)}
         <p class="stats-note">Split hands are counted individually in win/loss statistics.</p>
       </section>
       ${gameFooterMarkup()}
@@ -540,15 +539,6 @@ function statsMarkup(): string {
 
 function statCard(label: string, value: string | number): string {
   return `<div class="stat-card"><span>${label}</span><strong>${value}</strong></div>`;
-}
-
-function achievementCardMarkup(achievement: AchievementDefinition, unlocked: boolean): string {
-  return `
-    <article class="achievement-card ${unlocked ? 'is-unlocked' : 'is-locked'}">
-      <span class="achievement-mark" aria-hidden="true">${unlocked ? '◆' : '◇'}</span>
-      <div><strong>${achievement.name}</strong><p>${achievement.description}</p></div>
-      <b>${unlocked ? 'UNLOCKED' : 'LOCKED'}</b>
-    </article>`;
 }
 
 function achievementToastMarkup(): string {
@@ -1522,6 +1512,18 @@ function bindEvents(): void {
       const next = { ...model.preferences, [key]: !model.preferences[key] };
       persistPreferences(next);
       feedback('button', 'toggle');
+      render();
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-achievement-filter]').forEach((element) => {
+    element.addEventListener('click', () => {
+      if (!element.isConnected) return;
+      feedbackEngine.activate();
+      const filter = element.dataset.achievementFilter;
+      if (!isAchievementFilter(filter) || filter === model.achievementFilter) return;
+      model.achievementFilter = filter;
+      feedback('button', 'tap');
       render();
     });
   });
