@@ -109,9 +109,9 @@
 
 .daily-table > section > span {
   color: var(--bj-muted);
-  font-size: .48rem;
+  font-size: .56rem;
   font-weight: 900;
-  letter-spacing: .12em;
+  letter-spacing: var(--bj-label-track);
 }
 
 .daily-table > section > strong,
@@ -219,7 +219,20 @@
   }
 
   .daily-vs {
-    transform: rotate(90deg);
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    width: 100%;
+    font-size: .66rem;
+    letter-spacing: .12em;
+  }
+
+  .daily-vs::before,
+  .daily-vs::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(214,182,80,.28), transparent);
   }
 
   .daily-player-zone .player-hands.is-split {

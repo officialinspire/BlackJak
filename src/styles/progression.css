@@ -37,14 +37,13 @@
 
 .rep-pill {
   position: relative;
-  padding-bottom: .58rem !important;
 }
 
 .rep-mini-track {
   position: absolute;
   left: .48rem;
   right: .48rem;
-  bottom: .28rem;
+  bottom: 3px;
   height: 2px;
   overflow: hidden;
   border-radius: 999px;
@@ -62,9 +61,9 @@
   display: grid;
   gap: .5rem;
   margin: .75rem 0 1rem;
-  padding: 1rem;
-  border: 1px solid rgba(214,182,80,.18);
-  border-radius: 14px;
+  padding: .85rem 1rem;
+  border: 1px solid var(--bj-line);
+  border-radius: var(--bj-radius);
   background:
     radial-gradient(circle at 18% 0%, rgba(214,182,80,.08), transparent 38%),
     rgba(0,0,0,.2);
@@ -80,9 +79,9 @@
 .title-lockup span {
   grid-column: 1 / -1;
   color: var(--bj-muted);
-  font-size: .52rem;
+  font-size: var(--bj-label-size);
   font-weight: 900;
-  letter-spacing: .16em;
+  letter-spacing: var(--bj-label-track);
 }
 
 .title-lockup strong {
@@ -116,7 +115,7 @@
 
 .progression-summary > small {
   color: var(--bj-muted);
-  font-size: .62rem;
+  font-size: .68rem;
 }
 
 .achievement-section {
@@ -130,9 +129,9 @@
   gap: .75rem;
   margin-bottom: .55rem;
   color: var(--bj-muted);
-  font-size: .58rem;
+  font-size: var(--bj-label-size);
   font-weight: 900;
-  letter-spacing: .15em;
+  letter-spacing: var(--bj-label-track);
 }
 
 .section-heading b {
@@ -235,9 +234,15 @@
   background: var(--bj-gold-bright);
 }
 
-.achievement-filter:focus-visible {
-  outline: 2px solid var(--bj-gold-bright);
-  outline-offset: 2px;
+@media (hover: hover) {
+  .achievement-filter:not(.is-selected):hover {
+    border-color: var(--bj-line);
+    color: var(--bj-cream);
+  }
+}
+
+.achievement-filter:active {
+  transform: translateY(1px);
 }
 
 .achievement-group + .achievement-group {
@@ -250,9 +255,9 @@
   gap: .45rem;
   margin: 0 0 .4rem;
   color: var(--bj-muted);
-  font-size: .56rem;
+  font-size: var(--bj-label-size);
   font-weight: 900;
-  letter-spacing: .15em;
+  letter-spacing: var(--bj-label-track);
   text-transform: uppercase;
 }
 
@@ -308,15 +313,15 @@
 }
 
 .achievement-entry-meta small {
-  color: #625d52;
-  font-size: .5rem;
+  color: var(--bj-muted-dim);
+  font-size: .56rem;
   font-weight: 800;
   letter-spacing: .08em;
 }
 
 .achievement-entry-meta b {
-  color: #625d52;
-  font-size: .5rem;
+  color: var(--bj-muted-dim);
+  font-size: .56rem;
   letter-spacing: .11em;
 }
 
@@ -431,7 +436,7 @@
   border-radius: 999px;
   color: var(--bj-gold-bright);
   background: rgba(214,182,80,.05);
-  font-size: .48rem;
+  font-size: .52rem;
   font-style: normal;
   font-weight: 900;
   letter-spacing: .09em;
@@ -472,7 +477,7 @@
 .achievement-toast small {
   display: block;
   color: var(--bj-gold);
-  font-size: .43rem;
+  font-size: .52rem;
   font-weight: 900;
   letter-spacing: .13em;
 }
@@ -497,7 +502,7 @@
 
 .achievement-toast > b {
   color: var(--bj-gold-bright);
-  font-size: .47rem;
+  font-size: .52rem;
   letter-spacing: .07em;
   white-space: nowrap;
 }
