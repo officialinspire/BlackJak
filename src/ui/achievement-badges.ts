@@ -54,6 +54,48 @@ const chipPyramid = (): string =>
     .map(([cx, cy], index) => `<circle class="badge-${index % 2 ? 'cream' : 'gold'} badge-cut" cx="${cx}" cy="${cy}" r="3.3"/>`)
     .join('');
 
+/** Tier pips for ladder badges: `count` small gold dots in a row centred on x=20. */
+const pips = (count: number, cy: number): string =>
+  Array.from({ length: count }, (_, index) =>
+    `<circle class="badge-gold" cx="${round1(20 + (index - (count - 1) / 2) * 3.4)}" cy="${cy}" r="1.2"/>`).join('');
+
+/** Chip tower: one more chip per tier. */
+const chipTower = (chips: number): string =>
+  Array.from({ length: chips }, (_, index) => {
+    const cy = 27.5 - index * (14 / Math.max(chips, 4));
+    return `<ellipse class="badge-${index % 2 ? 'gold' : 'cream'} badge-cut" cx="20" cy="${round1(cy)}" rx="7.6" ry="2.6"/>`;
+  }).join('');
+
+/** Trophy cup with tier pips on the base. */
+const trophy = (tier: number): string => `
+      <path class="badge-gold" d="M14.5 11h11v4.5a5.5 5.5 0 0 1-11 0z"/>
+      <path class="badge-line" d="M14.6 13h-2.1v1.2a3 3 0 0 0 3 3M25.4 13h2.1v1.2a3 3 0 0 1-3 3"/>
+      <rect class="badge-gold" x="18.8" y="20.5" width="2.4" height="3.4"/>
+      <rect class="badge-cream" x="14" y="24" width="12" height="4.6" rx="1"/>
+      ${pips(tier, 26.3).replace(/badge-gold/g, 'badge-ink')}`;
+
+/** Card stack (hands played) with tier pips. */
+const cardStack = (tier: number): string => `
+      <rect class="badge-cream badge-cut" x="13.5" y="11" width="11" height="15" rx="1.4" transform="rotate(-8 19 18.5)"/>
+      <rect class="badge-cream badge-cut" x="15.5" y="12" width="11" height="15" rx="1.4"/>
+      ${pips(tier, 29.4)}`;
+
+/** Medal on a ribbon (wins) with tier pips. */
+const medal = (tier: number): string => `
+      <path class="badge-cream" d="M15 10.5h3.5l2.5 6-2.8 1.4zM25 10.5h-3.5l-2.5 6 2.8 1.4z"/>
+      <circle class="badge-gold" cx="20" cy="22.5" r="6.2"/>
+      ${pips(tier, 22.5).replace(/badge-gold/g, 'badge-ink')}`;
+
+/** Spade card (naturals) with tier pips. */
+const spadeCard = (tier: number): string => `
+      <rect class="badge-cream" x="13.5" y="10.5" width="13" height="19" rx="2"/>
+      <path class="badge-gold" d="M20 13.2c2.4 2.4 4.1 3.6 4.1 5.4 0 1.3-1 2.1-2.1 2.1-.7 0-1.3-.3-1.6-.7l.6 2.3h-2l.6-2.3c-.3.4-.9.7-1.6.7-1.1 0-2.1-.8-2.1-2.1 0-1.8 1.7-3 4.1-5.4z"/>
+      ${pips(tier, 26.4).replace(/badge-gold/g, 'badge-ink')}`;
+
+/** Seven-card fan for CARD HOARDER. */
+const bigFan = (): string =>
+  [-36, -24, -12, 0, 12, 24, 36].map((angle, index) => fanCard(angle, index === 6 ? 'gold' : 'cream')).join('');
+
 export const ACHIEVEMENT_BADGES: Readonly<Record<AchievementId, AchievementBadge>> = {
   blackjak: {
     name: 'Ace of Spades',
@@ -301,6 +343,253 @@ export const ACHIEVEMENT_BADGES: Readonly<Record<AchievementId, AchievementBadge
       <circle class="badge-gold" cx="16" cy="17" r="1.7"/>
       <circle class="badge-ink" cx="21" cy="15" r="1.7"/>
       <circle class="badge-gold" cx="15.5" cy="22.5" r="1.7"/>`,
+  },
+  // Milestones: chip towers grow a chip per tier; REP trophies gain a pip per tier.
+  'chips-25k': { name: 'Chip Tower I', glyph: chipTower(2) },
+  'chips-50k': { name: 'Chip Tower II', glyph: chipTower(3) },
+  'chips-100k': { name: 'Chip Tower III', glyph: chipTower(4) },
+  'chips-250k': { name: 'Chip Tower IV', glyph: chipTower(5) },
+  'chips-1m': { name: 'Chip Tower V', glyph: chipTower(6) },
+  'rep-25k': { name: 'REP Trophy I', glyph: trophy(1) },
+  'rep-50k': { name: 'REP Trophy II', glyph: trophy(2) },
+  'rep-100k': { name: 'REP Trophy III', glyph: trophy(3) },
+  'rep-250k': { name: 'REP Trophy IV', glyph: trophy(4) },
+  'rep-1m': { name: 'REP Trophy V', glyph: trophy(5) },
+  'hands-1000': { name: 'Card Stack I', glyph: cardStack(1) },
+  'hands-5000': { name: 'Card Stack II', glyph: cardStack(2) },
+  'wins-500': { name: 'Winner Medal I', glyph: medal(1) },
+  'wins-1000': { name: 'Winner Medal II', glyph: medal(2) },
+  'naturals-50': { name: 'Natural Spade I', glyph: spadeCard(1) },
+  'naturals-100': { name: 'Natural Spade II', glyph: spadeCard(2) },
+  // Gameplay
+  'beginners-luck': {
+    name: 'Lucky Horseshoe',
+    glyph: `
+      <path class="badge-gold" d="M13 12h4v7.5a3 3 0 0 0 6 0V12h4v7.5a7 7 0 0 1-14 0z"/>
+      <circle class="badge-ink" cx="15" cy="14.5" r=".9"/><circle class="badge-ink" cx="25" cy="14.5" r=".9"/>
+      <circle class="badge-ink" cx="15.4" cy="19.5" r=".9"/><circle class="badge-ink" cx="24.6" cy="19.5" r=".9"/>`,
+  },
+  'double-dipper': {
+    name: 'Chip with Up Arrow',
+    glyph: `
+      <circle class="badge-cream badge-cut" cx="20" cy="23" r="6.5"/>
+      <circle class="badge-ink" cx="20" cy="23" r="2.4"/>
+      <path class="badge-gold" d="M20 9.5l4.5 5h-3v3h-3v-3h-3z"/>`,
+  },
+  splitsville: {
+    name: 'Scissors',
+    glyph: `
+      <path class="badge-line" d="M16 12l9 11M24 12l-9 11"/>
+      <circle class="badge-gold" cx="14" cy="26" r="3.2"/>
+      <circle class="badge-gold" cx="26" cy="26" r="3.2"/>
+      <circle class="badge-ink" cx="14" cy="26" r="1.4"/><circle class="badge-ink" cx="26" cy="26" r="1.4"/>`,
+  },
+  'welcome-to-the-house': {
+    name: 'Open Door',
+    glyph: `
+      <rect class="badge-cream" x="13" y="10.5" width="14" height="19" rx="1"/>
+      <path class="badge-gold" d="M13.5 11l8 2.5v16l-8-1z"/>
+      <circle class="badge-ink" cx="19.6" cy="21" r="1"/>`,
+  },
+  'house-regular': {
+    name: 'House Key',
+    glyph: `
+      <circle class="badge-gold" cx="15" cy="16" r="5"/>
+      <circle class="badge-ink" cx="15" cy="16" r="2"/>
+      <path class="badge-gold" d="M18.5 19l9.5 9.5-1.8 1.8-1.6-1.6-1.5 1.5-1.5-1.5 1.5-1.5-6.4-6.4z"/>`,
+  },
+  'golden-touch': {
+    name: 'Gold Card Sparkle',
+    glyph: `
+      <rect class="badge-gold" x="12" y="12.5" width="11" height="16" rx="1.6" transform="rotate(-10 17.5 20.5)"/>
+      <path class="badge-cream" d="M26 9.5l1.2 3.3 3.3 1.2-3.3 1.2L26 18.5l-1.2-3.3-3.3-1.2 3.3-1.2z"/>`,
+  },
+  'second-chance': {
+    name: 'Rewind',
+    glyph: `
+      <path class="badge-gold" d="M19.5 13v14L10.5 20z"/>
+      <path class="badge-cream" d="M29.5 13v14L20.5 20z"/>`,
+  },
+  'high-stakes': {
+    name: 'Cut Gem',
+    glyph: `
+      <path class="badge-gold" d="M14 12h12l4 5.5-10 12-10-12z"/>
+      <path class="badge-cream" d="M14 12l3.2 5.5h5.6L26 12zM17.2 17.5L20 29.5l2.8-12z"/>`,
+  },
+  // Skill
+  unstoppable: {
+    name: 'Rocket',
+    glyph: `
+      <path class="badge-cream" d="M20 9.5c3.4 2.6 4.8 6.4 4.3 12.5h-8.6c-.5-6.1.9-9.9 4.3-12.5z"/>
+      <circle class="badge-ink" cx="20" cy="16" r="1.8"/>
+      <path class="badge-gold" d="M15.7 18.5l-3 5 3 .5zM24.3 18.5l3 5-3 .5zM17.6 23h4.8L20 29z"/>`,
+  },
+  'double-down-devotee': {
+    name: 'Triple Chevron',
+    glyph: `
+      <path class="badge-gold" d="M13 17l7-5.5 7 5.5-2 1.9-5-3.9-5 3.9z"/>
+      <path class="badge-cream" d="M13 22.5l7-5.5 7 5.5-2 1.9-5-3.9-5 3.9z"/>
+      <path class="badge-gold" d="M13 28l7-5.5 7 5.5-2 1.9-5-3.9-5 3.9z"/>`,
+  },
+  'split-decision': {
+    name: 'Forked Path',
+    glyph: `
+      <path class="badge-line" d="M20 29v-8l-6-7M20 21l6-7"/>
+      <circle class="badge-gold" cx="13.5" cy="12.8" r="2.4"/>
+      <circle class="badge-gold" cx="26.5" cy="12.8" r="2.4"/>`,
+  },
+  'charlies-angel': {
+    name: 'Halo Over Hat',
+    glyph: `
+      <ellipse class="badge-line" cx="20" cy="11.6" rx="5.5" ry="1.6"/>
+      <rect class="badge-cream" x="15.5" y="15" width="9" height="9.5" rx="1"/>
+      <rect class="badge-gold" x="15.5" y="21.2" width="9" height="2"/>
+      <rect class="badge-cream" x="11.5" y="24.5" width="17" height="2.6" rx="1.2"/>`,
+  },
+  'soft-touch': {
+    name: 'Feather',
+    glyph: `
+      <path class="badge-cream" d="M27.5 10.5c-7 .5-12 5.5-13 14l2.2-.4c.6-5.8 4.6-10.3 10.8-13.6z"/>
+      <path class="badge-gold" d="M27.5 10.5c-1.2 7.8-5.3 12.5-11.4 13.8 1.6-6.2 5.4-10.8 11.4-13.8z"/>
+      <path class="badge-line" d="M14.5 29l2.6-5"/>`,
+  },
+  'back-to-back': {
+    name: 'Twin Spades',
+    glyph: `
+      <path class="badge-cream" d="M15 13.5c2.4 2.4 4.1 3.6 4.1 5.4 0 1.3-1 2.1-2.1 2.1-.7 0-1.3-.3-1.6-.7l.6 2.3h-2l.6-2.3c-.3.4-.9.7-1.6.7-1.1 0-2.1-.8-2.1-2.1 0-1.8 1.7-3 4.1-5.4z"/>
+      <path class="badge-gold" d="M25 17.5c2.4 2.4 4.1 3.6 4.1 5.4 0 1.3-1 2.1-2.1 2.1-.7 0-1.3-.3-1.6-.7l.6 2.3h-2l.6-2.3c-.3.4-.9.7-1.6.7-1.1 0-2.1-.8-2.1-2.1 0-1.8 1.7-3 4.1-5.4z"/>`,
+  },
+  'low-and-slow': {
+    name: 'Turtle',
+    glyph: `
+      <path class="badge-gold" d="M11.5 24a8.5 8.5 0 0 1 17 0z"/>
+      <path class="badge-ink" d="M16 24l2-4h4l2 4z"/>
+      <circle class="badge-cream" cx="30" cy="22.5" r="2.2"/>
+      <path class="badge-line" d="M14 24.5v2.5M26 24.5v2.5"/>`,
+  },
+  phoenix: {
+    name: 'Phoenix Wings',
+    glyph: `
+      <path class="badge-gold" d="M20 29c-1.6-4-5.5-6-9.5-6.5 2.5-.4 5 .2 6.8 1.6-2.4-2.8-3.6-6.4-3.2-11 1.6 3.8 4 6.7 5.9 8.2 1.9-1.5 4.3-4.4 5.9-8.2.4 4.6-.8 8.2-3.2 11 1.8-1.4 4.3-2 6.8-1.6-4 .5-7.9 2.5-9.5 6.5z"/>
+      <circle class="badge-cream" cx="20" cy="15.2" r="2"/>`,
+  },
+  // Visits
+  'loyalty-program': {
+    name: 'Punch Card',
+    glyph: `
+      <rect class="badge-cream" x="10.5" y="14" width="19" height="12" rx="1.6"/>
+      <circle class="badge-ink" cx="14.5" cy="18.2" r="1.3"/><circle class="badge-ink" cx="18.2" cy="18.2" r="1.3"/>
+      <circle class="badge-ink" cx="21.9" cy="18.2" r="1.3"/><circle class="badge-gold" cx="25.6" cy="18.2" r="1.3"/>
+      <rect class="badge-gold" x="13" y="22" width="14" height="1.6" rx=".8"/>`,
+  },
+  'permanent-resident': {
+    name: 'Rocking Chair',
+    glyph: `
+      <path class="badge-line" d="M15.5 11v12.5h10M25.5 23.5V17M15.5 17.5h10"/>
+      <path class="badge-gold" d="M11 26.5c5 2.6 13 2.6 18 0l.6 1.4c-5.4 2.8-13.8 2.8-19.2 0z"/>`,
+  },
+  'half-year-habit': {
+    name: 'Half Moon Dial',
+    glyph: `
+      <circle class="badge-line" cx="20" cy="20" r="8.5"/>
+      <path class="badge-gold" d="M20 11.5a8.5 8.5 0 0 1 0 17z"/>`,
+  },
+  anniversary: {
+    name: 'Anniversary Ring',
+    glyph: `
+      <circle class="badge-line" cx="20" cy="23" r="6.5"/>
+      <path class="badge-gold" d="M16.5 12.5h7l1.8 2.4L20 19.5l-5.3-4.6z"/>`,
+  },
+  'frequent-flyer': {
+    name: 'Paper Plane',
+    glyph: `
+      <path class="badge-cream" d="M10.5 19.5l19-8-6 17-4.2-6.6z"/>
+      <path class="badge-gold" d="M19.3 21.9l10.2-10.4-12.4 8.6 1 5.9z"/>`,
+  },
+  // Daily Hand
+  'all-month': {
+    name: 'Full Sun',
+    glyph: `
+      <circle class="badge-gold" cx="20" cy="20" r="5"/>
+      <path class="badge-line" d="M20 10.5v2.4M20 27.1v2.4M10.5 20h2.4M27.1 20h2.4M13.3 13.3l1.7 1.7M25 25l1.7 1.7M26.7 13.3L25 15M15 25l-1.7 1.7"/>`,
+  },
+  'daily-regular': {
+    name: 'Alarm Clock',
+    glyph: `
+      <circle class="badge-cream" cx="20" cy="21.5" r="7.5"/>
+      <path class="badge-gold" d="M11.5 15a4 4 0 0 1 5-4.2zM28.5 15a4 4 0 0 0-5-4.2z"/>
+      <path class="badge-ink" d="M19.3 16.5h1.4v5h3.8v1.4h-5.2z"/>`,
+  },
+  'daily-domination': {
+    name: 'Podium',
+    glyph: `
+      <rect class="badge-gold" x="16.5" y="15" width="7" height="14" rx=".6"/>
+      <rect class="badge-cream" x="10.5" y="20" width="6" height="9" rx=".6"/>
+      <rect class="badge-cream" x="23.5" y="22.5" width="6" height="6.5" rx=".6"/>
+      ${star(20, 11.4, 3, 1.3)}`,
+  },
+  'daily-natural': {
+    name: 'Sunlit Ace',
+    glyph: `
+      <rect class="badge-cream" x="14" y="13" width="12" height="17" rx="1.8"/>
+      <path class="badge-ink" d="M20 17c2 2 3.4 3 3.4 4.5 0 1.1-.8 1.8-1.8 1.8-.6 0-1.1-.2-1.3-.6l.5 1.9h-1.6l.5-1.9c-.2.4-.7.6-1.3.6-1 0-1.8-.7-1.8-1.8 0-1.5 1.4-2.5 3.4-4.5z"/>
+      <path class="badge-gold" d="M26 9.5l1 2.5 2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1z"/>`,
+  },
+  'no-solution': {
+    name: 'Rain Cloud',
+    glyph: `
+      <path class="badge-cream" d="M14 22a4 4 0 0 1-.4-8 5.5 5.5 0 0 1 10.6-1.2A4.6 4.6 0 1 1 26 22z"/>
+      <path class="badge-line" d="M15.5 25l-1.2 3M20 25l-1.2 3M24.5 25l-1.2 3"/>`,
+  },
+  // Comedy
+  'agree-to-disagree': {
+    name: 'Equals Sign',
+    glyph: `
+      <rect class="badge-cream" x="12" y="15" width="16" height="3.4" rx="1.4"/>
+      <rect class="badge-gold" x="12" y="21.6" width="16" height="3.4" rx="1.4"/>`,
+  },
+  stalemate: {
+    name: 'Balanced Scales',
+    glyph: `
+      <path class="badge-line" d="M20 11v17M12.5 14h15M15 28h10"/>
+      <path class="badge-gold" d="M12.5 14l-3 7h6zM27.5 14l-3 7h6z"/>`,
+  },
+  'live-dangerously': {
+    name: 'Skull',
+    glyph: `
+      <path class="badge-cream" d="M20 10.5c5 0 8 3.4 8 7.6 0 2.6-1.3 4.3-3 5.1v3.3h-10v-3.3c-1.7-.8-3-2.5-3-5.1 0-4.2 3-7.6 8-7.6z"/>
+      <circle class="badge-ink" cx="16.8" cy="18" r="2.1"/><circle class="badge-ink" cx="23.2" cy="18" r="2.1"/>
+      <path class="badge-ink" d="M19.2 21.8h1.6l.5 1.6h-2.6z"/>`,
+  },
+  'early-bird': {
+    name: 'Early Bird',
+    glyph: `
+      <path class="badge-gold" d="M11 22c2-5 6.5-7.5 11-6.5 1.8-2.4 4.4-3 6.5-2l-2.4 1.8c.7 5.6-3.6 10.2-9.6 10.2-2.7 0-4.4-1.2-5.5-3.5z"/>
+      <circle class="badge-ink" cx="24.6" cy="16.4" r=".9"/>
+      <path class="badge-line" d="M17 26.5v2.5M20.5 26.5v2.5"/>`,
+  },
+  'gravity-wins': {
+    name: 'Anvil',
+    glyph: `
+      <path class="badge-cream" d="M11 14h13c0 2.6 2 4 5 4v2c-3.6 0-5.4-.8-6 3h-6c-.4-3.4-3-4.6-6-5.2z"/>
+      <rect class="badge-gold" x="14.5" y="23" width="11" height="3" rx=".6"/>
+      <rect class="badge-gold" x="12.5" y="26" width="15" height="2.6" rx=".6"/>`,
+  },
+  'card-hoarder': {
+    name: 'Seven-Card Fan',
+    glyph: bigFan(),
+  },
+  'split-disorder': {
+    name: 'Broken Heart',
+    glyph: `
+      <path class="badge-cream" d="M19.5 28.5L12 20.8c-2.8-2.9-1.3-8 2.9-8 1.9 0 3.4 1 4.6 2.6l-1.6 3.6 2 2.4-1.6 3.2z"/>
+      <path class="badge-gold" d="M21 28.5l7.5-7.7c2.8-2.9 1.3-8-2.9-8-1.9 0-3.4 1-4.6 2.6l1.6 3.6-2 2.4 1.6 3.2z"/>`,
+  },
+  'down-bad': {
+    name: 'Shovel',
+    glyph: `
+      <path class="badge-line" d="M14 11l7.5 9"/>
+      <path class="badge-gold" d="M20.2 18.4l4.6-3.8 4.2 6.2c1.3 2 .2 4.4-2 5l-2.2.6c-2.2.6-4.3-1-4.2-3.3z"/>`,
   },
 };
 

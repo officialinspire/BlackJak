@@ -35,6 +35,11 @@ const VISIT_ACHIEVEMENTS: readonly { id: AchievementId; met: (activity: Activity
   { id: 'part-of-the-furniture', met: (activity) => activity.visitStreak >= 30 },
   { id: 'weekly-regular', met: (activity) => activity.weekStreak >= 4 },
   { id: 'season-ticket', met: (activity) => activity.weekStreak >= 12 },
+  { id: 'loyalty-program', met: (activity) => activity.visitStreak >= 60 },
+  { id: 'permanent-resident', met: (activity) => activity.visitStreak >= 100 },
+  { id: 'half-year-habit', met: (activity) => activity.weekStreak >= 26 },
+  { id: 'anniversary', met: (activity) => activity.weekStreak >= 52 },
+  { id: 'frequent-flyer', met: (activity) => activity.daysVisited >= 30 },
 ];
 
 /**
@@ -86,7 +91,12 @@ export function recordDailyHand(profile: PlayerProfile, outcome: DailyOutcome): 
   };
   const ids: AchievementId[] = ['daily-dose'];
   if (profile.daily.currentStreak >= 7) ids.push('same-problem');
+  if (profile.daily.currentStreak >= 30) ids.push('all-month');
   if (activity.dailyWins >= 10) ids.push('daily-grind');
+  if (activity.dailyWins >= 50) ids.push('daily-domination');
+  if (activity.dailyHandsCompleted >= 25) ids.push('daily-regular');
+  if (outcome === 'blackjack') ids.push('daily-natural');
+  if (outcome === 'loss') ids.push('no-solution');
   return unlockAchievementIds({ ...profile, activity }, ids);
 }
 
@@ -96,6 +106,38 @@ export function recordDeckTried(profile: PlayerProfile, theme: string, totalDeck
   const decksTried = known ? profile.activity.decksTried : [...profile.activity.decksTried, theme];
   const next = known ? profile : { ...profile, activity: { ...profile.activity, decksTried } };
   return unlockAchievementIds(next, decksTried.length >= totalDecks ? ['fashion-victim'] : []);
+}
+
+/** Peak-chip and REP ladders. */
+export const CHIP_MILESTONES: readonly (readonly [AchievementId, number])[] = [
+  ['chips-25k', 25_000],
+  ['chips-50k', 50_000],
+  ['chips-100k', 100_000],
+  ['chips-250k', 250_000],
+  ['chips-1m', 1_000_000],
+];
+
+export const REP_MILESTONES: readonly (readonly [AchievementId, number])[] = [
+  ['rep-25k', 25_000],
+  ['rep-50k', 50_000],
+  ['rep-100k', 100_000],
+  ['rep-250k', 250_000],
+  ['rep-1m', 1_000_000],
+];
+
+/**
+ * Chip and REP ladders. REP also grows outside a hand (Daily Hand, House
+ * bonus), so this runs after every change to either, and at startup so
+ * balances earned before these achievements existed are credited.
+ */
+export function recordMilestones(profile: PlayerProfile): ActivityUpdate {
+  const peakChips = Math.max(profile.chips, profile.stats.highestChipBalance);
+  const rep = Math.max(profile.rep, profile.stats.lifetimeRep);
+  const ids = [
+    ...CHIP_MILESTONES.filter(([, target]) => peakChips >= target),
+    ...REP_MILESTONES.filter(([, target]) => rep >= target),
+  ].map(([id]) => id);
+  return unlockAchievementIds(profile, ids);
 }
 
 /** The refill is only offered at zero chips, so taking it is the whole joke. */
@@ -140,5 +182,30 @@ export function achievementProgress(profile: PlayerProfile): Partial<Record<Achi
     'daily-grind': progress(activity.dailyWins, 10),
     'rock-bottom': progress(stats.longestLossStreak, 10),
     'fashion-victim': progress(activity.decksTried.length, 3),
+    ...Object.fromEntries(CHIP_MILESTONES.map(([id, target]) => [id, progress(Math.max(profile.chips, stats.highestChipBalance), target)])),
+    ...Object.fromEntries(REP_MILESTONES.map(([id, target]) => [id, progress(Math.max(profile.rep, stats.lifetimeRep), target)])),
+    'hands-1000': progress(stats.totalHands, 1000),
+    'hands-5000': progress(stats.totalHands, 5000),
+    'wins-500': progress(stats.wins, 500),
+    'wins-1000': progress(stats.wins, 1000),
+    'naturals-50': progress(stats.blackjacks, 50),
+    'naturals-100': progress(stats.blackjacks, 100),
+    'house-regular': progress(activity.houseRounds, 100),
+    unstoppable: progress(stats.longestWinStreak, 15),
+    'double-down-devotee': progress(stats.doublesWon, 25),
+    'split-decision': progress(stats.splitSweeps, 5),
+    'charlies-angel': progress(stats.fiveCardWins, 5),
+    'loyalty-program': progress(activity.visitStreak, 60),
+    'permanent-resident': progress(activity.visitStreak, 100),
+    'half-year-habit': progress(activity.weekStreak, 26),
+    anniversary: progress(activity.weekStreak, 52),
+    'frequent-flyer': progress(activity.daysVisited, 30),
+    'all-month': progress(daily.currentStreak, 30),
+    'daily-regular': progress(activity.dailyHandsCompleted, 25),
+    'daily-domination': progress(activity.dailyWins, 50),
+    stalemate: progress(stats.pushes, 25),
+    'live-dangerously': progress(stats.riskyHits, 50),
+    'gravity-wins': progress(stats.busts, 100),
+    'down-bad': progress(stats.longestLossStreak, 20),
   };
 }

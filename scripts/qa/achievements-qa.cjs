@@ -96,7 +96,7 @@ async function playOneHand(p) {
         smallTargets: [...document.querySelectorAll('.achievement-category, .achievement-filter')].filter((e) => e.getBoundingClientRect().height < 44).length,
         clipped: [...document.querySelectorAll('.achievement-entry')].filter((e) => { const r = e.getBoundingClientRect(); return r.left < -1 || r.right > innerWidth + 1; }).length,
       }));
-      check(`stats ${w}x${h}: 39 entries, 39 shelf badges, 6 type chips`, shape.entries === 39 && shape.shelf === 39 && shape.categories === 6, JSON.stringify(shape));
+      check(`stats ${w}x${h}: 89 entries, 89 shelf badges, 7 type chips`, shape.entries === 89 && shape.shelf === 89 && shape.categories === 7, JSON.stringify(shape));
       check(`stats ${w}x${h}: no horizontal overflow or clipped entries`, shape.overflow <= 0 && shape.clipped === 0, JSON.stringify(shape));
       check(`stats ${w}x${h}: type and filter chips are 44px touch targets`, shape.smallTargets === 0, JSON.stringify(shape));
 
@@ -109,22 +109,77 @@ async function playOneHand(p) {
         return performance.now() - t0;
       });
       const visits = await p.evaluate(() => ({
-        ids: [...document.querySelectorAll('.achievement-entry')].map((e) => e.dataset.achievementId),
+        ids: [...document.querySelectorAll('.achievement-entry')].filter((e) => e.checkVisibility()).map((e) => e.dataset.achievementId),
         focused: document.activeElement?.getAttribute('data-achievement-category'),
         pressed: document.querySelector('[data-achievement-category="visits"]')?.getAttribute('aria-pressed'),
       }));
-      check(`stats ${w}x${h}: Log-ins shows the five visit achievements`, visits.ids.join() === 'back-again,creature-of-habit,part-of-the-furniture,weekly-regular,season-ticket', visits.ids.join());
+      check(`stats ${w}x${h}: Log-ins shows the ten visit achievements`, visits.ids.join() === 'back-again,creature-of-habit,part-of-the-furniture,weekly-regular,season-ticket,loyalty-program,permanent-resident,half-year-habit,anniversary,frequent-flyer', visits.ids.join());
       check(`stats ${w}x${h}: focus stays on the pressed type chip`, visits.focused === 'visits' && visits.pressed === 'true', JSON.stringify(visits));
       check(`stats ${w}x${h}: type filter redraw under 50ms`, timing < 50, `${timing.toFixed(1)}ms`);
       await p.click('[data-achievement-filter="locked"]');
       await p.click('[data-achievement-category="comedy"]');
-      const comedy = await p.$$eval('.achievement-entry', (list) => list.map((e) => e.dataset.category));
-      check(`stats ${w}x${h}: Comedy + Locked filters combine`, comedy.length === 11 && comedy.every((c) => c === 'comedy'), `${comedy.length} ${[...new Set(comedy)]}`);
-      await p.click('[data-achievement-category="all"]');
+      const comedy = await p.$$eval('.achievement-entry', (list) => list.filter((e) => e.checkVisibility()).map((e) => e.dataset.category));
+      const visibleIds = () => p.$$eval('.achievement-entry', (list) => list.filter((e) => e.checkVisibility()).map((e) => e.dataset.achievementId).join());
+      const inPlace = await visibleIds();
+      // Leave and come back: a full render from the same filter state must show the same entries.
+      await p.click('.back-button[data-screen="menu"]');
+      await p.click('[data-screen="stats"]');
+      const reRendered = await visibleIds();
+      const kept = await p.evaluate(() => [document.querySelector('.achievement-category.is-selected')?.dataset.achievementCategory, document.querySelector('.achievement-filter.is-selected')?.dataset.achievementFilter].join());
+      check(`stats ${w}x${h}: in-place filtering matches a full re-render`, inPlace === reRendered && kept === 'comedy,locked', `${kept} ${inPlace === reRendered}`);
+      check(`stats ${w}x${h}: Comedy + Locked filters combine`, comedy.length === 19 && comedy.every((c) => c === 'comedy'), `${comedy.length} ${[...new Set(comedy)]}`);
       await p.click('[data-achievement-filter="all"]');
+      const fullRedraw = await p.evaluate(() => {
+        const t0 = performance.now();
+        document.querySelector('[data-achievement-category="all"]').click();
+        return performance.now() - t0;
+      });
+      check(`stats ${w}x${h}: full 89-entry logbook redraw under 50ms`, fullRedraw < 50, `${fullRedraw.toFixed(1)}ms`);
       if (w === 390) await p.screenshot({ path: `${process.env.S}/achievements-stats-390.png`, fullPage: true });
       if (w === 1280) await p.screenshot({ path: `${process.env.S}/achievements-stats-1280.png`, fullPage: true });
       check(`stats ${w}x${h}: no console errors`, errors.length === 0, errors.join(' | '));
+      await p.close();
+    }
+
+    // ---- Chip and REP ladders: balances from before these achievements are credited at startup.
+    {
+      const { p, errors } = await openWith(b, { width: 390, height: 844 }, { chips: 120000, rep: 30000, stats: { highestChipBalance: 120000, lifetimeRep: 30000 } });
+      const toast = await p.$eval('.achievement-toast', (e) => e.textContent.replace(/\s+/g, ' ')).catch(() => '');
+      check('milestones: startup toast shows QUARTER STACK +3 MORE', toast.includes('QUARTER STACK') && toast.includes('+3 MORE'), toast);
+      const saved = await savedProfile(p);
+      const ladder = ['chips-25k', 'chips-50k', 'chips-100k', 'rep-25k'];
+      check('milestones: exactly the reached rungs saved', ladder.every((id) => saved.progression.unlockedAchievements.includes(id)) && !saved.progression.unlockedAchievements.includes('chips-250k') && !saved.progression.unlockedAchievements.includes('rep-50k'), saved.progression.unlockedAchievements.join());
+      await p.click('[data-screen="stats"]');
+      await p.click('[data-achievement-category="milestones"]');
+      const view = await p.evaluate(() => ({
+        entries: [...document.querySelectorAll('.achievement-entry')].filter((e) => e.checkVisibility()).length,
+        unlocked: [...document.querySelectorAll('.achievement-entry.is-unlocked')].filter((e) => e.checkVisibility()).length,
+        chips250: document.querySelector('[data-achievement-id="chips-250k"] .achievement-progress small')?.textContent,
+        rep1m: document.querySelector('[data-achievement-id="rep-1m"] .achievement-progress small')?.textContent,
+      }));
+      check('milestones: Milestones type lists 16 with 4 unlocked and ladder progress', view.entries === 16 && view.unlocked === 4 && view.chips250 === '120,000 / 250,000' && view.rep1m === '30,000 / 1,000,000', JSON.stringify(view));
+      await p.reload(); await enterGame(p);
+      check('milestones: not re-toasted on the next visit', await toastName(p) === null);
+      check('milestones: no console errors', errors.length === 0, errors.join(' | '));
+      await p.close();
+    }
+
+    // ---- Table-max bet and a first Jak's House round.
+    {
+      const { p, errors } = await openWith(b, { width: 390, height: 844 }, { chips: 5000, rep: 0 });
+      await p.click('[data-screen="classic"]');
+      await p.waitForTimeout(400);
+      await p.click('[data-stake="max"]');
+      await playOneHand(p);
+      let saved = await savedProfile(p);
+      check('high stakes: betting the table max unlocks HIGH STAKES', saved.progression.unlockedAchievements.includes('high-stakes'), saved.progression.unlockedAchievements.join());
+      await p.keyboard.press('Escape'); await p.waitForTimeout(650);
+      await p.click('.pause-overlay [data-pause-action="menu"]'); await p.waitForTimeout(150);
+      await p.click('[data-screen="house"]');
+      await playOneHand(p);
+      saved = await savedProfile(p);
+      check("house: first Jak's House round unlocks WELCOME TO THE HOUSE", saved.progression.unlockedAchievements.includes('welcome-to-the-house') && saved.activity.houseRounds === 1, `${saved.activity.houseRounds} ${saved.progression.unlockedAchievements.join()}`);
+      check('high stakes / house: no console errors', errors.length === 0, errors.join(' | '));
       await p.close();
     }
 

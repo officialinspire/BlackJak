@@ -11,7 +11,7 @@ mkdir -p "$S"
 node scripts/qa/browser-qa.cjs       # startup/intro (+ failed/stalled intro) + 320–1440 + landscape; tables, dialogue bar vs dock, pause, hitboxes, keyboard, reduced motion, mute, music (one track, background tab), refresh, corrupt + blocked storage, HUD/dock controls within the viewport (betting and playing), offline + media Range 206
 node scripts/qa/gameplay-pwa-qa.cjs  # card lifecycle/input stress, split, Gold Card, PWA update (dist/sw.js is restored in finally)
 node scripts/qa/refresh-qa.cjs       # 30 refresh-mid-hand trials across Classic and Jak's House
-node scripts/qa/achievements-qa.cjs  # logbook at 320–1280 (39 entries, type/lock filters, touch targets, focus, redraw time), log-in streak, first-hand, deck, refill and Daily Hand unlock toasts, mid-hand unlock save safety, 60-hand performance
+node scripts/qa/achievements-qa.cjs  # logbook at 320–1280 (89 entries, in-place type/lock filters vs full render, touch targets, focus, redraw time), chip/REP ladders at startup, table-max bet, first House round, log-in streak, first-hand, deck, refill and Daily Hand unlock toasts, mid-hand unlock save safety, 60-hand performance
 ```
 
 Each script closes Chromium in `finally` and exits non-zero on any failure or thrown error, so

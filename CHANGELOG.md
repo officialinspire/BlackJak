@@ -2,6 +2,25 @@
 
 All notable changes to BlackJak are documented here.
 
+## [0.6.0] — 2026-09-28 — 50 more achievements, milestone ladders
+
+Blackjack rules, odds and payouts are unchanged.
+
+### Added
+- **50 new achievements (89 in total)**, each with its own badge, and a new **Milestones** type:
+  - **Milestones:** peak chips of 25,000, 50,000, 100,000, 250,000 and 1,000,000; REP of 25,000, 50,000, 100,000, 250,000 and 1,000,000; 1,000 and 5,000 hands; 500 and 1,000 wins; 50 and 100 naturals. Ladder badges show their tier (a taller chip tower, more trophy pips).
+  - **Gameplay:** first win, first double, first split, first and 100th Jak's House round, winning a Gold Card round, winning a Run It Back replay, and betting the table maximum.
+  - **Skill:** a 15-round win streak, 25 doubled-down wins, 5 split sweeps, 5 five-card wins, a soft 21 from three or more cards, back-to-back naturals, winning on 12 or less, and winning right after five straight losses.
+  - **Log-ins:** 60- and 100-day visit streaks, 26- and 52-week streaks, and 30 different days visited.
+  - **Daily Hand:** a 30-day streak, 25 Daily Hands, 50 Daily Hand wins, a Daily Hand natural, and losing a Daily Hand.
+  - **Comedy:** first push, 25 pushes, 50 hits on 16 or more, playing at dawn, 100 busts, a seven-card hand, losing both split hands, and 20 straight losses.
+- Chip and REP ladders are checked after every hand, Daily Hand and House bonus, and at startup, so balances reached before this update are credited on the next launch.
+- `tests/achievements-catalogue.test.ts` drives every one of the 89 achievements through a game scenario and checks that thresholds do not unlock one step early.
+
+### Changed
+- **Faster Stats filters.** The logbook keeps every entry in the page, and the type and Unlocked/Locked chips only show and hide entries, so a tap takes 1–3 ms instead of rebuilding 89 badges (13–46 ms), and focus stays on the chip.
+- Progress numbers use one shared formatter, cutting logbook build time from about 6 ms to under 0.5 ms.
+
 ## [0.5.0] — 2026-09-28 — Expanded achievements
 
 Blackjack rules, odds and payouts are unchanged.

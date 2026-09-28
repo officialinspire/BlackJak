@@ -1,11 +1,12 @@
 import type { AchievementId } from '../types/profile';
 
 /** Logbook sections: what kind of play earns the achievement. */
-export type AchievementCategory = 'gameplay' | 'skill' | 'visits' | 'daily' | 'comedy';
+export type AchievementCategory = 'milestones' | 'gameplay' | 'skill' | 'visits' | 'daily' | 'comedy';
 
-export const ACHIEVEMENT_CATEGORIES: readonly AchievementCategory[] = ['gameplay', 'skill', 'visits', 'daily', 'comedy'];
+export const ACHIEVEMENT_CATEGORIES: readonly AchievementCategory[] = ['milestones', 'gameplay', 'skill', 'visits', 'daily', 'comedy'];
 
 export const ACHIEVEMENT_CATEGORY_LABELS: Readonly<Record<AchievementCategory, string>> = {
+  milestones: 'Milestones',
   gameplay: 'Gameplay',
   skill: 'Skill',
   visits: 'Log-ins',
@@ -70,6 +71,62 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
   { id: 'double-down-fall-down', name: 'DOUBLE DOWN, FALL DOWN', description: 'Bust a doubled-down hand.', category: 'comedy' },
   { id: 'night-owl', name: 'NIGHT OWL', description: 'Finish a hand between midnight and 4 a.m.', category: 'comedy' },
   { id: 'fashion-victim', name: 'FASHION VICTIM', description: 'Try all three card decks.', category: 'comedy' },
+  // Milestones: peak chips, REP and lifetime counts
+  { id: 'chips-25k', name: 'QUARTER STACK', description: 'Reach 25,000 practice chips.', category: 'milestones' },
+  { id: 'chips-50k', name: 'FIFTY GRAND', description: 'Reach 50,000 practice chips.', category: 'milestones' },
+  { id: 'chips-100k', name: 'SIX FIGURES', description: 'Reach 100,000 practice chips.', category: 'milestones' },
+  { id: 'chips-250k', name: 'WHALE WATCHING', description: 'Reach 250,000 practice chips.', category: 'milestones' },
+  { id: 'chips-1m', name: 'FICTIONAL MILLIONAIRE', description: 'Reach 1,000,000 practice chips.', category: 'milestones' },
+  { id: 'rep-25k', name: 'LOCAL LEGEND', description: 'Earn 25,000 REP.', category: 'milestones' },
+  { id: 'rep-50k', name: 'TABLE ROYALTY', description: 'Earn 50,000 REP.', category: 'milestones' },
+  { id: 'rep-100k', name: 'HALL OF FAME', description: 'Earn 100,000 REP.', category: 'milestones' },
+  { id: 'rep-250k', name: 'MYTHICAL', description: 'Earn 250,000 REP.', category: 'milestones' },
+  { id: 'rep-1m', name: "JAK'S EQUAL", description: 'Earn 1,000,000 REP.', category: 'milestones' },
+  { id: 'hands-1000', name: 'FOUR DIGITS', description: 'Complete 1,000 hands.', category: 'milestones' },
+  { id: 'hands-5000', name: 'TOUCH GRASS', description: 'Complete 5,000 hands. Then maybe go outside.', category: 'milestones' },
+  { id: 'wins-500', name: 'WINNING IS A HABIT', description: 'Win 500 hands.', category: 'milestones' },
+  { id: 'wins-1000', name: 'THE CLOSER', description: 'Win 1,000 hands.', category: 'milestones' },
+  { id: 'naturals-50', name: 'NATURAL BORN', description: 'Get 50 natural blackjacks.', category: 'milestones' },
+  { id: 'naturals-100', name: 'ACE COLLECTOR', description: 'Get 100 natural blackjacks.', category: 'milestones' },
+  // Gameplay
+  { id: 'beginners-luck', name: "BEGINNER'S LUCK", description: 'Win your first hand.', category: 'gameplay' },
+  { id: 'double-dipper', name: 'DOUBLE DIPPER', description: 'Double down for the first time.', category: 'gameplay' },
+  { id: 'splitsville', name: 'SPLITSVILLE', description: 'Split a pair for the first time.', category: 'gameplay' },
+  { id: 'welcome-to-the-house', name: 'WELCOME TO THE HOUSE', description: "Finish your first round in Jak's House.", category: 'gameplay' },
+  { id: 'house-regular', name: 'HOUSE REGULAR', description: "Complete 100 rounds in Jak's House.", category: 'gameplay' },
+  { id: 'golden-touch', name: 'GOLDEN TOUCH', description: 'Win a Gold Card round.', category: 'gameplay' },
+  { id: 'second-chance', name: 'SECOND CHANCE', description: 'Win a Run It Back replay.', category: 'gameplay' },
+  { id: 'high-stakes', name: 'HIGH STAKES', description: 'Bet the table maximum on a hand.', category: 'gameplay' },
+  // Skill
+  { id: 'unstoppable', name: 'UNSTOPPABLE', description: 'Win 15 rounds in a row.', category: 'skill' },
+  { id: 'double-down-devotee', name: 'DOUBLE DOWN DEVOTEE', description: 'Win 25 doubled-down hands.', category: 'skill' },
+  { id: 'split-decision', name: 'SPLIT DECISION', description: 'Win both hands after a split 5 times.', category: 'skill' },
+  { id: 'charlies-angel', name: "CHARLIE'S ANGEL", description: 'Win 5 hands holding five or more cards.', category: 'skill' },
+  { id: 'soft-touch', name: 'SOFT TOUCH', description: 'Win with a soft 21 from three or more cards.', category: 'skill' },
+  { id: 'back-to-back', name: 'BACK TO BACK', description: 'Get natural blackjacks in two rounds in a row.', category: 'skill' },
+  { id: 'low-and-slow', name: 'LOW AND SLOW', description: 'Win a hand totalling 12 or less.', category: 'skill' },
+  { id: 'phoenix', name: 'PHOENIX', description: 'Win a round right after losing five in a row.', category: 'skill' },
+  // Visits
+  { id: 'loyalty-program', name: 'LOYALTY PROGRAM', description: 'Visit the table 60 days in a row.', category: 'visits' },
+  { id: 'permanent-resident', name: 'PERMANENT RESIDENT', description: 'Visit the table 100 days in a row.', category: 'visits' },
+  { id: 'half-year-habit', name: 'HALF-YEAR HABIT', description: 'Visit the table 26 weeks in a row.', category: 'visits' },
+  { id: 'anniversary', name: 'ANNIVERSARY', description: 'Visit the table 52 weeks in a row.', category: 'visits' },
+  { id: 'frequent-flyer', name: 'FREQUENT FLYER', description: 'Visit the table on 30 different days.', category: 'visits' },
+  // Daily Hand
+  { id: 'all-month', name: 'SAME PROBLEM, ALL MONTH', description: 'Reach a 30-day Daily Hand streak.', category: 'daily' },
+  { id: 'daily-regular', name: 'DAILY REGULAR', description: 'Finish 25 Daily Hands.', category: 'daily' },
+  { id: 'daily-domination', name: 'DAILY DOMINATION', description: 'Win 50 Daily Hands.', category: 'daily' },
+  { id: 'daily-natural', name: 'DAILY NATURAL', description: 'Get a natural blackjack on a Daily Hand.', category: 'daily' },
+  { id: 'no-solution', name: 'SAME PROBLEM, NO SOLUTION', description: 'Lose a Daily Hand.', category: 'daily' },
+  // Comedy
+  { id: 'agree-to-disagree', name: 'AGREE TO DISAGREE', description: 'Push with the dealer.', category: 'comedy' },
+  { id: 'stalemate', name: 'STALEMATE ENTHUSIAST', description: 'Push 25 times.', category: 'comedy' },
+  { id: 'live-dangerously', name: 'LIVE DANGEROUSLY', description: 'Hit on 16 or more 50 times.', category: 'comedy' },
+  { id: 'early-bird', name: 'EARLY BIRD', description: 'Finish a hand between 5 and 7 a.m.', category: 'comedy' },
+  { id: 'gravity-wins', name: 'GRAVITY WINS', description: 'Bust 100 times.', category: 'comedy' },
+  { id: 'card-hoarder', name: 'CARD HOARDER', description: 'Hold seven or more cards in one hand.', category: 'comedy' },
+  { id: 'split-disorder', name: 'SPLIT PERSONALITY DISORDER', description: 'Lose both hands after a split.', category: 'comedy' },
+  { id: 'down-bad', name: 'DOWN BAD', description: 'Lose 20 rounds in a row.', category: 'comedy' },
 ] as const;
 
 export const TITLES: readonly TitleDefinition[] = [

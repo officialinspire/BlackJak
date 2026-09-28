@@ -25,6 +25,7 @@ import {
   recordDailyHand,
   recordDeckTried,
   recordHotHand,
+  recordMilestones,
   recordRefill,
   recordVisit,
   refillPracticeChips,
@@ -64,6 +65,7 @@ import { menuBoardMarkup } from './menu-board';
 import { badgeSvg } from './achievement-badges';
 import {
   achievementLogMarkup,
+  applyAchievementView,
   isAchievementCategoryFilter,
   isAchievementFilter,
   type AchievementCategoryFilter,
@@ -914,7 +916,10 @@ function settleIfResolved(): void {
   model.lastRepEarned = progression.repEarned;
   model.achievementToasts = [...model.achievementToasts, ...progression.unlocked];
   // A session left open past midnight still counts the new day's visit.
-  const visitUnlocks = applyActivity((profile) => recordVisit(profile, localDateKey()));
+  const visitUnlocks = [
+    ...applyActivity((profile) => recordVisit(profile, localDateKey())),
+    ...applyActivity(recordMilestones),
+  ];
   const unlockedCount = progression.unlocked.length + visitUnlocks.length;
   cueFx('result', ...(unlockedCount ? ['achievement' as const] : []));
   say(resolutionDialogueEvent(model.round));
@@ -925,7 +930,7 @@ function settleHouseIfResolved(): void {
   if (!model.round || model.round.phase !== 'resolved') return;
 
   const settled = settleResults(model.profile, model.round.results);
-  const progression = applyProgression(settled, model.round, { ...model.roundProgress, house: true, finishedHour: new Date().getHours() });
+  const progression = applyProgression(settled, model.round, { ...model.roundProgress, house: true, goldRound: model.house.goldRound, finishedHour: new Date().getHours() });
   const houseResolution = completeHouseRound(model.house, model.round, progression.repEarned);
   const withHouseBonus = applyRepBonus(progression.profile, houseResolution.hotHandBonusRep);
   const heat = recordHotHand(withHouseBonus, houseResolution.house.hotHandStreak);
@@ -938,7 +943,10 @@ function settleHouseIfResolved(): void {
   model.houseTokenAwarded = houseResolution.tokenAwarded;
   model.lastRepEarned = progression.repEarned + houseResolution.hotHandBonusRep;
   model.achievementToasts = [...model.achievementToasts, ...progression.unlocked, ...heat.unlocked];
-  const visitUnlocks = applyActivity((profile) => recordVisit(profile, localDateKey()));
+  const visitUnlocks = [
+    ...applyActivity((profile) => recordVisit(profile, localDateKey())),
+    ...applyActivity(recordMilestones),
+  ];
   const unlockedCount = progression.unlocked.length + heat.unlocked.length + visitUnlocks.length;
   cueFx('result', ...(unlockedCount ? ['achievement' as const] : []));
   say(resolutionDialogueEvent(model.round));
@@ -954,6 +962,7 @@ function dealRound(): void {
   model.lastRepEarned = 0;
   model.roundProgress = emptyRoundProgressionContext();
   model.roundProgress.allIn = stake >= model.profile.chips;
+  model.roundProgress.maxStake = stake >= MAX_STAKE;
 
   if (model.profile.progression.currentLossStreak >= 5) {
     const again = unlockAchievementIds(model.profile, ['again']);
@@ -998,6 +1007,7 @@ function dealHouseRound(): void {
   model.houseTokenAwarded = false;
   model.roundProgress = emptyRoundProgressionContext();
   model.roundProgress.allIn = stake >= model.profile.chips;
+  model.roundProgress.maxStake = stake >= MAX_STAKE;
 
   if (model.profile.progression.currentLossStreak >= 5) {
     const again = unlockAchievementIds(model.profile, ['again']);
@@ -1043,6 +1053,7 @@ function runHouseReplay(): void {
   model.houseLastBonusRep = 0;
   model.houseTokenAwarded = false;
   model.roundProgress = emptyRoundProgressionContext();
+  model.roundProgress.replay = true;
 
   const beforeHouse = model.house;
   model.houseCheckpoint = beforeHouse;
@@ -1238,7 +1249,9 @@ function completeDailyIfResolved(): void {
   const firstFinish = completed.profile !== model.profile;
   persistProfile(completed.profile);
   model.lastRepEarned = completed.repAwarded;
-  const unlocked = firstFinish ? applyActivity((profile) => recordDailyHand(profile, outcome)) : [];
+  const unlocked = firstFinish
+    ? [...applyActivity((profile) => recordDailyHand(profile, outcome)), ...applyActivity(recordMilestones)]
+    : [];
   playRoundFeedback(model.dailyRound, unlocked.length);
 }
 
@@ -1546,6 +1559,12 @@ function render(options: RenderOptions = {}): void {
   focusAfterRender(focusKey, screenChanged, hadInteractiveFocus);
 }
 
+function updateAchievementView(): void {
+  const log = app().querySelector<HTMLElement>('.achievement-log');
+  if (log) applyAchievementView(log, model.achievementFilter, model.achievementCategory);
+  else render();
+}
+
 function bindEvents(): void {
   document.querySelectorAll<HTMLElement>('[data-screen]').forEach((element) => {
     element.addEventListener('click', () => {
@@ -1615,7 +1634,8 @@ function bindEvents(): void {
       if (!isAchievementFilter(filter) || filter === model.achievementFilter) return;
       model.achievementFilter = filter;
       feedback('button', 'tap');
-      render();
+      // In place: the logbook already holds every entry, so no badge is rebuilt.
+      updateAchievementView();
     });
   });
 
@@ -1627,7 +1647,7 @@ function bindEvents(): void {
       if (!isAchievementCategoryFilter(category) || category === model.achievementCategory) return;
       model.achievementCategory = category;
       feedback('button', 'tap');
-      render();
+      updateAchievementView();
     });
   });
 
@@ -1720,6 +1740,11 @@ export function initializeUI(): void {
   bindGlobalKeyboardOnce();
   // Today's visit (daily/weekly log-in streaks) and the deck already in use.
   applyActivity((profile) => recordDeckTried(profile, model.visual.cardTheme, CARD_THEME_IDS.length));
-  if (applyActivity((profile) => recordVisit(profile, localDateKey())).length > 0) playAchievementSting();
+  // Chip and REP ladders credit balances reached before they existed.
+  const startupUnlocks = [
+    ...applyActivity((profile) => recordVisit(profile, localDateKey())),
+    ...applyActivity(recordMilestones),
+  ];
+  if (startupUnlocks.length > 0) playAchievementSting();
   render();
 }

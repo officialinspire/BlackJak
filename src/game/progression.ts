@@ -17,6 +17,12 @@ export interface RoundProgressionContext {
   house?: boolean;
   /** Local hour (0-23) when the round finished. */
   finishedHour?: number;
+  /** A Jak's House Gold Card round. */
+  goldRound?: boolean;
+  /** A Jak's House Run It Back replay. */
+  replay?: boolean;
+  /** The opening stake was the table maximum. */
+  maxStake?: boolean;
 }
 
 export interface ProgressionUpdate {
@@ -208,6 +214,50 @@ export function applyProgression(
   if (context.allIn) candidates.push('all-in');
   if (stats.longestLossStreak >= 10) candidates.push('rock-bottom');
   if (context.finishedHour !== undefined && context.finishedHour >= 0 && context.finishedHour < 4) candidates.push('night-owl');
+
+  // Milestones (lifetime counts; chips and REP ladders are in activity.ts)
+  if (stats.totalHands >= 1000) candidates.push('hands-1000');
+  if (stats.totalHands >= 5000) candidates.push('hands-5000');
+  if (stats.wins >= 500) candidates.push('wins-500');
+  if (stats.wins >= 1000) candidates.push('wins-1000');
+  if (stats.blackjacks >= 50) candidates.push('naturals-50');
+  if (stats.blackjacks >= 100) candidates.push('naturals-100');
+
+  // Gameplay firsts and Jak's House
+  const anyWin = round.results.some((result) => isWinningOutcome(result.outcome));
+  if (stats.wins >= 1) candidates.push('beginners-luck');
+  if (stats.doublesAttempted >= 1) candidates.push('double-dipper');
+  if (stats.splitsAttempted >= 1) candidates.push('splitsville');
+  if (activity.houseRounds >= 1) candidates.push('welcome-to-the-house');
+  if (activity.houseRounds >= 100) candidates.push('house-regular');
+  if (context.goldRound && anyWin) candidates.push('golden-touch');
+  if (context.replay && anyWin) candidates.push('second-chance');
+  if (context.maxStake) candidates.push('high-stakes');
+
+  // Skill
+  if (stats.longestWinStreak >= 15) candidates.push('unstoppable');
+  if (stats.doublesWon >= 25) candidates.push('double-down-devotee');
+  if (stats.splitSweeps >= 5) candidates.push('split-decision');
+  if (stats.fiveCardWins >= 5) candidates.push('charlies-angel');
+  if (handResults.some(({ hand, evaluation, outcome }) => outcome === 'win' && hand.cards.length >= 3 && evaluation.total === 21 && evaluation.isSoft)) {
+    candidates.push('soft-touch');
+  }
+  // A natural always ends a single-hand round, so the previous round's flag is the last one saved.
+  if (blackjackFlags.some(Boolean) && settledProfile.progression.recentBlackjackHands.at(-1) === true) candidates.push('back-to-back');
+  if (handResults.some(({ evaluation, outcome }) => outcome === 'win' && evaluation.total <= 12)) candidates.push('low-and-slow');
+  if (allWins && settledProfile.progression.currentLossStreak >= 5) candidates.push('phoenix');
+
+  // Comedy
+  if (round.results.some((result) => result.outcome === 'push')) candidates.push('agree-to-disagree');
+  if (stats.pushes >= 25) candidates.push('stalemate');
+  if (stats.riskyHits >= 50) candidates.push('live-dangerously');
+  if (context.finishedHour !== undefined && context.finishedHour >= 5 && context.finishedHour < 7) candidates.push('early-bird');
+  if (stats.busts >= 100) candidates.push('gravity-wins');
+  if (round.hands.some((hand) => hand.cards.length >= 7)) candidates.push('card-hoarder');
+  if (round.hands.length > 1 && round.results.length === round.hands.length && round.results.every((result) => result.outcome === 'loss')) {
+    candidates.push('split-disorder');
+  }
+  if (stats.longestLossStreak >= 20) candidates.push('down-bad');
 
   const unlocked = unlockAchievementIds(nextProfile, candidates);
   nextProfile = unlocked.profile;
