@@ -26,12 +26,16 @@ const ORIGINAL_IDS: AchievementId[] = [
 const ALL_IDS: AchievementId[] = ACHIEVEMENTS.map((achievement) => achievement.id);
 const TOTAL = ALL_IDS.length;
 
-const entryIds = (markup: string, group?: 'unlocked' | 'locked'): string[] => {
-  const scope = group
-    ? markup.match(new RegExp(`<section class="achievement-group is-${group}"[\\s\\S]*?</section>`))?.[0] ?? ''
-    : markup;
-  return [...scope.matchAll(/data-achievement-id="([^"]+)"/g)].map((match) => match[1]);
-};
+/** IDs of the entries a player can see: hidden groups and hidden entries are left out. */
+const entryIds = (markup: string, group?: 'unlocked' | 'locked'): string[] =>
+  [...markup.matchAll(/<section class="achievement-group is-(\w+)"([^>]*)>([\s\S]*?)<\/section>/g)]
+    .filter(([, kind, attributes]) => !/\bhidden\b/.test(attributes) && (!group || kind === group))
+    .flatMap(([, , , body]) => [...body.matchAll(/<li [^>]*data-achievement-id="([^"]+)"[^>]*>/g)]
+      .filter((match) => !/\shidden>$/.test(match[0]))
+      .map((match) => match[1]));
+
+const groupHidden = (markup: string, group: 'unlocked' | 'locked'): boolean =>
+  new RegExp(`<section class="achievement-group is-${group}"[^>]*\\shidden>`).test(markup);
 
 const originalWindow = globalThis.window;
 
@@ -43,7 +47,7 @@ describe('achievement logbook', () => {
   it('keeps the original nine achievements first, in catalogue order, and every ID unique', () => {
     expect(ALL_IDS.slice(0, 9)).toEqual(ORIGINAL_IDS);
     expect(new Set(ALL_IDS).size).toBe(TOTAL);
-    expect(TOTAL).toBe(39);
+    expect(TOTAL).toBe(89);
     expect(entryIds(achievementLogMarkup([], 'all'))).toEqual(ALL_IDS);
   });
 
@@ -63,12 +67,13 @@ describe('achievement logbook', () => {
     const unlocked: AchievementId[] = ['golden-boy', 'again'];
     const onlyUnlocked = achievementLogMarkup(unlocked, 'unlocked');
     expect(entryIds(onlyUnlocked)).toEqual(['golden-boy', 'again']);
-    expect(onlyUnlocked).not.toContain('achievement-group is-locked');
+    expect(groupHidden(onlyUnlocked, 'locked')).toBe(true);
+    expect(groupHidden(onlyUnlocked, 'unlocked')).toBe(false);
 
     const onlyLocked = achievementLogMarkup(unlocked, 'locked');
     expect(entryIds(onlyLocked)).toHaveLength(TOTAL - 2);
     expect(entryIds(onlyLocked)).not.toContain('golden-boy');
-    expect(onlyLocked).not.toContain('achievement-group is-unlocked');
+    expect(groupHidden(onlyLocked, 'unlocked')).toBe(true);
   });
 
   it('marks the selected filter and shows per-filter counts', () => {

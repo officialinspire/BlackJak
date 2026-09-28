@@ -245,7 +245,12 @@
   transform: translateY(1px);
 }
 
-/* Achievement type chips (Gameplay, Skill, Log-ins, Daily Hand, Comedy). */
+/* Logbook filters toggle `hidden`; beat the display rules on entries and lists. */
+.achievement-log [hidden] {
+  display: none !important;
+}
+
+/* Achievement type chips (Milestones, Gameplay, Skill, Log-ins, Daily Hand, Comedy). */
 .achievement-categories {
   display: grid;
   grid-template-columns: repeat(3, minmax(0,1fr));
@@ -303,7 +308,7 @@
 
 @media (min-width: 700px) {
   .achievement-categories {
-    grid-template-columns: repeat(6, minmax(0,1fr));
+    grid-template-columns: repeat(7, minmax(0,1fr));
   }
 }
 

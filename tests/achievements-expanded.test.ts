@@ -59,9 +59,9 @@ function settle(
 const unlockedIn = (profile: PlayerProfile): AchievementId[] => profile.progression.unlockedAchievements;
 
 describe('expanded achievement catalogue', () => {
-  it('has 39 achievements across five categories, each with a unique name and badge', () => {
-    expect(ACHIEVEMENTS).toHaveLength(39);
-    expect(new Set(ACHIEVEMENTS.map((achievement) => achievement.name)).size).toBe(39);
+  it('has 89 achievements across six categories, each with a unique name and badge', () => {
+    expect(ACHIEVEMENTS).toHaveLength(89);
+    expect(new Set(ACHIEVEMENTS.map((achievement) => achievement.name)).size).toBe(89);
     for (const category of ACHIEVEMENT_CATEGORIES) {
       expect(ACHIEVEMENTS.filter((achievement) => achievement.category === category).length).toBeGreaterThanOrEqual(3);
     }
@@ -203,7 +203,7 @@ describe('daily and weekly log-ins', () => {
 
 describe('Daily Hand, refill and deck achievements', () => {
   it('unlocks DAILY DOSE on the first Daily Hand and DAILY GRIND at ten Daily Hand wins', () => {
-    const first = recordDailyHand(defaultProfile(), 'loss');
+    const first = recordDailyHand(defaultProfile(), 'push');
     expect(first.unlocked.map((achievement) => achievement.id)).toEqual(['daily-dose']);
     expect(first.profile.activity).toMatchObject({ dailyHandsCompleted: 1, dailyWins: 0 });
 
@@ -294,13 +294,18 @@ describe('saved progress', () => {
 describe('Stats logbook for the expanded catalogue', () => {
   it('filters by achievement type and shows per-type counts', () => {
     const markup = achievementLogMarkup(['back-again'], 'all', 'visits');
-    const ids = [...markup.matchAll(/data-achievement-id="([^"]+)"/g)].map((match) => match[1]);
-    expect(ids).toEqual(['back-again', 'creature-of-habit', 'part-of-the-furniture', 'weekly-regular', 'season-ticket']);
+    const ids = [...markup.matchAll(/<li [^>]*data-achievement-id="([^"]+)"[^>]*>/g)]
+      .filter((match) => !/\shidden>$/.test(match[0]))
+      .map((match) => match[1]);
+    expect(ids).toEqual([
+      'back-again', 'creature-of-habit', 'part-of-the-furniture', 'weekly-regular', 'season-ticket',
+      'loyalty-program', 'permanent-resident', 'half-year-habit', 'anniversary', 'frequent-flyer',
+    ]);
     expect(markup).toContain('data-achievement-type="visits"');
-    expect(markup).toMatch(/data-achievement-category="visits"[^>]*aria-pressed="true"[^>]*>\s*Log-ins <b>1\/5<\/b>/);
-    expect(markup).toMatch(/data-achievement-category="all"[^>]*aria-pressed="false"[^>]*>\s*Every type <b>1\/39<\/b>/);
+    expect(markup).toMatch(/data-achievement-category="visits"[^>]*aria-pressed="true"[^>]*>\s*Log-ins <b>1\/10<\/b>/);
+    expect(markup).toMatch(/data-achievement-category="all"[^>]*aria-pressed="false"[^>]*>\s*Every type <b>1\/89<\/b>/);
     // The overall completion stays whole-logbook.
-    expect(markup).toContain('<b>1/39</b>');
+    expect(markup).toContain('<b>1/89</b>');
     expect(isAchievementCategoryFilter('comedy')).toBe(true);
     expect(isAchievementCategoryFilter('secret')).toBe(false);
   });
@@ -329,6 +334,7 @@ describe('Stats logbook for the expanded catalogue', () => {
     for (let index = 0; index < 200; index += 1) achievementLogMarkup(['blackjak', 'night-owl'], 'all', 'all', progress);
     const perRender = (performance.now() - started) / 200;
     expect(perRender).toBeLessThan(5);
-    expect(achievementLogMarkup([], 'all', 'all', progress).length).toBeLessThan(80_000);
+    // Every badge is drawn twice (shelf + entry); keep the page well under a quarter megabyte.
+    expect(achievementLogMarkup([], 'all', 'all', progress).length).toBeLessThan(200_000);
   });
 });

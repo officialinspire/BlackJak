@@ -53,7 +53,12 @@ export function achievementLogbook(unlockedIds: Iterable<AchievementId>): Achiev
   return { unlocked, locked, total, percent: total > 0 ? Math.round((unlocked.length / total) * 100) : 0 };
 }
 
-const formatCount = (value: number): string => new Intl.NumberFormat('en-US').format(value);
+// Built once: constructing a NumberFormat per progress bar dominated redraw time.
+const countFormat = new Intl.NumberFormat('en-US');
+const formatCount = (value: number): string => countFormat.format(value);
+
+/** Catalogue numbers ("No.07"), precomputed for every entry. */
+const ENTRY_NUMBERS = new Map(ACHIEVEMENTS.map((achievement, index) => [achievement.id, String(index + 1).padStart(2, '0')]));
 
 function progressMarkup(progress: AchievementProgress | undefined): string {
   if (!progress || progress.target <= 0) return '';
@@ -65,10 +70,10 @@ function progressMarkup(progress: AchievementProgress | undefined): string {
         </span>`;
 }
 
-function entryMarkup(achievement: AchievementDefinition, unlocked: boolean, progress: AchievementProgressMap): string {
-  const number = String(ACHIEVEMENTS.indexOf(achievement) + 1).padStart(2, '0');
+function entryMarkup(achievement: AchievementDefinition, unlocked: boolean, progress: AchievementProgressMap, shown: boolean): string {
+  const number = ENTRY_NUMBERS.get(achievement.id) ?? '00';
   return `
-    <li class="achievement-entry ${unlocked ? 'is-unlocked' : 'is-locked'}" data-achievement-id="${achievement.id}" data-category="${achievement.category}">
+    <li class="achievement-entry ${unlocked ? 'is-unlocked' : 'is-locked'}" data-achievement-id="${achievement.id}" data-category="${achievement.category}"${shown ? '' : ' hidden'}>
       ${badgeMarkup(achievement.id, unlocked)}
       <div class="achievement-entry-copy">
         <strong>${escapeHtml(achievement.name)}</strong>
@@ -78,18 +83,41 @@ function entryMarkup(achievement: AchievementDefinition, unlocked: boolean, prog
     </li>`;
 }
 
-function groupMarkup(kind: 'unlocked' | 'locked', entries: AchievementDefinition[], progress: AchievementProgressMap, wholeLog: boolean): string {
+const EMPTY_TEXT = {
+  unlocked: 'Nothing logged yet. Play a few hands and Jak will start keeping score.',
+  lockedWhole: 'Every achievement unlocked. The logbook is complete.',
+  lockedType: 'Every achievement of this type is unlocked.',
+} as const;
+
+const emptyText = (kind: 'unlocked' | 'locked', category: AchievementCategoryFilter): string =>
+  kind === 'unlocked' ? EMPTY_TEXT.unlocked : category === 'all' ? EMPTY_TEXT.lockedWhole : EMPTY_TEXT.lockedType;
+
+const inCategory = (achievement: AchievementDefinition, category: AchievementCategoryFilter): boolean =>
+  category === 'all' || achievement.category === category;
+
+const groupShown = (kind: 'unlocked' | 'locked', filter: AchievementFilter): boolean =>
+  filter === 'all' || filter === kind;
+
+/**
+ * Every entry of the group is always in the DOM; the type and unlocked/locked
+ * filters only toggle `hidden` (see applyAchievementView), so a filter tap never
+ * rebuilds the badges.
+ */
+function groupMarkup(
+  kind: 'unlocked' | 'locked',
+  entries: AchievementDefinition[],
+  progress: AchievementProgressMap,
+  filter: AchievementFilter,
+  category: AchievementCategoryFilter,
+): string {
   const heading = kind === 'unlocked' ? 'Unlocked' : 'Locked';
-  const empty = kind === 'unlocked'
-    ? 'Nothing logged yet. Play a few hands and Jak will start keeping score.'
-    : wholeLog ? 'Every achievement unlocked. The logbook is complete.' : 'Every achievement of this type is unlocked.';
+  const shownCount = entries.filter((achievement) => inCategory(achievement, category)).length;
   const headingId = `achievement-group-${kind}`;
   return `
-    <section class="achievement-group is-${kind}" aria-labelledby="${headingId}">
-      <h3 id="${headingId}" class="achievement-group-heading"><span>${heading}</span><b>${entries.length}</b></h3>
-      ${entries.length
-        ? `<ol class="achievement-list">${entries.map((achievement) => entryMarkup(achievement, kind === 'unlocked', progress)).join('')}</ol>`
-        : `<p class="achievement-empty">${empty}</p>`}
+    <section class="achievement-group is-${kind}" aria-labelledby="${headingId}"${groupShown(kind, filter) ? '' : ' hidden'}>
+      <h3 id="${headingId}" class="achievement-group-heading"><span>${heading}</span><b>${shownCount}</b></h3>
+      <ol class="achievement-list"${shownCount ? '' : ' hidden'}>${entries.map((achievement) => entryMarkup(achievement, kind === 'unlocked', progress, inCategory(achievement, category))).join('')}</ol>
+      <p class="achievement-empty"${shownCount ? ' hidden' : ''}>${emptyText(kind, category)}</p>
     </section>`;
 }
 
@@ -115,9 +143,8 @@ export function achievementLogMarkup(
 ): string {
   const unlockedSet = new Set(unlockedIds);
   const log = achievementLogbook(unlockedSet);
-  const inCategory = (achievement: AchievementDefinition): boolean => category === 'all' || achievement.category === category;
-  const shownUnlocked = log.unlocked.filter(inCategory);
-  const shownLocked = log.locked.filter(inCategory);
+  const shownUnlocked = log.unlocked.filter((achievement) => inCategory(achievement, category));
+  const shownLocked = log.locked.filter((achievement) => inCategory(achievement, category));
   const counts: Record<AchievementFilter, number> = {
     all: shownUnlocked.length + shownLocked.length,
     unlocked: shownUnlocked.length,
@@ -138,11 +165,6 @@ export function achievementLogMarkup(
         </button>`;
   }).join('');
 
-  const groups = [
-    filter !== 'locked' ? groupMarkup('unlocked', shownUnlocked, progress, category === 'all') : '',
-    filter !== 'unlocked' ? groupMarkup('locked', shownLocked, progress, category === 'all') : '',
-  ].join('');
-
   return `
     <div class="achievement-section achievement-log" data-achievement-view="${filter}" data-achievement-type="${category}">
       <div class="section-heading"><span>ACHIEVEMENT LOGBOOK</span><b>${log.unlocked.length}/${log.total}</b></div>
@@ -157,6 +179,58 @@ export function achievementLogMarkup(
       </div>
       <div class="achievement-filters" role="group" aria-label="Filter achievements">${chips}
       </div>
-      ${groups}
+      ${groupMarkup('unlocked', log.unlocked, progress, filter, category)}
+      ${groupMarkup('locked', log.locked, progress, filter, category)}
     </div>`;
+}
+
+const CATEGORY_OF = new Map(ACHIEVEMENTS.map((achievement) => [achievement.id as string, achievement.category]));
+
+/**
+ * Applies a filter/type choice to a rendered logbook in place: toggles
+ * `hidden`, updates counts, pressed states and empty text. Produces the same
+ * visible result as re-rendering achievementLogMarkup with these arguments.
+ */
+export function applyAchievementView(log: HTMLElement, filter: AchievementFilter, category: AchievementCategoryFilter): void {
+  log.dataset.achievementView = filter;
+  log.dataset.achievementType = category;
+  const counts: Record<AchievementFilter, number> = { all: 0, unlocked: 0, locked: 0 };
+
+  for (const kind of ['unlocked', 'locked'] as const) {
+    const group = log.querySelector<HTMLElement>(`.achievement-group.is-${kind}`);
+    if (!group) continue;
+    let shown = 0;
+    group.querySelectorAll<HTMLElement>('.achievement-entry').forEach((entry) => {
+      const entryCategory = CATEGORY_OF.get(entry.dataset.achievementId ?? '');
+      const visible = category === 'all' || entryCategory === category;
+      entry.hidden = !visible;
+      if (visible) shown += 1;
+    });
+    counts[kind] = shown;
+    group.hidden = !groupShown(kind, filter);
+    const heading = group.querySelector('.achievement-group-heading b');
+    if (heading) heading.textContent = String(shown);
+    const list = group.querySelector<HTMLElement>('.achievement-list');
+    if (list) list.hidden = shown === 0;
+    const empty = group.querySelector<HTMLElement>('.achievement-empty');
+    if (empty) {
+      empty.hidden = shown > 0;
+      empty.textContent = emptyText(kind, category);
+    }
+  }
+  counts.all = counts.unlocked + counts.locked;
+
+  log.querySelectorAll<HTMLButtonElement>('[data-achievement-filter]').forEach((button) => {
+    const option = button.dataset.achievementFilter as AchievementFilter;
+    const selected = option === filter;
+    button.classList.toggle('is-selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+    const count = button.querySelector('b');
+    if (count) count.textContent = String(counts[option] ?? 0);
+  });
+  log.querySelectorAll<HTMLButtonElement>('[data-achievement-category]').forEach((button) => {
+    const selected = button.dataset.achievementCategory === category;
+    button.classList.toggle('is-selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  });
 }
