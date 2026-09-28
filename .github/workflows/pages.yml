@@ -84,6 +84,7 @@ jobs:
           node scripts/qa/browser-qa.cjs
           node scripts/qa/gameplay-pwa-qa.cjs
           node scripts/qa/refresh-qa.cjs
+          node scripts/qa/achievements-qa.cjs
 
       - name: Check GitHub Pages availability
         if: github.event_name != 'pull_request'

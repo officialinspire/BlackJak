@@ -1,3 +1,4 @@
+export * from './activity';
 export * from './dialogue';
 export * from './deck';
 export * from './daily';

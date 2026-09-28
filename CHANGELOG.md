@@ -2,6 +2,28 @@
 
 All notable changes to BlackJak are documented here.
 
+## [0.5.0] — 2026-09-28 — Expanded achievements
+
+Blackjack rules, odds and payouts are unchanged.
+
+### Added
+- **30 new achievements (39 in total)**, each with its own badge, in five types:
+  - **Gameplay:** first hand, 100 wins, 10 naturals, 10,000 chips, 25 Jak's House rounds, 500 hands.
+  - **Skill:** doubled-down wins, 5- and 10-round win streaks, five-card wins, three-card 21s, a win after three losses, and the 2× Hot Hand cap.
+  - **Log-ins:** 3-, 7- and 30-day visit streaks, and 4- and 12-week streaks.
+  - **Daily Hand:** first Daily Hand, a 7-day Daily Hand streak, and 10 Daily Hand wins.
+  - **Comedy:** busting on exactly 22, standing on 11 or less, 10 straight losses, taking the chip refill, betting your whole balance, busting a double, playing after midnight, and trying every card deck.
+- **Stats logbook:** type chips (Gameplay, Skill, Log-ins, Daily Hand, Comedy) that work together with the Unlocked/Locked filter, a type tag on every entry, and progress bars such as "42 / 100" on locked count-based achievements.
+- Unlock toasts on the menu, Settings and Daily Hand screens as well as the tables.
+- `scripts/qa/achievements-qa.cjs`, a browser QA pass for the logbook, unlock toasts and save safety, now run in CI.
+
+### Changed
+- Achievements based on best streaks and peak chips credit progress saved before this update on the next hand.
+- Badge SVG is built once per badge with whitespace stripped, so the larger logbook redraws quickly.
+
+### Compatibility
+- Saves from earlier versions load unchanged. New visit, Daily Hand, House and deck counters start at zero, and existing unlocks are kept.
+
 ## [0.4.2] — 2026-09-24 — Gold House pills
 
 ### Changed
