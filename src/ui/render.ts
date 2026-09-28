@@ -4,6 +4,7 @@ import { gameSfxSequence, SfxEventGate, type GameSfxEvent } from '../feedback/ga
 import { HOUSE_MODIFIERS } from '../data/house';
 import { titleProgressForRep, type AchievementDefinition } from '../data/progression';
 import {
+  achievementProgress,
   allowedActions,
   applyProgression,
   applyRepBonus,
@@ -21,6 +22,11 @@ import {
   isGoldCard,
   localDateKey,
   performAction,
+  recordDailyHand,
+  recordDeckTried,
+  recordHotHand,
+  recordRefill,
+  recordVisit,
   refillPracticeChips,
   replayHouseRound,
   reserveStake,
@@ -32,6 +38,7 @@ import {
   type DialogueEvent,
   type DialogueMemory,
   type DialogueSelection,
+  type ActivityUpdate,
   type Card,
   type HouseState,
   type PlayerAction,
@@ -55,7 +62,13 @@ import { ACTION_SHORTCUTS, dockPhaseFor, tableDockMarkup, type DockPhase } from 
 import { FxQueue, controlsStateKey, fxClassNames, fxStyleVars, shouldIgnoreActivation, type FxCue } from './fx';
 import { menuBoardMarkup } from './menu-board';
 import { badgeSvg } from './achievement-badges';
-import { achievementLogMarkup, isAchievementFilter, type AchievementFilter } from './achievement-log';
+import {
+  achievementLogMarkup,
+  isAchievementCategoryFilter,
+  isAchievementFilter,
+  type AchievementCategoryFilter,
+  type AchievementFilter,
+} from './achievement-log';
 import { escapeIntent, isTableScreen, pauseLeaveDecision, pauseMenuMarkup } from './pause-menu';
 import { dialoguePanelMarkup, type PanelStatus } from './dialogue-panel';
 import { dealerMarkup } from './dealer';
@@ -101,6 +114,8 @@ interface AppModel {
   roundSerial: number;
   /** Stats-screen logbook filter; kept for the session so re-renders don't reset it. */
   achievementFilter: AchievementFilter;
+  /** Stats-screen logbook category; kept for the session like the filter. */
+  achievementCategory: AchievementCategoryFilter;
 }
 
 type RoundTone = 'idle' | 'playing' | 'blackjack' | 'win' | 'loss' | 'push' | 'mixed';
@@ -117,6 +132,7 @@ const FOCUS_ATTRIBUTES = [
   'data-pause',
   'data-deck-cycle',
   'data-achievement-filter',
+  'data-achievement-category',
   'data-screen',
 ] as const;
 
@@ -164,6 +180,7 @@ const model: AppModel = {
   handCheckpoint: null,
   roundSerial: 0,
   achievementFilter: 'all',
+  achievementCategory: 'all',
 };
 
 const cardMotion = new CardMotionPlanner();
@@ -311,10 +328,40 @@ function persistProfile(profile: PlayerProfile): void {
   saveProfile(profile);
 }
 
+/**
+ * Applies an out-of-hand activity update (visit, deck, refill, Daily Hand) and
+ * toasts what it unlocked. During a hand the live profile has the stake
+ * reserved, so the same update also goes to the pre-deal checkpoint and only
+ * that checkpoint is saved; leaving mid-hand then keeps the unlock.
+ */
+function applyActivity(update: (profile: PlayerProfile) => ActivityUpdate): AchievementDefinition[] {
+  const result = update(model.profile);
+  if (result.profile === model.profile) return [];
+  model.profile = result.profile;
+  if (model.handCheckpoint) {
+    model.handCheckpoint = update(model.handCheckpoint).profile;
+    saveProfile(model.handCheckpoint);
+  } else {
+    saveProfile(model.profile);
+  }
+  if (result.unlocked.length > 0) {
+    model.achievementToasts = [...model.achievementToasts, ...result.unlocked];
+    cueFx('achievement');
+  }
+  return result.unlocked;
+}
+
+function playAchievementSting(): void {
+  if (typeof window === 'undefined') return;
+  window.setTimeout(() => feedbackEngine.play('achievement', model.preferences), 240);
+  haptic('achievement', model.preferences);
+}
+
 function setCardTheme(theme: CardThemeId): void {
   model.visual = { ...model.visual, cardTheme: theme };
   saveVisualPreferences(model.visual);
   setActiveCardTheme(theme);
+  if (applyActivity((profile) => recordDeckTried(profile, theme, CARD_THEME_IDS.length)).length > 0) playAchievementSting();
 }
 
 function deckThemeSettingMarkup(): string {
@@ -368,10 +415,7 @@ function playRoundFeedback(round: RoundState, unlockedCount = 0): void {
     playGameSfx('result-neutral', token);
   }
 
-  if (unlockedCount > 0 && typeof window !== 'undefined') {
-    window.setTimeout(() => feedbackEngine.play('achievement', model.preferences), 240);
-    haptic('achievement', model.preferences);
-  }
+  if (unlockedCount > 0) playAchievementSting();
 }
 
 function say(event: DialogueEvent): void {
@@ -456,6 +500,7 @@ function menuMarkup(): string {
       <div class="menu-bankroll" aria-label="Saved Classic BlackJak bankroll">Practice chips <strong>${formatChips(model.profile.chips)}</strong></div>
       <p class="fine-print">Fictional practice chips only. No purchases, cash-out, or real-money wagering.</p>
       ${gameFooterMarkup()}
+      ${achievementToastMarkup()}
     </main>`;
 }
 
@@ -498,6 +543,7 @@ function settingsMarkup(): string {
         <p class="panel-footnote">Browser autoplay rules require a tap/click before music or sound effects can begin.</p>
       </section>
       ${gameFooterMarkup()}
+      ${achievementToastMarkup()}
     </main>`;
 }
 
@@ -542,7 +588,7 @@ function statsMarkup(): string {
           ${statCard('Risky hits 16+', stats.riskyHits)}
           ${statCard('Five-card wins', stats.fiveCardWins)}
         </div>
-        ${achievementLogMarkup(model.profile.progression.unlockedAchievements, model.achievementFilter)}
+        ${achievementLogMarkup(model.profile.progression.unlockedAchievements, model.achievementFilter, model.achievementCategory, achievementProgress(model.profile))}
         <p class="stats-note">Split hands are counted individually in win/loss statistics.</p>
       </section>
       ${gameFooterMarkup()}
@@ -862,35 +908,41 @@ function settleIfResolved(): void {
   if (!model.round || model.round.phase !== 'resolved') return;
 
   const settled = settleResults(model.profile, model.round.results);
-  const progression = applyProgression(settled, model.round, model.roundProgress);
+  const progression = applyProgression(settled, model.round, { ...model.roundProgress, finishedHour: new Date().getHours() });
   persistProfile(progression.profile);
   model.handCheckpoint = null;
   model.lastRepEarned = progression.repEarned;
   model.achievementToasts = [...model.achievementToasts, ...progression.unlocked];
-  cueFx('result', ...(progression.unlocked.length ? ['achievement' as const] : []));
+  // A session left open past midnight still counts the new day's visit.
+  const visitUnlocks = applyActivity((profile) => recordVisit(profile, localDateKey()));
+  const unlockedCount = progression.unlocked.length + visitUnlocks.length;
+  cueFx('result', ...(unlockedCount ? ['achievement' as const] : []));
   say(resolutionDialogueEvent(model.round));
-  playRoundFeedback(model.round, progression.unlocked.length);
+  playRoundFeedback(model.round, unlockedCount);
 }
 
 function settleHouseIfResolved(): void {
   if (!model.round || model.round.phase !== 'resolved') return;
 
   const settled = settleResults(model.profile, model.round.results);
-  const progression = applyProgression(settled, model.round, model.roundProgress);
+  const progression = applyProgression(settled, model.round, { ...model.roundProgress, house: true, finishedHour: new Date().getHours() });
   const houseResolution = completeHouseRound(model.house, model.round, progression.repEarned);
   const withHouseBonus = applyRepBonus(progression.profile, houseResolution.hotHandBonusRep);
+  const heat = recordHotHand(withHouseBonus, houseResolution.house.hotHandStreak);
 
-  persistProfile(withHouseBonus);
+  persistProfile(heat.profile);
   model.handCheckpoint = null;
   model.house = houseResolution.house;
   model.houseCheckpoint = null;
   model.houseLastBonusRep = houseResolution.hotHandBonusRep;
   model.houseTokenAwarded = houseResolution.tokenAwarded;
   model.lastRepEarned = progression.repEarned + houseResolution.hotHandBonusRep;
-  model.achievementToasts = [...model.achievementToasts, ...progression.unlocked];
-  cueFx('result', ...(progression.unlocked.length ? ['achievement' as const] : []));
+  model.achievementToasts = [...model.achievementToasts, ...progression.unlocked, ...heat.unlocked];
+  const visitUnlocks = applyActivity((profile) => recordVisit(profile, localDateKey()));
+  const unlockedCount = progression.unlocked.length + heat.unlocked.length + visitUnlocks.length;
+  cueFx('result', ...(unlockedCount ? ['achievement' as const] : []));
   say(resolutionDialogueEvent(model.round));
-  playRoundFeedback(model.round, progression.unlocked.length);
+  playRoundFeedback(model.round, unlockedCount);
 }
 
 function dealRound(): void {
@@ -901,6 +953,7 @@ function dealRound(): void {
   model.achievementToasts = [];
   model.lastRepEarned = 0;
   model.roundProgress = emptyRoundProgressionContext();
+  model.roundProgress.allIn = stake >= model.profile.chips;
 
   if (model.profile.progression.currentLossStreak >= 5) {
     const again = unlockAchievementIds(model.profile, ['again']);
@@ -944,6 +997,7 @@ function dealHouseRound(): void {
   model.houseLastBonusRep = 0;
   model.houseTokenAwarded = false;
   model.roundProgress = emptyRoundProgressionContext();
+  model.roundProgress.allIn = stake >= model.profile.chips;
 
   if (model.profile.progression.currentLossStreak >= 5) {
     const again = unlockAchievementIds(model.profile, ['again']);
@@ -1040,6 +1094,7 @@ function takePlayerAction(action: PlayerAction): void {
   if (action === 'hit' && startingTotal >= 16) model.roundProgress.riskyHits = (model.roundProgress.riskyHits ?? 0) + 1;
   if (action === 'double') model.roundProgress.doublesAttempted = (model.roundProgress.doublesAttempted ?? 0) + 1;
   if (action === 'split') model.roundProgress.splitsAttempted = (model.roundProgress.splitsAttempted ?? 0) + 1;
+  if (action === 'stand' && startingTotal <= 11) model.roundProgress.stoodOnLow = true;
 
   playGameSfx(
     action,
@@ -1104,6 +1159,7 @@ function takeHouseAction(action: PlayerAction): void {
   if (action === 'hit' && startingTotal >= 16) model.roundProgress.riskyHits = (model.roundProgress.riskyHits ?? 0) + 1;
   if (action === 'double') model.roundProgress.doublesAttempted = (model.roundProgress.doublesAttempted ?? 0) + 1;
   if (action === 'split') model.roundProgress.splitsAttempted = (model.roundProgress.splitsAttempted ?? 0) + 1;
+  if (action === 'stand' && startingTotal <= 11) model.roundProgress.stoodOnLow = true;
 
   playGameSfx(
     action,
@@ -1179,9 +1235,11 @@ function completeDailyIfResolved(): void {
   if (!model.dailyRound || model.dailyRound.phase !== 'resolved') return;
   const outcome = dailyOutcome(model.dailyRound);
   const completed = completeDailyChallenge(model.profile, model.dailyDateKey, outcome);
+  const firstFinish = completed.profile !== model.profile;
   persistProfile(completed.profile);
   model.lastRepEarned = completed.repAwarded;
-  playRoundFeedback(model.dailyRound, 0);
+  const unlocked = firstFinish ? applyActivity((profile) => recordDailyHand(profile, outcome)) : [];
+  playRoundFeedback(model.dailyRound, unlocked.length);
 }
 
 function takeDailyAction(action: PlayerAction): void {
@@ -1267,6 +1325,7 @@ function dailyMarkup(): string {
         ${model.dailyShareStatus ? `<p class="daily-share-status" role="status">${escapeHtml(model.dailyShareStatus)}</p>` : ''}
       </section>
       ${gameFooterMarkup()}
+      ${achievementToastMarkup()}
     </main>`;
 }
 
@@ -1298,6 +1357,8 @@ async function shareDailyResult(): Promise<void> {
 
 function goToScreen(screen: AppScreen): void {
   model.pauseMenuOpen = false;
+  // Toasts belong to the screen that earned them.
+  if (screen !== model.screen) model.achievementToasts = [];
   model.pauseConfirmLeave = false;
   if (screen === 'menu' && isTableScreen(model.screen) && handInProgress()) {
     // Abandoning an unfinished hand: restore the pre-deal profile from memory, so the
@@ -1558,6 +1619,18 @@ function bindEvents(): void {
     });
   });
 
+  document.querySelectorAll<HTMLButtonElement>('[data-achievement-category]').forEach((element) => {
+    element.addEventListener('click', () => {
+      if (!element.isConnected) return;
+      feedbackEngine.activate();
+      const category = element.dataset.achievementCategory;
+      if (!isAchievementCategoryFilter(category) || category === model.achievementCategory) return;
+      model.achievementCategory = category;
+      feedback('button', 'tap');
+      render();
+    });
+  });
+
   document.querySelectorAll<HTMLButtonElement>('[data-card-theme]').forEach((element) => {
     element.addEventListener('click', () => {
       if (!element.isConnected) return;
@@ -1619,11 +1692,13 @@ function bindEvents(): void {
         } else if (action === 'run-it-back') {
           runHouseReplay();
         } else if (action === 'refill') {
+          const wasBroke = model.profile.chips <= 0;
           persistProfile(refillPracticeChips(model.profile));
           model.selectedStake = 25;
           model.round = null;
           model.roundProgress = emptyRoundProgressionContext();
           model.achievementToasts = [];
+          if (wasBroke && applyActivity(recordRefill).length > 0) playAchievementSting();
           model.lastRepEarned = 0;
           model.houseLastBonusRep = 0;
           model.houseTokenAwarded = false;
@@ -1643,5 +1718,8 @@ function bindEvents(): void {
 
 export function initializeUI(): void {
   bindGlobalKeyboardOnce();
+  // Today's visit (daily/weekly log-in streaks) and the deck already in use.
+  applyActivity((profile) => recordDeckTried(profile, model.visual.cardTheme, CARD_THEME_IDS.length));
+  if (applyActivity((profile) => recordVisit(profile, localDateKey())).length > 0) playAchievementSting();
   render();
 }

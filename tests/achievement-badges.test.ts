@@ -9,12 +9,12 @@ const ids = ACHIEVEMENTS.map((achievement) => achievement.id);
 const glyphOf = (svg: string): string => svg.match(/<g class="badge-glyph">([\s\S]*?)<\/g>/)?.[1].trim() ?? '';
 
 describe('achievement badges', () => {
-  it('gives each of the nine achievements a distinct named badge', () => {
+  it('gives every achievement a distinct named badge', () => {
     expect(Object.keys(ACHIEVEMENT_BADGES).sort()).toEqual([...ids].sort());
     const names = ids.map((id) => ACHIEVEMENT_BADGES[id].name);
     const glyphs = ids.map((id) => glyphOf(badgeSvg(id)));
-    expect(new Set(names).size).toBe(9);
-    expect(new Set(glyphs).size).toBe(9);
+    expect(new Set(names).size).toBe(ids.length);
+    expect(new Set(glyphs).size).toBe(ids.length);
     for (const glyph of glyphs) expect(glyph.length).toBeGreaterThan(0);
   });
 
@@ -38,10 +38,10 @@ describe('achievement badges', () => {
     const markup = achievementLogMarkup(['golden-boy'], 'all');
     expect(markup).toMatch(/data-achievement-id="golden-boy"[\s\S]*?achievement-badge is-earned" role="img" aria-label="Golden Crown badge, earned"/);
     expect(markup).toMatch(/data-achievement-id="blackjak"[\s\S]*?achievement-badge is-locked" role="img" aria-label="Ace of Spades badge, locked"/);
-    expect(markup.match(/role="img"/g)).toHaveLength(9);
+    expect(markup.match(/role="img"/g)).toHaveLength(ids.length);
   });
 
-  it('adds a decorative shelf of all nine badges in catalogue order', () => {
+  it('adds a decorative shelf of every badge in catalogue order', () => {
     const markup = achievementLogMarkup(['again', 'jakpot'], 'locked');
     const shelf = markup.match(/<div class="badge-shelf" aria-hidden="true">[\s\S]*?<\/div>/)?.[0] ?? '';
     const slots = [...shelf.matchAll(/badge-shelf-slot (is-\w+)" data-badge="([^"]+)"/g)];

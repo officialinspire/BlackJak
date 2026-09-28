@@ -1,6 +1,6 @@
 import { DEFAULT_CHIPS, DEFAULT_REP } from '../config/constants';
 import { isAchievementId } from '../data/progression';
-import type { ClassicStats, DailyState, PlayerProfile, ProgressionState } from '../types/profile';
+import type { ActivityState, ClassicStats, DailyState, PlayerProfile, ProgressionState } from '../types/profile';
 import { storage } from './storage';
 
 const PROFILE_KEY = 'profile';
@@ -40,12 +40,27 @@ export const defaultDaily = (): DailyState => ({
   lastCompletedDate: null,
 });
 
+export const defaultActivity = (): ActivityState => ({
+  lastVisitDate: null,
+  visitStreak: 0,
+  longestVisitStreak: 0,
+  daysVisited: 0,
+  lastVisitWeek: null,
+  weekStreak: 0,
+  longestWeekStreak: 0,
+  dailyHandsCompleted: 0,
+  dailyWins: 0,
+  houseRounds: 0,
+  decksTried: [],
+});
+
 export const defaultProfile = (): PlayerProfile => ({
   chips: DEFAULT_CHIPS,
   rep: DEFAULT_REP,
   stats: defaultStats(),
   progression: defaultProgression(),
   daily: defaultDaily(),
+  activity: defaultActivity(),
 });
 
 const safeCount = (value: unknown, fallback = 0): number =>
@@ -62,6 +77,7 @@ export function loadProfile(): PlayerProfile {
   const storedProgression = stored.progression;
   const storedDaily = stored.daily;
   const stats = stored.stats;
+  const storedActivity = stored.activity;
 
   return {
     chips: safeCount(stored.chips, fallback.chips),
@@ -105,6 +121,24 @@ export function loadProfile(): PlayerProfile {
       rewardClaimed: storedDaily?.rewardClaimed === true,
       currentStreak: safeCount(storedDaily?.currentStreak),
       lastCompletedDate: safeString(storedDaily?.lastCompletedDate),
+    },
+    // Saves from before activity tracking start with fresh counters.
+    activity: {
+      lastVisitDate: safeString(storedActivity?.lastVisitDate),
+      visitStreak: safeCount(storedActivity?.visitStreak),
+      longestVisitStreak: safeCount(storedActivity?.longestVisitStreak),
+      daysVisited: safeCount(storedActivity?.daysVisited),
+      lastVisitWeek: typeof storedActivity?.lastVisitWeek === 'number' && Number.isInteger(storedActivity.lastVisitWeek)
+        ? storedActivity.lastVisitWeek
+        : null,
+      weekStreak: safeCount(storedActivity?.weekStreak),
+      longestWeekStreak: safeCount(storedActivity?.longestWeekStreak),
+      dailyHandsCompleted: safeCount(storedActivity?.dailyHandsCompleted),
+      dailyWins: safeCount(storedActivity?.dailyWins),
+      houseRounds: safeCount(storedActivity?.houseRounds),
+      decksTried: Array.isArray(storedActivity?.decksTried)
+        ? [...new Set(storedActivity.decksTried.filter((value): value is string => typeof value === 'string'))].slice(0, 16)
+        : [],
     },
   };
 }

@@ -9,6 +9,14 @@ export interface RoundProgressionContext {
   riskyHits?: number;
   doublesAttempted?: number;
   splitsAttempted?: number;
+  /** Stood on a hand totalling 11 or less (it could not have busted). */
+  stoodOnLow?: boolean;
+  /** The opening stake was the player's entire balance. */
+  allIn?: boolean;
+  /** The round was played in Jak's House. */
+  house?: boolean;
+  /** Local hour (0-23) when the round finished. */
+  finishedHour?: number;
 }
 
 export interface ProgressionUpdate {
@@ -126,6 +134,9 @@ export function applyProgression(
     round.results.every((result) => isWinningOutcome(result.outcome));
 
   const stats = { ...settledProfile.stats };
+  const activity = context.house
+    ? { ...settledProfile.activity, houseRounds: settledProfile.activity.houseRounds + 1 }
+    : settledProfile.activity;
   stats.doublesAttempted += context.doublesAttempted ?? 0;
   stats.splitsAttempted += context.splitsAttempted ?? 0;
   stats.riskyHits += context.riskyHits ?? 0;
@@ -149,6 +160,7 @@ export function applyProgression(
     rep: settledProfile.rep + repEarned,
     stats,
     progression,
+    activity,
   };
 
   const candidates: AchievementId[] = [];
@@ -163,6 +175,39 @@ export function applyProgression(
 
   const dealer = evaluateHand(round.dealer);
   if (round.dealer.length >= 5 && dealer.total === 21) candidates.push('absolute-bullshii');
+
+  // Gameplay milestones
+  if (stats.totalHands >= 1) candidates.push('pull-up-a-chair');
+  if (stats.wins >= 100) candidates.push('professional-degenerate');
+  if (stats.blackjacks >= 10) candidates.push('natural-talent');
+  if (stats.highestChipBalance >= 10_000) candidates.push('high-roller');
+  if (activity.houseRounds >= 25) candidates.push('house-guest');
+  if (stats.totalHands >= 500) candidates.push('this-is-fine');
+
+  // Skill
+  if (stats.doublesWon >= 1) candidates.push('double-trouble');
+  if (stats.doublesWon >= 10) candidates.push('double-or-nothing');
+  if (stats.longestWinStreak >= 5) candidates.push('on-fire');
+  if (stats.longestWinStreak >= 10) candidates.push('untouchable');
+  if (stats.fiveCardWins >= 1) candidates.push('five-card-charlie');
+  if (allWins && settledProfile.progression.currentLossStreak >= 3) candidates.push('comeback-kid');
+
+  const handResults = round.hands.map((hand) => ({
+    hand,
+    evaluation: evaluateHand(hand.cards),
+    outcome: round.results.find((result) => result.handId === hand.id)?.outcome,
+  }));
+  if (handResults.some(({ hand, evaluation, outcome }) => outcome === 'win' && hand.cards.length >= 3 && evaluation.total === 21)) {
+    candidates.push('hand-crafted');
+  }
+
+  // Comedy
+  if (handResults.some(({ evaluation }) => evaluation.isBust && evaluation.total === 22)) candidates.push('so-close');
+  if (handResults.some(({ hand, evaluation }) => hand.doubled && evaluation.isBust)) candidates.push('double-down-fall-down');
+  if (context.stoodOnLow) candidates.push('scared-money');
+  if (context.allIn) candidates.push('all-in');
+  if (stats.longestLossStreak >= 10) candidates.push('rock-bottom');
+  if (context.finishedHour !== undefined && context.finishedHour >= 0 && context.finishedHour < 4) candidates.push('night-owl');
 
   const unlocked = unlockAchievementIds(nextProfile, candidates);
   nextProfile = unlocked.profile;

@@ -59,10 +59,16 @@ Core game features:
 - persistent REP progression that never changes card odds or dealer behavior
 - REP rewards for wins, natural BlackJak, successful doubles, split sweeps, five-card wins, and survived risky hits
 - eight escalating titles from **Table Scrub** through **BlackJak**
-- nine deterministic achievements: BLACKJAK, WHY WOULD YOU DO THAT?, SPLIT PERSONALITY, GOLDEN BOY, HOUSE MONEY, I CAN QUIT ANYTIME, AGAIN., JAKPOT, and ABSOLUTE BULLSHII
+- 39 achievements in five types, each with its own inline-SVG badge:
+  - **Gameplay:** BLACKJAK, GOLDEN BOY, HOUSE MONEY, I CAN QUIT ANYTIME, PULL UP A CHAIR, PROFESSIONAL DEGENERATE, NATURAL TALENT, HIGH ROLLER, HOUSE GUEST, THIS IS FINE
+  - **Skill:** SPLIT PERSONALITY, JAKPOT, DOUBLE TROUBLE, DOUBLE OR NOTHING, ON FIRE, UNTOUCHABLE, FIVE CARD CHARLIE, HAND-CRAFTED 21, COMEBACK KID, MAXIMUM HEAT
+  - **Log-ins:** BACK AGAIN (3 days in a row), CREATURE OF HABIT (7 days), PART OF THE FURNITURE (30 days), WEEKLY REGULAR (4 weeks in a row), SEASON TICKET (12 weeks)
+  - **Daily Hand:** DAILY DOSE, SAME PROBLEM, EVERY DAY, DAILY GRIND
+  - **Comedy:** WHY WOULD YOU DO THAT?, AGAIN., ABSOLUTE BULLSHII, SO CLOSE, SCARED MONEY, ROCK BOTTOM, RESPONSIBLE GAMBLING, ALL IN, NO NOTES, DOUBLE DOWN, FALL DOWN, NIGHT OWL, FASHION VICTIM
+- Stats logbook with type and unlocked/locked filters, a badge shelf, and progress bars on count-based achievements
 - persistent win/loss streak state and ten-hand blackjack history
 - compact title/REP meter on the table plus full progression display on Stats
-- non-blocking achievement unlock toasts
+- non-blocking achievement unlock toasts on the menu, tables, Daily Hand and Settings
 - backward-compatible profile hydration for saves created before Prompt 5
 - separate **Jak's House** arcade mode with explicit "not standard blackjack" labeling
 - generic House modifier framework isolated from Classic `startRound`

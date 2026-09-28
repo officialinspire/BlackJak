@@ -12,7 +12,7 @@ import {
   isAchievementFilter,
 } from '../src/ui/achievement-log';
 
-const ALL_IDS: AchievementId[] = [
+const ORIGINAL_IDS: AchievementId[] = [
   'blackjak',
   'why-would-you-do-that',
   'split-personality',
@@ -23,6 +23,8 @@ const ALL_IDS: AchievementId[] = [
   'jakpot',
   'absolute-bullshii',
 ];
+const ALL_IDS: AchievementId[] = ACHIEVEMENTS.map((achievement) => achievement.id);
+const TOTAL = ALL_IDS.length;
 
 const entryIds = (markup: string, group?: 'unlocked' | 'locked'): string[] => {
   const scope = group
@@ -38,8 +40,10 @@ afterEach(() => {
 });
 
 describe('achievement logbook', () => {
-  it('keeps all nine achievement IDs in catalogue order', () => {
-    expect(ACHIEVEMENTS.map((achievement) => achievement.id)).toEqual(ALL_IDS);
+  it('keeps the original nine achievements first, in catalogue order, and every ID unique', () => {
+    expect(ALL_IDS.slice(0, 9)).toEqual(ORIGINAL_IDS);
+    expect(new Set(ALL_IDS).size).toBe(TOTAL);
+    expect(TOTAL).toBe(39);
     expect(entryIds(achievementLogMarkup([], 'all'))).toEqual(ALL_IDS);
   });
 
@@ -48,11 +52,11 @@ describe('achievement logbook', () => {
     expect(entryIds(markup, 'unlocked')).toEqual(['blackjak', 'jakpot']);
     expect(entryIds(markup, 'locked')).toEqual(ALL_IDS.filter((id) => id !== 'blackjak' && id !== 'jakpot'));
     expect(markup.indexOf('is-unlocked')).toBeLessThan(markup.indexOf('achievement-group is-locked'));
-    expect(markup).toContain('<b>2/9</b>');
-    expect(markup).toContain('<strong>2 of 9</strong> unlocked');
+    expect(markup).toContain(`<b>2/${TOTAL}</b>`);
+    expect(markup).toContain(`<strong>2 of ${TOTAL}</strong> unlocked`);
     expect(markup).toContain('aria-valuenow="2"');
-    expect(markup).toContain('aria-valuemax="9"');
-    expect(markup).toContain('width: 22%');
+    expect(markup).toContain(`aria-valuemax="${TOTAL}"`);
+    expect(markup).toContain(`width: ${Math.round((2 / TOTAL) * 100)}%`);
   });
 
   it('filters to only unlocked or only locked entries', () => {
@@ -62,7 +66,7 @@ describe('achievement logbook', () => {
     expect(onlyUnlocked).not.toContain('achievement-group is-locked');
 
     const onlyLocked = achievementLogMarkup(unlocked, 'locked');
-    expect(entryIds(onlyLocked)).toHaveLength(7);
+    expect(entryIds(onlyLocked)).toHaveLength(TOTAL - 2);
     expect(entryIds(onlyLocked)).not.toContain('golden-boy');
     expect(onlyLocked).not.toContain('achievement-group is-unlocked');
   });
@@ -75,9 +79,9 @@ describe('achievement logbook', () => {
       expect(button).toBeDefined();
       expect(button).toContain(`aria-pressed="${filter === 'locked'}"`);
     }
-    expect(markup).toMatch(/data-achievement-filter="all"[^>]*>\s*All <b>9<\/b>/);
+    expect(markup).toMatch(new RegExp(`data-achievement-filter="all"[^>]*>\\s*All <b>${TOTAL}<\\/b>`));
     expect(markup).toMatch(/data-achievement-filter="unlocked"[^>]*>\s*Unlocked <b>1<\/b>/);
-    expect(markup).toMatch(/data-achievement-filter="locked"[^>]*>\s*Locked <b>8<\/b>/);
+    expect(markup).toMatch(new RegExp(`data-achievement-filter="locked"[^>]*>\\s*Locked <b>${TOTAL - 1}<\\/b>`));
   });
 
   it('shows friendly empty states for both groups', () => {
@@ -125,16 +129,20 @@ describe('existing unlock display', () => {
 
 describe('Stats screen wiring', () => {
   it('renders the logbook from the model filter and keeps it across re-renders', () => {
-    expect(renderSource).toContain('achievementLogMarkup(model.profile.progression.unlockedAchievements, model.achievementFilter)');
+    expect(renderSource).toContain('achievementLogMarkup(model.profile.progression.unlockedAchievements, model.achievementFilter, model.achievementCategory, achievementProgress(model.profile))');
     expect(renderSource).toMatch(/achievementFilter: 'all',/);
-    // Only the filter click handler assigns it; screen changes and re-renders leave it alone.
+    expect(renderSource).toMatch(/achievementCategory: 'all',/);
+    // Only the click handlers assign them; screen changes and re-renders leave them alone.
     expect(renderSource.match(/model\.achievementFilter = /g)).toHaveLength(1);
+    expect(renderSource.match(/model\.achievementCategory = /g)).toHaveLength(1);
     expect(renderSource).toContain("'data-achievement-filter',");
+    expect(renderSource).toContain("'data-achievement-category',");
     expect(renderSource).toContain("querySelectorAll<HTMLButtonElement>('[data-achievement-filter]')");
+    expect(renderSource).toContain("querySelectorAll<HTMLButtonElement>('[data-achievement-category]')");
   });
 
-  it('keeps achievement toasts on the table screens', () => {
-    expect(renderSource.match(/\$\{achievementToastMarkup\(\)\}/g)).toHaveLength(2);
+  it('shows achievement toasts on every screen that can unlock one (menu, settings, tables, Daily Hand)', () => {
+    expect(renderSource.match(/\$\{achievementToastMarkup\(\)\}/g)).toHaveLength(5);
     expect(renderSource).toContain('ACHIEVEMENT UNLOCKED');
   });
 
