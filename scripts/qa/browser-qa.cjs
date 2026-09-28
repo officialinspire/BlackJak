@@ -453,10 +453,13 @@ async function layoutMetrics(p) {
     await p.click('.pause-overlay [data-pause-action="menu"].menu-board-item'); await p.waitForTimeout(150);
     const afterEmptyVisit = await rep();
     await p.click('[data-screen="classic"]'); await dealPlaying(p);
+    // A natural dealt on the way to a live hand settles and earns REP legitimately;
+    // abandoning the live hand must leave exactly the REP it started with.
+    const beforeAbandon = `${await hudRep()} REP`;
     await p.keyboard.press('Escape'); await p.waitForTimeout(650);
     for (let i = 0; i < 2; i++) { await p.click('.pause-overlay [data-pause-action="menu"].menu-board-item'); await p.waitForTimeout(400); }
     const afterAbandon = await rep();
-    check('blocked storage: leaving a table keeps session REP', earned !== '0 REP' && afterEmptyVisit === earned && afterAbandon === earned && p.errs.length === 0, `${earned} → ${afterEmptyVisit} → ${afterAbandon} ${p.errs.join(';')}`);
+    check('blocked storage: leaving a table keeps session REP', earned !== '0 REP' && afterEmptyVisit === earned && afterAbandon === beforeAbandon && p.errs.length === 0, `${earned} → ${afterEmptyVisit} → ${beforeAbandon} → ${afterAbandon} ${p.errs.join(';')}`);
     await ctx.close();
   }
 
