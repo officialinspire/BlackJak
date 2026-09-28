@@ -42,9 +42,36 @@ const contentSecurityPolicy = (): Plugin => ({
   },
 });
 
+/** Art on the first menu / table frame (see src/assets/preload.ts). */
+export const CRITICAL_ART_FILES = ['menu-bar.webp', 'blackjak-table.webp', 'blackjak-sprite-sheet.webp', 'dialogue-status-bar.webp'];
+
+/**
+ * `<link rel="preload">` for the critical art sheets, so their download starts
+ * with the HTML instead of after the script bundle has loaded and run.
+ */
+const preloadCriticalArt = (): Plugin => {
+  let base = '/';
+  return {
+    name: 'blackjak-preload-art',
+    apply: 'build',
+    configResolved: (config) => {
+      base = config.base;
+    },
+    transformIndexHtml: {
+      order: 'post',
+      handler: (_html, ctx) => {
+        if (!ctx.bundle) return [];
+        return Object.values(ctx.bundle)
+          .filter((output) => output.type === 'asset' && output.names.some((name) => CRITICAL_ART_FILES.includes(name.replace(/^.*[\\/]/, ''))))
+          .map((output) => ({ tag: 'link', attrs: { rel: 'preload', as: 'image', type: 'image/webp', href: `${base}${output.fileName}` }, injectTo: 'head' as const }));
+      },
+    },
+  };
+};
+
 export default defineConfig({
   base: '/BlackJak/',
-  plugins: [contentSecurityPolicy()],
+  plugins: [contentSecurityPolicy(), preloadCriticalArt()],
   build: {
     sourcemap: false,
     rollupOptions: {

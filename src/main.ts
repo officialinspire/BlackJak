@@ -21,6 +21,21 @@ import { initializeUI } from './ui/render';
 import { feedbackEngine } from './feedback/feedback';
 import { StartupController } from './startup/startup';
 import { musicEngine } from './audio/music';
+import { preloadArtSheets, whenCriticalArtReady } from './assets/preload';
+import { loadVisualPreferences } from './storage/visual-preferences';
+
+// Fetch and decode the art sheets while the start screen and intro play, so
+// the menu, table, dealer and every card deck appear without popping in.
+const bootCardTheme = loadVisualPreferences().cardTheme;
+preloadArtSheets(bootCardTheme);
+
+function startGame(): void {
+  // Usually already resolved by the end of the intro; capped so a slow
+  // network never holds the player on an empty screen.
+  void whenCriticalArtReady(bootCardTheme)
+    .then(initializeUI)
+    .catch((error) => console.error('BlackJak failed to render the table.', error));
+}
 
 function boot(): void {
   try {
@@ -30,7 +45,7 @@ function boot(): void {
       root,
       unlockAudio: () => feedbackEngine.activate(),
       unlockMedia: () => musicEngine.unlock(),
-      onGameReady: initializeUI,
+      onGameReady: startGame,
     }).mount();
   } catch (error) {
     const root = document.querySelector<HTMLElement>('#app');
