@@ -73,7 +73,8 @@ async function playOneHand(p) {
       const saved = await savedProfile(p);
       check('log-in streak: saved 3-day streak for today', saved?.activity?.visitStreak === 3 && saved.activity.lastVisitDate === today, JSON.stringify(saved?.activity));
       check('log-in streak: unlock saved', saved?.progression?.unlockedAchievements?.includes('back-again'));
-      const toastBox = await p.$eval('.achievement-toast', (e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, b: r.bottom, w: innerWidth, h: innerHeight, pe: getComputedStyle(e).pointerEvents }; });
+      // Measure the resting position: the toast slides up 10px as it arrives.
+      const toastBox = await p.$eval('.achievement-toast', async (e) => { await Promise.all(e.getAnimations().map((a) => a.finished)); const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, b: r.bottom, w: innerWidth, h: innerHeight, pe: getComputedStyle(e).pointerEvents }; });
       check('log-in streak: toast inside viewport and click-through', toastBox.l >= 0 && toastBox.r <= toastBox.w && toastBox.b <= toastBox.h && toastBox.pe === 'none', JSON.stringify(toastBox));
       await p.reload(); await enterGame(p);
       check('log-in streak: second visit the same day does not re-toast', await toastName(p) === null);
