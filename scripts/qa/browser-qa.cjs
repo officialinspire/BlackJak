@@ -1,5 +1,6 @@
 // Dev-only browser QA. See scripts/qa/README.md.
 const { chromium } = require(process.env.PW);
+const { isolateAnalytics } = require('./analytics-capture.cjs');
 const S = process.env.S;
 const URL = 'http://localhost:4173/BlackJak/';
 const log = (...a) => console.log(...a);
@@ -84,6 +85,7 @@ async function layoutMetrics(p) {
 
 (async () => {
   const b = await chromium.launch();
+  await isolateAnalytics(b);
   try {
 
   // ---- Prompt 5 device matrix: startup, intro, menu/panels, tables, pause ----

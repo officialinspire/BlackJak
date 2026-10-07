@@ -1,5 +1,6 @@
 // Dev-only browser QA. See scripts/qa/README.md.
 const { chromium } = require(process.env.PW);
+const { isolateAnalytics } = require('./analytics-capture.cjs');
 const { execSync } = require('node:child_process');
 const { readFileSync, writeFileSync } = require('node:fs');
 const { resolve } = require('node:path');
@@ -20,6 +21,7 @@ async function enterGame(p) {
 (async () => {
   const originalServiceWorker = readFileSync(swPath);
   const b = await chromium.launch();
+  await isolateAnalytics(b);
   try {
   // ---- Hidden dealer card, layering, split, Gold Card (House) ----
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 } }); const p = await ctx.newPage();

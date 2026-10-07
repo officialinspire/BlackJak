@@ -1,5 +1,6 @@
 // Dev-only browser QA for the achievement logbook. See scripts/qa/README.md.
 const { chromium } = require(process.env.PW);
+const { isolateAnalytics } = require('./analytics-capture.cjs');
 const URL = 'http://localhost:4173/BlackJak/';
 const PROFILE_KEY = 'blackjak:v1:profile';
 const fails = [];
@@ -57,6 +58,7 @@ async function playOneHand(p) {
 
 (async () => {
   const b = await chromium.launch();
+  await isolateAnalytics(b);
   try {
     // ---- Log-in streak: yesterday's visit on a 2-day streak becomes BACK AGAIN today, toasted on the menu.
     {
