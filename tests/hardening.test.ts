@@ -34,6 +34,10 @@ describe('Content-Security-Policy', () => {
     expect(directives['object-src']).toEqual(["'none'"]);
     expect(directives['base-uri']).toEqual(["'self'"]);
     expect(directives['form-action']).toEqual(["'none'"]);
-    expect(CONTENT_SECURITY_POLICY).not.toMatch(/unsafe-eval|https?:|\*/);
+    expect(directives['connect-src']).toEqual(["'self'", 'https://us.i.posthog.com']);
+    for (const [name, sources] of Object.entries(directives)) {
+      if (name !== 'connect-src') expect(sources.join(' ')).not.toMatch(/https?:/);
+    }
+    expect(CONTENT_SECURITY_POLICY).not.toMatch(/unsafe-eval|\*/);
   });
 });

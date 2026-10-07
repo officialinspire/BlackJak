@@ -15,7 +15,7 @@ export const CONTENT_SECURITY_POLICY = [
   "img-src 'self' data: blob:",
   "font-src 'self'",
   "media-src 'self'",
-  "connect-src 'self'",
+  "connect-src 'self' https://us.i.posthog.com",
   "manifest-src 'self'",
   "worker-src 'self'",
   "object-src 'none'",
