@@ -16,6 +16,7 @@ import './styles/fx.css';
 import './styles/startup.css';
 import './styles/game-footer.css';
 import './styles/buttons.css';
+import { initAnalytics, trackGameEvent } from './analytics';
 import { registerPWA } from './pwa/register';
 import { initializeUI } from './ui/render';
 import { feedbackEngine } from './feedback/feedback';
@@ -29,12 +30,14 @@ import { loadVisualPreferences } from './storage/visual-preferences';
 const bootCardTheme = loadVisualPreferences().cardTheme;
 preloadArtSheets(bootCardTheme);
 
+initAnalytics();
+
 function startGame(): void {
   // Usually already resolved by the end of the intro; capped so a slow
   // network never holds the player on an empty screen.
   void whenCriticalArtReady(bootCardTheme)
     .then(initializeUI)
-    .catch((error) => console.error('BlackJak failed to render the table.', error));
+    .catch((error) => { trackGameEvent('error_encountered', { error_type: 'startup', error_name: 'RenderError' }, 'startup-render'); console.error('BlackJak failed to render the table.', error); });
 }
 
 function boot(): void {
@@ -58,6 +61,7 @@ function boot(): void {
         </main>`;
       document.querySelector('#reload-app')?.addEventListener('click', () => window.location.reload());
     }
+    trackGameEvent('error_encountered', { error_type: 'startup', error_name: 'BootError' }, 'startup-boot');
     console.error('BlackJak failed to initialize.', error);
   }
 }

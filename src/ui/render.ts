@@ -1,3 +1,4 @@
+import { setAnalyticsContext, trackGameEvent } from '../analytics';
 import { APP_NAME, APP_TAGLINE, MAX_STAKE, STAKE_OPTIONS } from '../config/constants';
 import { feedbackEngine, haptic, type FeedbackCue, type HapticCue } from '../feedback/feedback';
 import { gameSfxSequence, SfxEventGate, type GameSfxEvent } from '../feedback/game-sfx';
@@ -185,6 +186,8 @@ const model: AppModel = {
   achievementCategory: 'all',
 };
 
+setAnalyticsContext(() => ({ mode: model.screen, round: model.roundSerial }));
+
 const cardMotion = new CardMotionPlanner();
 
 const fxQueue = new FxQueue();
@@ -349,6 +352,7 @@ function applyActivity(update: (profile: PlayerProfile) => ActivityUpdate): Achi
   if (result.unlocked.length > 0) {
     model.achievementToasts = [...model.achievementToasts, ...result.unlocked];
     cueFx('achievement');
+    for (const item of result.unlocked) trackGameEvent('achievement_unlocked', { achievement: item.id });
   }
   return result.unlocked;
 }
@@ -915,6 +919,7 @@ function settleIfResolved(): void {
   model.handCheckpoint = null;
   model.lastRepEarned = progression.repEarned;
   model.achievementToasts = [...model.achievementToasts, ...progression.unlocked];
+  for (const item of progression.unlocked) trackGameEvent('achievement_unlocked', { achievement: item.id });
   // A session left open past midnight still counts the new day's visit.
   const visitUnlocks = [
     ...applyActivity((profile) => recordVisit(profile, localDateKey())),
@@ -924,6 +929,7 @@ function settleIfResolved(): void {
   cueFx('result', ...(unlockedCount ? ['achievement' as const] : []));
   say(resolutionDialogueEvent(model.round));
   playRoundFeedback(model.round, unlockedCount);
+  trackGameEvent('round_completed', { score: model.round.results.reduce((sum, result) => sum + result.net, 0) }, `round:${model.roundSerial}`);
 }
 
 function settleHouseIfResolved(): void {
@@ -943,6 +949,7 @@ function settleHouseIfResolved(): void {
   model.houseTokenAwarded = houseResolution.tokenAwarded;
   model.lastRepEarned = progression.repEarned + houseResolution.hotHandBonusRep;
   model.achievementToasts = [...model.achievementToasts, ...progression.unlocked, ...heat.unlocked];
+  for (const item of [...progression.unlocked, ...heat.unlocked]) trackGameEvent('achievement_unlocked', { achievement: item.id });
   const visitUnlocks = [
     ...applyActivity((profile) => recordVisit(profile, localDateKey())),
     ...applyActivity(recordMilestones),
@@ -951,6 +958,7 @@ function settleHouseIfResolved(): void {
   cueFx('result', ...(unlockedCount ? ['achievement' as const] : []));
   say(resolutionDialogueEvent(model.round));
   playRoundFeedback(model.round, unlockedCount);
+  trackGameEvent('round_completed', { score: model.round.results.reduce((sum, result) => sum + result.net, 0) }, `round:${model.roundSerial}`);
 }
 
 function dealRound(): void {
@@ -970,6 +978,7 @@ function dealRound(): void {
       persistProfile(again.profile);
       model.achievementToasts = again.unlocked;
       cueFx('achievement');
+      for (const item of again.unlocked) trackGameEvent('achievement_unlocked', { achievement: item.id });
     }
   }
 
@@ -984,6 +993,7 @@ function dealRound(): void {
     cueFx('shuffle', 'deal');
     model.dealerCue = 'deal';
     playGameSfx('round-start-paid', `round:${model.roundSerial}:start`);
+    trackGameEvent('round_started', {}, `round:${model.roundSerial}`);
     if (model.round.phase === 'resolved') {
       settleIfResolved();
     } else {
@@ -1015,6 +1025,7 @@ function dealHouseRound(): void {
       persistProfile(again.profile);
       model.achievementToasts = again.unlocked;
       cueFx('achievement');
+      for (const item of again.unlocked) trackGameEvent('achievement_unlocked', { achievement: item.id });
     }
   }
 
@@ -1032,6 +1043,7 @@ function dealHouseRound(): void {
     cueFx('shuffle', 'deal');
     model.dealerCue = 'deal';
     playGameSfx('round-start-paid', `round:${model.roundSerial}:start`);
+    trackGameEvent('round_started', {}, `round:${model.roundSerial}`);
 
     if (model.round.phase === 'resolved') {
       settleHouseIfResolved();
@@ -1066,6 +1078,7 @@ function runHouseReplay(): void {
     cueFx('shuffle', 'deal');
     model.dealerCue = 'deal';
     playGameSfx('round-start-free', `round:${model.roundSerial}:start`);
+    trackGameEvent('round_started', {}, `round:${model.roundSerial}`);
 
     if (model.round.phase === 'resolved') {
       settleHouseIfResolved();
@@ -1240,6 +1253,7 @@ function prepareDailyRound(): void {
   model.dailyShareStatus = null;
   cueFx('shuffle', 'deal');
   playGameSfx('round-start-free', `daily:${model.dailyDateKey}:round:${model.roundSerial}:start`);
+  trackGameEvent('round_started', { mode: 'daily' }, `round:${model.roundSerial}`);
 }
 
 function completeDailyIfResolved(): void {
@@ -1253,6 +1267,7 @@ function completeDailyIfResolved(): void {
     ? [...applyActivity((profile) => recordDailyHand(profile, outcome)), ...applyActivity(recordMilestones)]
     : [];
   playRoundFeedback(model.dailyRound, unlocked.length);
+  if (firstFinish) trackGameEvent('round_completed', { mode: 'daily', score: model.dailyRound.results.reduce((sum, result) => sum + result.net, 0) }, `round:${model.roundSerial}`);
 }
 
 function takeDailyAction(action: PlayerAction): void {
@@ -1369,6 +1384,7 @@ async function shareDailyResult(): Promise<void> {
 }
 
 function goToScreen(screen: AppScreen): void {
+  const previousScreen = model.screen;
   model.pauseMenuOpen = false;
   // Toasts belong to the screen that earned them.
   if (screen !== model.screen) model.achievementToasts = [];
@@ -1398,6 +1414,7 @@ function goToScreen(screen: AppScreen): void {
     if (model.dailyRound) feedback('deal', 'deal');
   }
   model.screen = screen;
+  if ((screen === 'classic' || screen === 'house' || screen === 'daily') && screen !== previousScreen) trackGameEvent('game_started', { mode: screen });
   model.error = null;
   render();
 }
@@ -1690,6 +1707,7 @@ function bindEvents(): void {
         if (action) takeDailyAction(action);
       } catch (error) {
         model.error = error instanceof Error ? error.message : 'Unexpected Daily Hand error.';
+        trackGameEvent('error_encountered', { error_type: 'game_action', error_name: error instanceof TypeError ? 'TypeError' : error instanceof Error ? 'Error' : 'UnknownError' }, `daily:${model.roundSerial}:error`);
       }
       render();
     });
@@ -1730,6 +1748,7 @@ function bindEvents(): void {
         }
       } catch (error) {
         model.error = error instanceof Error ? error.message : 'Unexpected game error.';
+        trackGameEvent('error_encountered', { error_type: 'game_action', error_name: error instanceof TypeError ? 'TypeError' : error instanceof Error ? 'Error' : 'UnknownError' }, `round:${model.roundSerial}:error`);
       }
       render();
     });
