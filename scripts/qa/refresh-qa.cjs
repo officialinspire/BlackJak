@@ -1,5 +1,6 @@
 // Dev-only browser QA. See scripts/qa/README.md.
 const { chromium } = require(process.env.PW);
+const { isolateAnalytics } = require('./analytics-capture.cjs');
 const phase = (p) => p.$eval('.table-dock', (e) => e.className.match(/phase-(\w+)/)[1]).catch(() => null);
 const chips = (p) => p.$eval('.hud-chips strong', (e) => Number(e.textContent.replace(/,/g, '')));
 async function enterGame(p) {
@@ -13,7 +14,8 @@ async function enterGame(p) {
   await p.waitForSelector('.menu-board', { timeout: 10000 });
 }
 (async () => {
-  const b = await chromium.launch(); let bad = 0;
+  const b = await chromium.launch();
+  await isolateAnalytics(b); let bad = 0;
   try {
   for (const mode of ['classic', 'house']) for (let t = 0; t < 15; t++) {
     const p = await b.newPage({ viewport: { width: 390, height: 844 } });
