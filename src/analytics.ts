@@ -1,5 +1,7 @@
+import { createAttribution } from './attribution';
 /** Anonymous, best-effort capture. Never stores identifiers or observes the DOM. */
 const TOKEN = 'phc_wpvFbvptidYWtnkJG8EdMMhaXn6s2ZDznzNUha5V4KRm'; // public project token
+const attributionProperties = createAttribution();
 const ENDPOINT = 'https://us.i.posthog.com/i/v0/e/';
 const allowed = new Set(['game_opened', 'game_started', 'round_started', 'round_completed', 'game_over', 'achievement_unlocked', 'error_encountered']);
 const fields = new Set(['mode', 'round', 'score', 'achievement', 'error_type', 'error_name', 'outcome']);
@@ -13,7 +15,7 @@ export function setAnalyticsContext(provider: () => Record<string, unknown>): vo
 
 export function trackGameEvent(event: string, details: Record<string, unknown> = {}, once?: string): void {
   try {
-    if (!allowed.has(event) || (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true || navigator.onLine === false) return;
+    if (!allowed.has(event) || navigator.doNotTrack === '1' || (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true || navigator.onLine === false) return;
     const key = once === undefined ? null : `${event}:${once}`;
     if (key && seen.has(key)) return;
     if (key) seen.add(key);
@@ -22,6 +24,7 @@ export function trackGameEvent(event: string, details: Record<string, unknown> =
       brand: 'inspire', game: 'BlackJak', game_version: '0.6.0',
       $process_person_profile: false, $geoip_disable: true, $session_id: id, event_sequence: ++sequence,
     };
+    Object.assign(properties, attributionProperties(), { game_id: 'BlackJak' });
     let current: Record<string, unknown> = {};
     try { current = context(); } catch { /* optional context */ }
     for (const [name, value] of Object.entries({ ...current, ...details })) {
